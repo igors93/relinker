@@ -24,8 +24,9 @@ class RetryExhaustedError(RetryFlowError):
     """
     Raised when retry attempts are exhausted and the user chooses library-level failure.
 
-    By default, RetryFlow re-raises the last original exception. This exception is
-    available for users who prefer a RetryFlow-specific error object.
+    By default, RetryFlow re-raises the last original exception for exception-based
+    failures and returns the last value for result-based retries. This exception is
+    available for users who prefer a RetryFlow-specific failure object.
     """
 
     def __init__(self, message: str, *, result: Any | None = None) -> None:

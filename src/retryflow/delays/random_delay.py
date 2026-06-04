@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from random import Random
 
+from retryflow.exceptions import InvalidRetryConfigError
 from retryflow.internal.validation import ensure_non_negative
 
 
@@ -20,10 +21,16 @@ class RandomDelay:
         ensure_non_negative("minimum", self.minimum)
         ensure_non_negative("maximum", self.maximum)
         if self.maximum < self.minimum:
-            msg = "maximum must be greater than or equal to minimum"
-            raise ValueError(msg)
+            raise InvalidRetryConfigError(
+                "maximum must be greater than or equal to minimum"
+            )
 
     def next_delay(self, attempt_number: int) -> float:
-        """Return a random delay."""
+        """
+        Return a random delay.
+
+        When a seed is provided, each attempt gets a deterministic random stream.
+        This keeps tests reproducible while preserving random behavior per attempt.
+        """
         random = Random(self.seed + attempt_number if self.seed is not None else None)
         return random.uniform(self.minimum, self.maximum)

@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
 from functools import wraps
-from typing import Any, Generic, overload
+from typing import Any, Generic, Literal, overload
 
 from retryflow.conditions.base import RetryCondition
 from retryflow.conditions.custom import CustomCondition
@@ -33,6 +33,9 @@ from retryflow.stop.max_time import StopAfterDelay
 from retryflow.typing import P, T
 
 
+ResultExhaustedBehavior = Literal["return_last", "raise"]
+
+
 @dataclass(frozen=True, slots=True)
 class RetryPolicy(Generic[T]):
     """
@@ -47,6 +50,7 @@ class RetryPolicy(Generic[T]):
     condition: RetryCondition = ExceptionCondition((Exception,))
     should_raise_last: bool = True
     should_return_result: bool = False
+    result_exhausted_behavior: ResultExhaustedBehavior = "return_last"
     event_handlers: tuple[tuple[EventName, EventHandler], ...] = ()
     sleep: Callable[[float], None] = default_sleep
     async_sleep: Callable[[float], Awaitable[None]] = default_async_sleep
@@ -96,7 +100,10 @@ class RetryPolicy(Generic[T]):
         maximum: float | None = None,
     ) -> RetryPolicy[T]:
         """Return a new policy with exponential delay."""
-        return replace(self, delay_strategy=ExponentialDelay(base=base, factor=factor, maximum=maximum))
+        return replace(
+            self,
+            delay_strategy=ExponentialDelay(base=base, factor=factor, maximum=maximum),
+        )
 
     def random_delay(
         self,
@@ -106,7 +113,10 @@ class RetryPolicy(Generic[T]):
         seed: int | None = None,
     ) -> RetryPolicy[T]:
         """Return a new policy with random delay."""
-        return replace(self, delay_strategy=RandomDelay(minimum=minimum, maximum=maximum, seed=seed))
+        return replace(
+            self,
+            delay_strategy=RandomDelay(minimum=minimum, maximum=maximum, seed=seed),
+        )
 
     def custom_delay(self, callback: Callable[[int], float]) -> RetryPolicy[T]:
         """Return a new policy with a custom delay callback."""
@@ -119,6 +129,19 @@ class RetryPolicy(Generic[T]):
     def return_result(self) -> RetryPolicy[T]:
         """Return a new policy that returns RetryResult instead of raising."""
         return replace(self, should_return_result=True, should_raise_last=False)
+
+    def raise_on_result_exhausted(self) -> RetryPolicy[T]:
+        """
+        Return a new policy that raises RetryExhaustedError when result retry is exhausted.
+
+        This is optional. The default behavior keeps user freedom and returns the
+        last value for result-based retries unless `return_result()` is enabled.
+        """
+        return replace(self, result_exhausted_behavior="raise")
+
+    def return_last_on_result_exhausted(self) -> RetryPolicy[T]:
+        """Return a new policy that returns the last value when result retry is exhausted."""
+        return replace(self, result_exhausted_behavior="return_last")
 
     def with_sleep(
         self,
@@ -146,12 +169,12 @@ class RetryPolicy(Generic[T]):
         def print_event(event: RetryEvent) -> None:
             if event.name == "before_attempt":
                 print(f"[retryflow] attempt {event.attempt_number} started: {event.function_name}")
-            elif event.name == "after_failure":
+            elif event.name == "after_failure" and event.error is not None:
                 print(
                     "[retryflow] attempt "
                     f"{event.attempt_number} failed: {event.error.__class__.__name__}: {event.error}"
                 )
-            elif event.name == "before_sleep":
+            elif event.name == "before_sleep" and event.delay is not None:
                 print(f"[retryflow] sleeping {event.delay:.4f}s before next attempt")
             elif event.name == "after_success":
                 print(f"[retryflow] attempt {event.attempt_number} succeeded")
@@ -186,6 +209,7 @@ class RetryPolicy(Generic[T]):
                 f"Condition: {self.condition.__class__.__name__}",
                 f"Raise last exception: {self.should_raise_last}",
                 f"Return RetryResult: {self.should_return_result}",
+                f"Result exhausted behavior: {self.result_exhausted_behavior}",
                 f"Event handlers: {len(self.event_handlers)}",
             ]
         )
@@ -207,7 +231,12 @@ class RetryPolicy(Generic[T]):
         """Run a synchronous function with this policy."""
         return execute_sync(self, function, *args, **kwargs)
 
-    async def run_async(self, function: Callable[P, Awaitable[T]], *args: P.args, **kwargs: P.kwargs) -> Any:
+    async def run_async(
+        self,
+        function: Callable[P, Awaitable[T]],
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> Any:
         """Run an asynchronous function with this policy."""
         return await execute_async(self, function, *args, **kwargs)
 

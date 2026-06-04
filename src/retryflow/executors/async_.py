@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from retryflow.attempt import AttemptRecord
 from retryflow.event import RetryEvent
+from retryflow.exceptions import RetryExhaustedError
 from retryflow.internal.clock import now
 from retryflow.result import RetryResult
 
@@ -13,6 +14,11 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from retryflow.policy import RetryPolicy
+
+
+def _function_name(function: Callable[..., Any]) -> str:
+    """Return a readable function name for events and debug output."""
+    return getattr(function, "__name__", function.__class__.__name__)
 
 
 async def execute_async(
@@ -24,12 +30,13 @@ async def execute_async(
     """
     Execute an async function using a RetryPolicy.
 
-    The async executor mirrors the sync executor to keep behavior predictable.
+    The executor never catches BaseException directly. This prevents RetryFlow
+    from swallowing interpreter-level signals such as KeyboardInterrupt and
+    SystemExit.
     """
     attempts: list[AttemptRecord] = []
     execution_started_at = now()
-    function_name = getattr(function, "__name__", function.__class__.__name__)
-
+    function_name = _function_name(function)
     attempt_number = 0
 
     while True:
@@ -46,7 +53,7 @@ async def execute_async(
 
         try:
             value = await function(*args, **kwargs)
-        except BaseException as error:
+        except Exception as error:
             attempt_ended_at = now()
             attempts.append(
                 AttemptRecord(
@@ -76,6 +83,8 @@ async def execute_async(
                     error=error,
                     started_at=execution_started_at,
                     ended_at=now(),
+                    exhausted=should_retry and should_stop,
+                    retry_cause="exception" if should_retry and should_stop else None,
                 )
                 policy.emit(
                     RetryEvent(
@@ -118,7 +127,7 @@ async def execute_async(
         elapsed = attempt_ended_at - execution_started_at
         should_stop = policy.stop_strategy.should_stop(attempt_number, elapsed)
 
-        if not should_retry or should_stop:
+        if not should_retry:
             result = RetryResult(
                 attempts=tuple(attempts),
                 value=value,
@@ -135,6 +144,32 @@ async def execute_async(
             )
             if policy.should_return_result:
                 return result
+            return value
+
+        if should_stop:
+            result = RetryResult(
+                attempts=tuple(attempts),
+                value=value,
+                started_at=execution_started_at,
+                ended_at=now(),
+                exhausted=True,
+                retry_cause="result",
+            )
+            policy.emit(
+                RetryEvent(
+                    name="after_giveup",
+                    attempt_number=attempt_number,
+                    function_name=function_name,
+                    value=value,
+                )
+            )
+            if policy.should_return_result:
+                return result
+            if policy.result_exhausted_behavior == "raise":
+                raise RetryExhaustedError(
+                    "Retry attempts were exhausted by rejected return values.",
+                    result=result,
+                )
             return value
 
         delay = policy.delay_strategy.next_delay(attempt_number)

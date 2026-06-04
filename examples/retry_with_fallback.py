@@ -1,12 +1,18 @@
+from __future__ import annotations
+
+from examples.fake_services import FlakyService
 from retryflow import RetryPolicy
 
-policy = RetryPolicy().attempts(2).on(TimeoutError).fallback_value("safe fallback")
+service = FlakyService(failures_before_success=99)
 
-
-@policy
-def call_service() -> str:
-    raise TimeoutError("service unavailable")
+policy = (
+    RetryPolicy()
+    .attempts(3)
+    .on(TimeoutError)
+    .fixed_delay(0.1)
+    .fallback_value({"status": "offline"})
+)
 
 
 if __name__ == "__main__":
-    print(call_service())
+    print(policy.run(service.call))

@@ -1,10 +1,15 @@
+from __future__ import annotations
+
+from examples.fake_services import FlakyService
 from retryflow import RetryPolicy
 
+service = FlakyService(failures_before_success=2)
 
-def task() -> str:
-    raise RuntimeError("temporary failure")
+policy = RetryPolicy().attempts(3).on(TimeoutError).fixed_delay(0.1).return_result()
 
 
-result = RetryPolicy().attempts(2).return_result().run(task)
-
-print(result.story())
+if __name__ == "__main__":
+    result = policy.run(service.call)
+    print(result.summary())
+    print()
+    print(result.story())

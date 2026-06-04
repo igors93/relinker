@@ -1,67 +1,56 @@
 # Changelog
 
-All notable changes to RetryFlow are documented here.
+All notable changes to RetryFlow will be documented in this file.
 
-The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+RetryFlow follows practical semantic versioning while the project is still pre-1.0. Breaking changes may happen before 1.0, but they should be documented clearly.
 
----
-
-## Unreleased
+## 0.5.0
 
 ### Added
 
-- `TryAgain` exception for explicit retry control from inside wrapped functions.
-- `RetryWrappedFunction` Protocol for type-safe access to decorator attributes.
-- `RetryPolicy.with_logging()` for standard library logging integration.
-- `retryflow.http` module with `retry_if_status`, `should_retry_http_status`, `retry_after_delay`, and `parse_retry_after` helpers.
-- New `RetryResult` properties: `last_error`, `last_value`, `failed_attempts`, `successful_attempts`, `error_types`.
-- `RetryResult.summary()` method returning a compact dict suitable for logging.
-- `RetrySimulation` new properties: `attempt_count`, `max_delay`, `stops_early`.
-- `RetrySimulationAttempt.cumulative_sleep` field.
-- `RetrySimulation.to_json()` method.
-- New warning codes: `many_attempts`, `high_total_sleep`, `result_retry_without_observation`, `background_broad_exception`.
-- New example files: `fake_services.py`, `retry_http_like.py`, `retry_database_like.py`, `retry_polling.py`, `retry_try_again.py`, `retry_with_logging.py`, `retry_production_checklist.py`.
-- New docs: `try-again.md`, `http.md`, `production-checklist.md`, `common-patterns.md`, `release.md`.
+- Added `RetryPolicy.doctor()` for human-friendly policy health reports.
+- Added `PolicyHealthReport` with risk levels and JSON-friendly output.
+- Added `RetryPolicy.preview()` for concise retry timing previews.
+- Added more human-friendly `RetryPolicy.explain()` output.
+- Added shortcut event methods:
+  - `on_before_attempt()`
+  - `on_success()`
+  - `on_failure()`
+  - `on_retry()`
+  - `on_giveup()`
+- Added `with_structured_logging()` for compact JSON logs.
+- Added dependency-free HTTP helpers:
+  - `should_retry_http_status()`
+  - `retry_if_status()`
+  - `retry_after_delay()`
+  - `parse_retry_after()`
+  - `http_retry_policy()`
+- Added safer handling for large or invalid `Retry-After` headers.
+- Added documentation-focused examples for production-style workflows.
 
-### Changed
+### Improved
 
-- `RetrySimulation.to_dict()` now includes `attempt_count`, `max_delay`, `stops_early`, and `cumulative_sleep` per attempt.
-- `RetrySimulation.describe()` output now shows cumulative sleep, max delay, and attempt count.
+- Improved policy diagnostics for risky retry loops.
+- Improved simulation and preview readability.
+- Improved structured logging safety by excluding error messages by default.
+- Improved the public API exports for HTTP and diagnostics helpers.
+- Improved tests around diagnostics, HTTP helpers, simulation, logging, and policy guidance.
 
----
+### Notes
 
-## 0.4.0 — 2025-11-01
+This release strengthens the core project direction:
 
-### Added
+> Simple by default, powerful by composition, safe by guidance.
 
-- Core retry execution engine (sync and async).
-- Immutable `RetryPolicy` builder with fluent API.
-- Delay strategies: fixed, linear, exponential, random exponential, random, chain, additive, custom.
-- Retry conditions: exception-based, result-based, custom, composite (any/all).
-- Stop strategies: attempt count, elapsed time, forever, composite.
-- `RetryResult` with full attempt history and serialization.
-- Events system with five event types.
-- In-memory statistics via `RetryStats`.
-- Diagnostics: `warnings()` and `simulate()` / `timeline()`.
-- Context manager API (`for attempt in policy:`).
-- Presets: `fast`, `network`, `database`, `patient`, `background_job`.
-- Testing helpers: `no_sleep` context manager, `FailingTask`, `fail_times`.
-- Full type annotations, mypy strict mode, ruff linting.
-- Comprehensive test suite.
-
----
-
-## 0.1.0
+## 0.4.0
 
 ### Added
 
-- Initial project scaffold.
-- Retry decorator.
-- RetryPolicy builder.
-- Sync and async execution.
-- Delay strategies.
-- Retry conditions.
-- Stop strategies.
-- Result and attempt records.
-- Events.
-- Testing helpers.
+- Added the initial public retry policy builder.
+- Added retry decorator support.
+- Added sync and async execution.
+- Added retry by exception and result.
+- Added core delay strategies.
+- Added presets.
+- Added result objects and statistics.
+- Added initial diagnostics and simulation support.

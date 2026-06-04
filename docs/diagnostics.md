@@ -1,8 +1,6 @@
-# Diagnostics
+# Diagnostics and Guidance
 
-Diagnostics help users understand retry behavior before production.
-
-RetryFlow does not block risky application-level decisions. Instead, it gives advisory tools.
+RetryFlow is built around guidance. It does not block application-level decisions, but it helps users detect surprising or risky policies.
 
 ## Warnings
 
@@ -12,99 +10,87 @@ from retryflow import RetryPolicy
 policy = RetryPolicy().forever().on(Exception).no_delay()
 
 for warning in policy.warnings():
-    print(warning.code)
-    print(warning.message)
-    print(warning.hint)
+    print(warning.code, warning.message)
 ```
 
-Warnings are non-blocking. They are useful in tests, reviews, CLI tools, or startup checks.
+Warnings are advisory and non-blocking.
 
-### Warning codes
+## Doctor
 
-| Code | When it fires |
-|------|---------------|
-| `forever` | Policy can retry forever (no attempt or time limit) |
-| `no_delay` | Policy has no delay between attempts |
-| `broad_exception` | Policy retries all `Exception` subclasses |
-| `many_attempts` | Policy uses more than 10 attempts |
-| `high_total_sleep` | Simulated total sleep exceeds 300 seconds |
-| `return_result_precedence` | `return_result()` is set alongside a fallback or exception factory |
-| `result_retry_without_observation` | Result-based retry is configured with no way to observe exhaustion |
-| `background_broad_exception` | Broad exception combined with many attempts or forever retry |
-
-### Example: checking warnings at startup
+`doctor()` returns a `PolicyHealthReport`.
 
 ```python
-policy = (
-    RetryPolicy()
-    .attempts(10)
-    .on(Exception)
-    .exponential_delay(base=0.5, maximum=30)
-)
+report = policy.doctor()
 
-warnings = policy.warnings()
-if warnings:
-    for w in warnings:
-        print(f"[{w.code}] {w.message}")
-        if w.hint:
-            print(f"  Hint: {w.hint}")
+print(report.risk_level)
+print(report.describe())
 ```
 
-## Simulation
+Risk levels:
 
-Simulation estimates the delay timeline without calling user code:
+- `ok`: no warnings
+- `warning`: something deserves review
+- `risky`: the policy may cause serious operational problems
 
-```python
-policy = RetryPolicy().exponential_delay(base=1, maximum=30)
+## Explain
 
-simulation = policy.simulate(attempts=5)
-
-print(simulation.attempt_count)
-print(simulation.total_sleep)
-print(simulation.max_delay)
-print(simulation.stops_early)
-print(simulation.describe())
-```
-
-### Simulated attempt fields
-
-Each `RetrySimulationAttempt` contains:
-
-| Field | Description |
-|-------|-------------|
-| `attempt_number` | One-based attempt number |
-| `delay_before_next_attempt` | Delay before the next attempt |
-| `cumulative_sleep` | Total sleep accumulated up to this attempt |
-| `stops_after_attempt` | Whether the stop strategy fires here |
-
-### Serialisation
-
-```python
-sim = policy.simulate(attempts=5)
-
-# As a dict
-d = sim.to_dict()
-
-# As JSON
-print(sim.to_json(indent=2))
-```
-
-## Timeline alias
-
-`timeline()` is a readable shortcut over `simulate().describe()`:
-
-```python
-print(policy.timeline(attempts=5))
-```
-
-## Policy explanation
-
-`explain()` returns a human-readable summary of the policy plus any warnings:
+`explain()` describes what the policy does in human language.
 
 ```python
 print(policy.explain())
 ```
 
-## Why diagnostics matter
+This is useful in:
 
-Retry can make a system safer, but it can also make incidents worse if a policy is too aggressive. Diagnostics help users understand behavior without forcing rules on them.
+- code reviews
+- debugging sessions
+- documentation
+- production readiness checks
+
+## Preview
+
+`preview()` shows an estimated timeline without running user code.
+
+```python
+print(policy.preview(attempts=5))
+```
+
+## Timeline and simulation
+
+Use `simulate()` when you want structured data:
+
+```python
+simulation = policy.simulate(attempts=5)
+
+print(simulation.to_dict())
+print(simulation.describe())
+```
+
+Use `timeline()` when you want the readable simulation report directly:
+
+```python
+print(policy.timeline(attempts=5))
+```
+
+## Common warnings
+
+| Warning | Meaning |
+|---|---|
+| `forever` | The policy can retry forever |
+| `no_delay` | The policy has no sleep between attempts |
+| `tight_loop_risk` | The policy can retry forever without sleeping |
+| `broad_exception` | The policy retries all `Exception` subclasses |
+| `many_attempts` | The policy uses many attempts |
+| `high_total_sleep` | The simulated sleep time is high |
+| `result_retry_without_observation` | Result-based retry may exhaust silently |
+| `return_result_precedence` | `return_result()` takes precedence over fallback or exhausted errors |
+
+## Production recommendation
+
+Before deploying a retry policy, run:
+
+```python
+print(policy.explain())
+print(policy.preview(attempts=5))
+print(policy.doctor().describe())
+```

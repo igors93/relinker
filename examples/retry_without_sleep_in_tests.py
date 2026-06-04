@@ -1,9 +1,14 @@
+from __future__ import annotations
+
+from examples.fake_services import FlakyService
 from retryflow import RetryPolicy
-from retryflow.testing import no_sleep
 
-policy = RetryPolicy().attempts(3).fixed_delay(10)
+sleeps: list[float] = []
+service = FlakyService(failures_before_success=2)
 
-with no_sleep(policy) as fast_policy:
-    result = fast_policy.return_result().run(lambda: "ok")
+policy = RetryPolicy().attempts(3).on(TimeoutError).fixed_delay(10).with_sleep(sleeps.append)
 
-print(result.story())
+
+if __name__ == "__main__":
+    print(policy.run(service.call))
+    print(f"requested sleeps: {sleeps}")

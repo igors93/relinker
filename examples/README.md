@@ -1,63 +1,40 @@
-# Examples
+# RetryFlow Examples
 
-This directory contains standalone examples for RetryFlow.
+This directory contains standalone examples that show how to use RetryFlow in real situations.
 
-## How to run
-
-Run examples from the **project root directory** using the `-m` flag:
+Run examples from the project root directory using `python -m`:
 
 ```bash
-cd retryflow/   # project root, where pyproject.toml lives
-
-# Install the package first (editable mode)
-pip install -e .
-
-# Run any example
+cd retryflow
 python -m examples.basic_retry
-python -m examples.retry_with_policy
-python -m examples.retry_try_again
-python -m examples.retry_http_like
-python -m examples.retry_database_like
-python -m examples.retry_polling
-python -m examples.retry_with_logging
-python -m examples.retry_with_diagnostics
-python -m examples.retry_with_statistics
-python -m examples.retry_with_fallback
-python -m examples.retry_with_events
-python -m examples.retry_async
-python -m examples.retry_context_manager
-python -m examples.retry_result_to_json
-python -m examples.retry_return_result
-python -m examples.retry_production_checklist
-python -m examples.retry_without_sleep_in_tests
-python -m examples.retry_with_presets
 ```
 
-## What each example shows
+## Recommended order
 
-| File | Topic |
-|------|-------|
-| `basic_retry.py` | Simple `@retry` decorator |
-| `retry_with_policy.py` | `RetryPolicy` builder |
-| `retry_with_presets.py` | Preset policies (`network`, `database`, etc.) |
-| `retry_try_again.py` | `TryAgain` explicit retry signal |
-| `retry_http_like.py` | HTTP status-based retry helpers |
-| `retry_database_like.py` | Database retry patterns and statistics |
-| `retry_polling.py` | Polling with `TryAgain` and `retry_if_result` |
-| `retry_with_logging.py` | Built-in logging integration |
-| `retry_with_diagnostics.py` | Policy warnings and simulation |
-| `retry_production_checklist.py` | Pre-deploy policy review |
-| `retry_with_statistics.py` | Per-function retry statistics |
-| `retry_with_fallback.py` | Fallback values on exhaustion |
-| `retry_with_events.py` | Observability via events |
-| `retry_async.py` | Async retry with decorated functions |
-| `retry_context_manager.py` | Context manager retry blocks |
-| `retry_result_to_json.py` | Serializing results to JSON |
-| `retry_return_result.py` | Working with `RetryResult` |
-| `retry_without_sleep_in_tests.py` | Testing without real sleep |
-| `fake_services.py` | Shared fake services used by other examples |
+| Order | Example | What it teaches |
+|---:|---|---|
+| 1 | `basic_retry.py` | The smallest useful retry decorator |
+| 2 | `retry_with_policy.py` | The fluent `RetryPolicy` builder |
+| 3 | `retry_with_presets.py` | Ready-to-use presets |
+| 4 | `retry_preview_and_explain.py` | Understanding a policy before running it |
+| 5 | `retry_policy_doctor.py` | Detecting risky retry policies |
+| 6 | `retry_with_fallback.py` | Returning fallback values when retries fail |
+| 7 | `retry_return_result.py` | Inspecting `RetryResult` |
+| 8 | `retry_result_to_json.py` | Serializing retry results |
+| 9 | `retry_with_statistics.py` | Per-function retry statistics |
+| 10 | `retry_with_events.py` | Event hooks for observability |
+| 11 | `retry_with_logging.py` | Standard logging integration |
+| 12 | `retry_structured_logging.py` | JSON structured retry logs |
+| 13 | `retry_http_like.py` | HTTP status retry without external packages |
+| 14 | `retry_http_retry_after.py` | Respecting the `Retry-After` header |
+| 15 | `retry_database_like.py` | Database-like retry patterns |
+| 16 | `retry_polling.py` | Polling until a result is ready |
+| 17 | `retry_try_again.py` | Explicit retry with `TryAgain` |
+| 18 | `retry_async.py` | Async retry |
+| 19 | `retry_context_manager.py` | Retrying inline blocks |
+| 20 | `retry_without_sleep_in_tests.py` | Testing retry behavior without waiting |
+| 21 | `retry_production_checklist.py` | Pre-production policy review |
 
 ## No external dependencies
 
-All examples run without any external packages. They use only RetryFlow and
-Python's standard library.
+Examples use only Python's standard library and RetryFlow.

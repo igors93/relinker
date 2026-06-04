@@ -8,20 +8,29 @@ It gives you:
 - A fluent `RetryPolicy` builder.
 - Sync and async execution.
 - Retry by exception, result, or custom condition.
-- Fixed, exponential, random, and custom delays.
+- Fixed, exponential, random, custom, and additive delays.
+- Composable retry conditions.
+- Composable stop strategies.
 - Rich execution results.
-- Events for logging and observability.
+- Event state for logging and observability.
+- Context manager support for retrying blocks.
 - Testing helpers to avoid real sleeping in tests.
 
-## Installation
+## Current status
+
+RetryFlow is in early development.
+
+Until the package is published on PyPI, install it directly from GitHub:
 
 ```bash
-pip install retryflow
+pip install git+https://github.com/igors93/retryflow.git
 ```
 
 For local development:
 
 ```bash
+git clone https://github.com/igors93/retryflow.git
+cd retryflow
 pip install -e ".[dev]"
 ```
 
@@ -47,6 +56,7 @@ policy = (
     .attempts(5)
     .on(TimeoutError, ConnectionError)
     .exponential_delay(base=1, maximum=30)
+    .jitter(maximum=0.5)
     .debug()
 )
 
@@ -55,7 +65,46 @@ def fetch_data() -> str:
     return "data"
 ```
 
+## Result-aware retry
+
+```python
+from retryflow import RetryPolicy
+
+policy = (
+    RetryPolicy()
+    .attempts(3)
+    .retry_if_result(lambda value: value is None)
+    .return_result()
+)
+
+result = policy.run(lambda: None)
+
+print(result.failed)
+print(result.exhausted)
+print(result.story())
+```
+
+## Context manager
+
+```python
+from retryflow import RetryPolicy
+
+policy = RetryPolicy().attempts(3).on(RuntimeError)
+
+for attempt in policy.iter(name="important_block"):
+    with attempt:
+        risky_operation()
+```
+
 ## Design goal
 
-RetryFlow does not try to control your application.  
-It only prevents impossible configurations and gives you tools to understand exactly what will happen.
+RetryFlow does not try to control your application.
+
+It only prevents impossible or dangerous library-level behavior, such as:
+
+- negative attempts
+- negative delays
+- invalid exception types
+- swallowing `KeyboardInterrupt` or `SystemExit`
+
+The user remains in control of application-level decisions.

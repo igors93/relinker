@@ -5,12 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from random import Random
 
+from retryflow.delays.base import DelayMixin
 from retryflow.exceptions import InvalidRetryConfigError
 from retryflow.internal.validation import ensure_non_negative
 
 
 @dataclass(frozen=True, slots=True)
-class RandomDelay:
+class RandomDelay(DelayMixin):
     """Returns a random delay between minimum and maximum."""
 
     minimum: float = 0.0

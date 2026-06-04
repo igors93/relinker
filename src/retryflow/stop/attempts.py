@@ -5,10 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from retryflow.internal.validation import ensure_positive_int
+from retryflow.stop.base import StopMixin
 
 
 @dataclass(frozen=True, slots=True)
-class StopAfterAttempt:
+class StopAfterAttempt(StopMixin):
     """Stops after a maximum number of attempts."""
 
     maximum: int = 3

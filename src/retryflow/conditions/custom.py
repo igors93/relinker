@@ -6,9 +6,11 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from retryflow.conditions.base import ConditionMixin
+
 
 @dataclass(frozen=True, slots=True)
-class CustomCondition:
+class CustomCondition(ConditionMixin):
     """
     Fully custom retry condition.
 

@@ -9,6 +9,7 @@ from retryflow.event import RetryEvent
 from retryflow.exceptions import RetryExhaustedError
 from retryflow.internal.clock import now
 from retryflow.result import RetryResult
+from retryflow.state import RetryCause, RetryState
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -19,6 +20,44 @@ if TYPE_CHECKING:
 def _function_name(function: Callable[..., Any]) -> str:
     """Return a readable function name for events and debug output."""
     return getattr(function, "__name__", function.__class__.__name__)
+
+
+def _normalize_retry_cause(retry_cause: str | None) -> RetryCause | None:
+    """Return a RetryCause literal value accepted by type checkers."""
+    if retry_cause == "exception":
+        return "exception"
+    if retry_cause == "result":
+        return "result"
+    return None
+
+
+def _state(
+    *,
+    function_name: str,
+    attempt_number: int,
+    execution_started_at: float,
+    attempts: list[AttemptRecord],
+    last_value: Any = None,
+    last_error: BaseException | None = None,
+    next_delay: float | None = None,
+    retry_cause: str | None = None,
+    will_retry: bool = False,
+    will_stop: bool = False,
+) -> RetryState:
+    """Build an immutable state snapshot for events."""
+    return RetryState(
+        function_name=function_name,
+        attempt_number=attempt_number,
+        started_at=execution_started_at,
+        elapsed=now() - execution_started_at,
+        attempts=tuple(attempts),
+        last_value=last_value,
+        last_error=last_error,
+        next_delay=next_delay,
+        retry_cause=_normalize_retry_cause(retry_cause),
+        will_retry=will_retry,
+        will_stop=will_stop,
+    )
 
 
 def execute_sync(
@@ -46,6 +85,12 @@ def execute_sync(
                 name="before_attempt",
                 attempt_number=attempt_number,
                 function_name=function_name,
+                state=_state(
+                    function_name=function_name,
+                    attempt_number=attempt_number,
+                    execution_started_at=execution_started_at,
+                    attempts=attempts,
+                ),
             )
         )
 
@@ -64,18 +109,28 @@ def execute_sync(
                 )
             )
 
+            elapsed = attempt_ended_at - execution_started_at
+            should_retry = policy.condition.should_retry_exception(error)
+            should_stop = policy.stop_strategy.should_stop(attempt_number, elapsed)
+
             policy.emit(
                 RetryEvent(
                     name="after_failure",
                     attempt_number=attempt_number,
                     function_name=function_name,
                     error=error,
+                    state=_state(
+                        function_name=function_name,
+                        attempt_number=attempt_number,
+                        execution_started_at=execution_started_at,
+                        attempts=attempts,
+                        last_error=error,
+                        retry_cause="exception",
+                        will_retry=should_retry and not should_stop,
+                        will_stop=should_stop,
+                    ),
                 )
             )
-
-            elapsed = attempt_ended_at - execution_started_at
-            should_retry = policy.condition.should_retry_exception(error)
-            should_stop = policy.stop_strategy.should_stop(attempt_number, elapsed)
 
             if not should_retry or should_stop:
                 result: RetryResult[Any] = RetryResult(
@@ -92,6 +147,15 @@ def execute_sync(
                         attempt_number=attempt_number,
                         function_name=function_name,
                         error=error,
+                        state=_state(
+                            function_name=function_name,
+                            attempt_number=attempt_number,
+                            execution_started_at=execution_started_at,
+                            attempts=attempts,
+                            last_error=error,
+                            retry_cause="exception",
+                            will_stop=True,
+                        ),
                     )
                 )
                 if policy.should_return_result:
@@ -108,6 +172,16 @@ def execute_sync(
                     function_name=function_name,
                     delay=delay,
                     error=error,
+                    state=_state(
+                        function_name=function_name,
+                        attempt_number=attempt_number,
+                        execution_started_at=execution_started_at,
+                        attempts=attempts,
+                        last_error=error,
+                        next_delay=delay,
+                        retry_cause="exception",
+                        will_retry=True,
+                    ),
                 )
             )
             policy.sleep(delay)
@@ -140,6 +214,13 @@ def execute_sync(
                     attempt_number=attempt_number,
                     function_name=function_name,
                     value=value,
+                    state=_state(
+                        function_name=function_name,
+                        attempt_number=attempt_number,
+                        execution_started_at=execution_started_at,
+                        attempts=attempts,
+                        last_value=value,
+                    ),
                 )
             )
             if policy.should_return_result:
@@ -161,6 +242,15 @@ def execute_sync(
                     attempt_number=attempt_number,
                     function_name=function_name,
                     value=value,
+                    state=_state(
+                        function_name=function_name,
+                        attempt_number=attempt_number,
+                        execution_started_at=execution_started_at,
+                        attempts=attempts,
+                        last_value=value,
+                        retry_cause="result",
+                        will_stop=True,
+                    ),
                 )
             )
             if policy.should_return_result:
@@ -180,6 +270,16 @@ def execute_sync(
                 function_name=function_name,
                 delay=delay,
                 value=value,
+                state=_state(
+                    function_name=function_name,
+                    attempt_number=attempt_number,
+                    execution_started_at=execution_started_at,
+                    attempts=attempts,
+                    last_value=value,
+                    next_delay=delay,
+                    retry_cause="result",
+                    will_retry=True,
+                ),
             )
         )
         policy.sleep(delay)

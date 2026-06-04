@@ -6,9 +6,11 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from retryflow.conditions.base import ConditionMixin
+
 
 @dataclass(frozen=True, slots=True)
-class ResultCondition:
+class ResultCondition(ConditionMixin):
     """Retries when a user-provided predicate returns True for a value."""
 
     predicate: Callable[[Any], bool]

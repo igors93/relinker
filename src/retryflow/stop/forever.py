@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from retryflow.stop.base import StopMixin
+
 
 @dataclass(frozen=True, slots=True)
-class StopForever:
+class StopForever(StopMixin):
     """
     Never stops based on attempts or elapsed time.
 

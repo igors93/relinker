@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from retryflow.delays.base import DelayMixin
 from retryflow.internal.validation import ensure_non_negative
 
 
 @dataclass(frozen=True, slots=True)
-class FixedDelay:
+class FixedDelay(DelayMixin):
     """Always returns the same delay."""
 
     seconds: float = 0.0

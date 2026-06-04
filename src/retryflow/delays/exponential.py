@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from retryflow.delays.base import DelayMixin
 from retryflow.internal.validation import ensure_non_negative, ensure_positive
 
 
 @dataclass(frozen=True, slots=True)
-class ExponentialDelay:
+class ExponentialDelay(DelayMixin):
     """
     Exponential backoff delay.
 

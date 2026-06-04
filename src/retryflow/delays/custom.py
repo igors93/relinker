@@ -5,11 +5,12 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from retryflow.delays.base import DelayMixin
 from retryflow.internal.validation import ensure_non_negative
 
 
 @dataclass(frozen=True, slots=True)
-class CustomDelay:
+class CustomDelay(DelayMixin):
     """Delegates delay calculation to a user-provided function."""
 
     callback: Callable[[int], float]

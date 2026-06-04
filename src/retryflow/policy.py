@@ -14,10 +14,13 @@ from functools import wraps
 from typing import Any, Generic, Literal, overload
 
 from retryflow.conditions.base import RetryCondition
+from retryflow.conditions.composite import AllCondition, AnyCondition
 from retryflow.conditions.custom import CustomCondition
 from retryflow.conditions.exception import ExceptionCondition
 from retryflow.conditions.result import ResultCondition
+from retryflow.context import AsyncRetryBlockIterator, RetryBlockIterator
 from retryflow.delays.base import DelayStrategy
+from retryflow.delays.composite import AdditiveDelay
 from retryflow.delays.custom import CustomDelay
 from retryflow.delays.exponential import ExponentialDelay
 from retryflow.delays.fixed import FixedDelay
@@ -28,6 +31,8 @@ from retryflow.executors.sync import execute_sync
 from retryflow.internal.sleep import async_sleep as default_async_sleep
 from retryflow.internal.sleep import sleep as default_sleep
 from retryflow.stop.attempts import StopAfterAttempt
+from retryflow.stop.base import StopStrategy
+from retryflow.stop.composite import AllStopStrategy, AnyStopStrategy
 from retryflow.stop.forever import StopForever
 from retryflow.stop.max_time import StopAfterDelay
 from retryflow.typing import P, T
@@ -44,7 +49,7 @@ class RetryPolicy(Generic[T]):
     running. This separation keeps configuration and execution easy to maintain.
     """
 
-    stop_strategy: Any = StopAfterAttempt(3)
+    stop_strategy: StopStrategy = StopAfterAttempt(3)
     delay_strategy: DelayStrategy = FixedDelay(0)
     condition: RetryCondition = ExceptionCondition((Exception,))
     should_raise_last: bool = True
@@ -66,6 +71,38 @@ class RetryPolicy(Generic[T]):
         """Return a new policy that stops after the given elapsed time."""
         return replace(self, stop_strategy=StopAfterDelay(seconds))
 
+    def stop_when(self, strategy: StopStrategy) -> RetryPolicy[T]:
+        """Return a new policy using a custom stop strategy."""
+        return replace(self, stop_strategy=strategy)
+
+    def or_stop_after_attempts(self, maximum: int) -> RetryPolicy[T]:
+        """Return a new policy that stops on current strategy OR attempt limit."""
+        return replace(
+            self,
+            stop_strategy=AnyStopStrategy((self.stop_strategy, StopAfterAttempt(maximum))),
+        )
+
+    def or_stop_after_time(self, seconds: float) -> RetryPolicy[T]:
+        """Return a new policy that stops on current strategy OR elapsed time."""
+        return replace(
+            self,
+            stop_strategy=AnyStopStrategy((self.stop_strategy, StopAfterDelay(seconds))),
+        )
+
+    def and_stop_after_attempts(self, maximum: int) -> RetryPolicy[T]:
+        """Return a new policy that stops only when both strategies stop."""
+        return replace(
+            self,
+            stop_strategy=AllStopStrategy((self.stop_strategy, StopAfterAttempt(maximum))),
+        )
+
+    def and_stop_after_time(self, seconds: float) -> RetryPolicy[T]:
+        """Return a new policy that stops only when both strategies stop."""
+        return replace(
+            self,
+            stop_strategy=AllStopStrategy((self.stop_strategy, StopAfterDelay(seconds))),
+        )
+
     def on(self, *exception_types: type[BaseException]) -> RetryPolicy[T]:
         """Return a new policy that retries on the given exception types."""
         types = exception_types or (Exception,)
@@ -82,6 +119,28 @@ class RetryPolicy(Generic[T]):
         The callback receives either an error or a value. Exactly one is non-None.
         """
         return replace(self, condition=CustomCondition(callback))
+
+    def any_condition(self, *conditions: RetryCondition) -> RetryPolicy[T]:
+        """Return a new policy that retries when any condition matches."""
+        return replace(self, condition=AnyCondition(conditions))
+
+    def all_conditions(self, *conditions: RetryCondition) -> RetryPolicy[T]:
+        """Return a new policy that retries only when all conditions match."""
+        return replace(self, condition=AllCondition(conditions))
+
+    def or_on(self, *exception_types: type[BaseException]) -> RetryPolicy[T]:
+        """Return a new policy that OR-combines current condition with exception retry."""
+        return replace(
+            self,
+            condition=AnyCondition((self.condition, ExceptionCondition(exception_types))),
+        )
+
+    def or_retry_if_result(self, predicate: Callable[[Any], bool]) -> RetryPolicy[T]:
+        """Return a new policy that OR-combines current condition with result retry."""
+        return replace(
+            self,
+            condition=AnyCondition((self.condition, ResultCondition(predicate))),
+        )
 
     def fixed_delay(self, seconds: float) -> RetryPolicy[T]:
         """Return a new policy with a fixed delay strategy."""
@@ -116,6 +175,26 @@ class RetryPolicy(Generic[T]):
             self,
             delay_strategy=RandomDelay(minimum=minimum, maximum=maximum, seed=seed),
         )
+
+    def jitter(
+        self,
+        *,
+        minimum: float = 0.0,
+        maximum: float = 1.0,
+        seed: int | None = None,
+    ) -> RetryPolicy[T]:
+        """
+        Return a new policy that adds random jitter to the current delay.
+
+        Example:
+            RetryPolicy().exponential_delay(base=1).jitter(maximum=0.5)
+        """
+        jitter_delay = RandomDelay(minimum=minimum, maximum=maximum, seed=seed)
+        return replace(self, delay_strategy=AdditiveDelay((self.delay_strategy, jitter_delay)))
+
+    def add_delay(self, strategy: DelayStrategy) -> RetryPolicy[T]:
+        """Return a new policy that adds a delay strategy to the current strategy."""
+        return replace(self, delay_strategy=AdditiveDelay((self.delay_strategy, strategy)))
 
     def custom_delay(self, callback: Callable[[int], float]) -> RetryPolicy[T]:
         """Return a new policy with a custom delay callback."""
@@ -226,6 +305,22 @@ class RetryPolicy(Generic[T]):
             delay = self.delay_strategy.next_delay(attempt_number)
             lines.append(f"After attempt {attempt_number}: wait {delay:.4f}s")
         return "\n".join(lines)
+
+    def iter(self, *, name: str = "retry_block") -> RetryBlockIterator:
+        """Return a sync retry-block iterator."""
+        return RetryBlockIterator(self, name=name)
+
+    def async_iter(self, *, name: str = "retry_block") -> AsyncRetryBlockIterator:
+        """Return an async retry-block iterator."""
+        return AsyncRetryBlockIterator(self, name=name)
+
+    def __iter__(self) -> RetryBlockIterator:
+        """Allow `for attempt in policy:` syntax for retry blocks."""
+        return self.iter()
+
+    def __aiter__(self) -> AsyncRetryBlockIterator:
+        """Allow `async for attempt in policy:` syntax for retry blocks."""
+        return self.async_iter()
 
     def run(self, function: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> Any:
         """Run a synchronous function with this policy."""

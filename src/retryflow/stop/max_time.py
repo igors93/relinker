@@ -5,10 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from retryflow.internal.validation import ensure_non_negative
+from retryflow.stop.base import StopMixin
 
 
 @dataclass(frozen=True, slots=True)
-class StopAfterDelay:
+class StopAfterDelay(StopMixin):
     """Stops after the configured amount of elapsed seconds."""
 
     seconds: float

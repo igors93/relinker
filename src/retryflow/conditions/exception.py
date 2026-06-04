@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from retryflow.conditions.base import ConditionMixin
 from retryflow.internal.validation import ensure_exception_types
 
 
 @dataclass(frozen=True, slots=True)
-class ExceptionCondition:
+class ExceptionCondition(ConditionMixin):
     """Retries when the raised exception matches one of the configured types."""
 
     exception_types: tuple[type[BaseException], ...] = (Exception,)

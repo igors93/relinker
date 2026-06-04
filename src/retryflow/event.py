@@ -12,6 +12,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Literal, TypeAlias
 
+from retryflow.state import RetryState
+
 EventName: TypeAlias = Literal[
     "before_attempt",
     "after_success",
@@ -33,6 +35,7 @@ class RetryEvent:
         delay: Delay before next attempt, when applicable.
         value: Returned value, when applicable.
         error: Raised exception, when applicable.
+        state: Rich immutable execution state.
     """
 
     name: EventName
@@ -41,6 +44,7 @@ class RetryEvent:
     delay: float | None = None
     value: Any = None
     error: BaseException | None = None
+    state: RetryState | None = None
 
 
 EventHandler: TypeAlias = Callable[[RetryEvent], None]

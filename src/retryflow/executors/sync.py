@@ -21,7 +21,12 @@ def _function_name(function: Callable[..., Any]) -> str:
     return getattr(function, "__name__", function.__class__.__name__)
 
 
-def execute_sync(policy: RetryPolicy, function: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+def execute_sync(
+    policy: RetryPolicy[Any],
+    function: Callable[..., Any],
+    *args: Any,
+    **kwargs: Any,
+) -> Any:
     """
     Execute a synchronous function using a RetryPolicy.
 
@@ -73,7 +78,7 @@ def execute_sync(policy: RetryPolicy, function: Callable[..., Any], *args: Any, 
             should_stop = policy.stop_strategy.should_stop(attempt_number, elapsed)
 
             if not should_retry or should_stop:
-                result = RetryResult(
+                result: RetryResult[Any] = RetryResult(
                     attempts=tuple(attempts),
                     error=error,
                     started_at=execution_started_at,

@@ -12,7 +12,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Literal, TypeAlias
 
-
 EventName: TypeAlias = Literal[
     "before_attempt",
     "after_success",

@@ -32,7 +32,6 @@ from retryflow.stop.forever import StopForever
 from retryflow.stop.max_time import StopAfterDelay
 from retryflow.typing import P, T
 
-
 ResultExhaustedBehavior = Literal["return_last", "raise"]
 
 
@@ -170,10 +169,11 @@ class RetryPolicy(Generic[T]):
             if event.name == "before_attempt":
                 print(f"[retryflow] attempt {event.attempt_number} started: {event.function_name}")
             elif event.name == "after_failure" and event.error is not None:
-                print(
-                    "[retryflow] attempt "
-                    f"{event.attempt_number} failed: {event.error.__class__.__name__}: {event.error}"
+                message = (
+                    f"[retryflow] attempt {event.attempt_number} failed: "
+                    f"{event.error.__class__.__name__}: {event.error}"
                 )
+                print(message)
             elif event.name == "before_sleep" and event.delay is not None:
                 print(f"[retryflow] sleeping {event.delay:.4f}s before next attempt")
             elif event.name == "after_success":
@@ -241,12 +241,10 @@ class RetryPolicy(Generic[T]):
         return await execute_async(self, function, *args, **kwargs)
 
     @overload
-    def __call__(self, function: Callable[P, T]) -> Callable[P, T]:
-        ...
+    def __call__(self, function: Callable[P, T]) -> Callable[P, T]: ...
 
     @overload
-    def __call__(self, function: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[T]]:
-        ...
+    def __call__(self, function: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[T]]: ...
 
     def __call__(self, function: Callable[..., Any]) -> Callable[..., Any]:
         """

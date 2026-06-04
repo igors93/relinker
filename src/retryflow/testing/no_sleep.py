@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Iterator
+from typing import Any
 
 from retryflow.policy import RetryPolicy
 
@@ -17,7 +18,7 @@ async def _do_not_sleep_async(seconds: float) -> None:
 
 
 @contextmanager
-def no_sleep(policy: RetryPolicy) -> Iterator[RetryPolicy]:
+def no_sleep(policy: RetryPolicy[Any]) -> Iterator[RetryPolicy[Any]]:
     """
     Yield a copy of the policy with sync and async sleep disabled.
 
@@ -27,6 +28,6 @@ def no_sleep(policy: RetryPolicy) -> Iterator[RetryPolicy]:
     yield policy.with_sleep(_do_not_sleep, _do_not_sleep_async)
 
 
-def no_sleep_async(policy: RetryPolicy) -> RetryPolicy:
+def no_sleep_async(policy: RetryPolicy[Any]) -> RetryPolicy[Any]:
     """Return a copy of the policy with async sleep disabled."""
     return policy.with_sleep(_do_not_sleep, _do_not_sleep_async)

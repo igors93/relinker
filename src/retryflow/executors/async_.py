@@ -22,7 +22,7 @@ def _function_name(function: Callable[..., Any]) -> str:
 
 
 async def execute_async(
-    policy: RetryPolicy,
+    policy: RetryPolicy[Any],
     function: Callable[..., Any],
     *args: Any,
     **kwargs: Any,
@@ -78,7 +78,7 @@ async def execute_async(
             should_stop = policy.stop_strategy.should_stop(attempt_number, elapsed)
 
             if not should_retry or should_stop:
-                result = RetryResult(
+                result: RetryResult[Any] = RetryResult(
                     attempts=tuple(attempts),
                     error=error,
                     started_at=execution_started_at,

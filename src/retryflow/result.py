@@ -10,7 +10,6 @@ from typing import Generic, Literal
 from retryflow.attempt import AttemptRecord
 from retryflow.typing import T
 
-
 RetryCause = Literal["exception", "result"]
 
 
@@ -95,9 +94,7 @@ class RetryResult(Generic[T]):
 
         for attempt in self.attempts:
             attempt_status = "succeeded" if attempt.succeeded else "failed"
-            lines.append(
-                f"Attempt {attempt.number}: {attempt_status} in {attempt.duration:.4f}s"
-            )
+            lines.append(f"Attempt {attempt.number}: {attempt_status} in {attempt.duration:.4f}s")
             if attempt.error is not None:
                 lines.append(f"  Error: {attempt.error.__class__.__name__}: {attempt.error}")
             elif self.exhausted_by_result and attempt is self.attempts[-1]:

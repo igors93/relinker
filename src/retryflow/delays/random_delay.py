@@ -21,9 +21,7 @@ class RandomDelay:
         ensure_non_negative("minimum", self.minimum)
         ensure_non_negative("maximum", self.maximum)
         if self.maximum < self.minimum:
-            raise InvalidRetryConfigError(
-                "maximum must be greater than or equal to minimum"
-            )
+            raise InvalidRetryConfigError("maximum must be greater than or equal to minimum")
 
     def next_delay(self, attempt_number: int) -> float:
         """

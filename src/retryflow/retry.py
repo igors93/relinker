@@ -15,8 +15,7 @@ from retryflow.typing import P, T
 
 
 @overload
-def retry(function: Callable[P, T]) -> Callable[P, T]:
-    ...
+def retry(function: Callable[P, T]) -> Callable[P, T]: ...
 
 
 @overload
@@ -26,8 +25,7 @@ def retry(
     delay: float = 0.0,
     on: tuple[type[BaseException], ...] = (Exception,),
     return_result: bool = False,
-) -> Callable[[Callable[P, T]], Callable[P, T]]:
-    ...
+) -> Callable[[Callable[P, T]], Callable[P, T]]: ...
 
 
 def retry(
@@ -49,7 +47,7 @@ def retry(
         @retry(attempts=5, delay=1, on=(TimeoutError,))
         def task(): ...
     """
-    policy = RetryPolicy().attempts(attempts).fixed_delay(delay).on(*on)
+    policy: RetryPolicy[Any] = RetryPolicy().attempts(attempts).fixed_delay(delay).on(*on)
 
     if return_result:
         policy = policy.return_result()

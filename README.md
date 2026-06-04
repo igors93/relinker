@@ -1,5 +1,7 @@
 # RetryFlow
 
+[![CI](https://github.com/igors93/retryflow/actions/workflows/ci.yml/badge.svg)](https://github.com/igors93/retryflow/actions/workflows/ci.yml)
+
 RetryFlow is a Python retry library focused on clarity, control, and debuggability.
 
 It gives you:
@@ -94,6 +96,14 @@ policy = RetryPolicy().attempts(3).on(RuntimeError)
 for attempt in policy.iter(name="important_block"):
     with attempt:
         risky_operation()
+```
+
+## Development checks
+
+Run the same checks used by GitHub Actions:
+
+```bash
+./scripts/ci.sh
 ```
 
 ## Design goal

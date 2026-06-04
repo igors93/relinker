@@ -5,17 +5,35 @@ Thank you for considering contributing to RetryFlow.
 ## Local setup
 
 ```bash
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
-pip install -e ".[dev]"
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
 ```
 
 ## Run checks
 
+Run the same checks used by GitHub Actions:
+
 ```bash
-./scripts/format.sh
-./scripts/lint.sh
-./scripts/test.sh
+./scripts/ci.sh
+```
+
+Or run them separately:
+
+```bash
+python -m ruff format --check .
+python -m ruff check .
+python -m mypy src
+python -m pytest
+python -m build
+```
+
+## Auto-format code
+
+```bash
+python -m ruff check . --fix
+python -m ruff format .
 ```
 
 ## Code principles
@@ -25,3 +43,5 @@ pip install -e ".[dev]"
 - Avoid hidden behavior.
 - Validate impossible configurations only.
 - Keep user control at the center of the API.
+- Prefer explicit behavior over magic.
+- Add tests for bug fixes and new behavior.

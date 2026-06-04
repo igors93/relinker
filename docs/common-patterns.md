@@ -171,3 +171,44 @@ print(f"Failed attempts: {result.failed_attempts}")
 print(f"Error types seen: {[t.__name__ for t in result.error_types]}")
 print(result.to_json(indent=2))
 ```
+
+## State-aware delay
+
+Adapt delay based on execution state:
+
+```python
+from retryflow import RetryPolicy, RetryState
+
+def backoff_by_error_type(state: RetryState) -> float:
+    if isinstance(state.last_error, TimeoutError):
+        return 5.0  # longer wait for timeouts
+    return 1.0
+
+policy = (
+    RetryPolicy()
+    .attempts(5)
+    .on(TimeoutError, ConnectionError)
+    .stateful_delay(backoff_by_error_type)
+)
+```
+
+## HTTP Retry-After
+
+Honour the server's requested delay using state-aware retry:
+
+```python
+from retryflow import RetryPolicy
+from retryflow.http import retry_if_status, retry_after_delay
+
+RETRYABLE = {429, 500, 502, 503, 504}
+
+policy = (
+    RetryPolicy()
+    .attempts(5)
+    .retry_if_result(retry_if_status(RETRYABLE))
+    .stateful_delay(retry_after_delay(default=1.0, maximum=60.0))
+    .return_result()
+)
+
+result = policy.run(lambda: my_http_client.get("/api/data"))
+```

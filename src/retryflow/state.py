@@ -48,6 +48,25 @@ class RetryState:
     will_stop: bool = False
 
     @property
+    def attempt_count(self) -> int:
+        """Return how many attempts have been recorded in this snapshot."""
+        return len(self.attempts)
+
+    @property
+    def failed_attempts(self) -> int:
+        """Return how many recorded attempts raised an exception."""
+        return sum(1 for a in self.attempts if a.failed)
+
+    @property
+    def successful_attempts(self) -> int:
+        """Return how many recorded attempts completed without an exception."""
+        return sum(1 for a in self.attempts if a.succeeded)
+
+    def last_attempt(self) -> AttemptRecord | None:
+        """Return the most recent attempt record, or None when no attempts were made."""
+        return self.attempts[-1] if self.attempts else None
+
+    @property
     def has_error(self) -> bool:
         """Return True when this state contains an exception."""
         return self.last_error is not None

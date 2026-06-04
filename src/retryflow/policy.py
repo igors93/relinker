@@ -1,9 +1,12 @@
 """
 Retry policy builder.
 
-RetryPolicy is the main object in RetryFlow. It is intentionally designed as a
-small, explicit, immutable builder. Every configuration method returns a new
-policy, which avoids surprising side effects when policies are reused.
+RetryPolicy is the main public object in RetryFlow. It is an immutable builder:
+every configuration method returns a new policy so it can be shared and reused
+safely without side effects.
+
+Implementation details are kept in the internal/ modules so this file remains
+a readable public facade.
 """
 
 from __future__ import annotations
@@ -11,7 +14,6 @@ from __future__ import annotations
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
-from functools import wraps
 from typing import Any, Generic, Literal, cast, overload
 
 from retryflow.conditions.base import RetryCondition
@@ -29,15 +31,16 @@ from retryflow.delays.fixed import FixedDelay
 from retryflow.delays.linear import LinearDelay
 from retryflow.delays.random_delay import RandomDelay
 from retryflow.delays.random_exponential import RandomExponentialDelay
-from retryflow.diagnostics import PolicyWarning, RetrySimulation, RetrySimulationAttempt
+from retryflow.delays.stateful import StatefulCustomDelay
+from retryflow.diagnostics import PolicyWarning, RetrySimulation
 from retryflow.event import EventHandler, EventName, RetryEvent
-from retryflow.exceptions import InvalidRetryConfigError, RetryExhaustedError
+from retryflow.exceptions import InvalidRetryConfigError
 from retryflow.executors.async_ import execute_async
 from retryflow.executors.sync import execute_sync
 from retryflow.internal.sleep import async_sleep as default_async_sleep
 from retryflow.internal.sleep import sleep as default_sleep
 from retryflow.result import RetryResult
-from retryflow.stats import RetryStats
+from retryflow.state import RetryState
 from retryflow.stop.attempts import StopAfterAttempt
 from retryflow.stop.base import StopStrategy
 from retryflow.stop.forever import StopForever
@@ -47,24 +50,16 @@ from retryflow.typing import P, T
 ResultExhaustedBehavior = Literal["return_last", "raise"]
 ExhaustedCallback = Callable[[RetryResult[Any]], Any]
 ExceptionFactory = Callable[[RetryResult[Any]], BaseException]
-
-
-def _has_result_condition(condition: RetryCondition) -> bool:
-    """Return True when the condition tree includes at least one ResultCondition."""
-    if isinstance(condition, ResultCondition):
-        return True
-    if isinstance(condition, (AnyCondition, AllCondition)):
-        return any(_has_result_condition(c) for c in condition.conditions)
-    return False
+StatefulDelayCallback = Callable[[RetryState], float]
 
 
 @dataclass(frozen=True, slots=True)
 class RetryPolicy(Generic[T]):
     """
-    Immutable retry policy.
+    Immutable retry policy builder.
 
-    The policy stores what should happen, but the executors perform the actual
-    running. This separation keeps configuration and execution easy to maintain.
+    The policy stores configuration only. Executors perform the actual execution.
+    Every builder method returns a new policy; the original is never modified.
     """
 
     stop_strategy: StopStrategy = StopAfterAttempt(3)
@@ -78,6 +73,8 @@ class RetryPolicy(Generic[T]):
     event_handlers: tuple[tuple[EventName, EventHandler], ...] = ()
     sleep: Callable[[float], None] = default_sleep
     async_sleep: Callable[[float], Awaitable[None]] = default_async_sleep
+
+    # ------------------------------------------------------------------ stop
 
     def attempts(self, maximum: int) -> RetryPolicy[T]:
         """Return a new policy that stops after a maximum number of attempts."""
@@ -131,6 +128,8 @@ class RetryPolicy(Generic[T]):
             stop_strategy=AllStopStrategy((self.stop_strategy, StopAfterDelay(seconds))),
         )
 
+    # ----------------------------------------------------------- conditions
+
     def on(self, *exception_types: type[BaseException]) -> RetryPolicy[T]:
         """Return a new policy that retries on the given exception types."""
         types = exception_types or (Exception,)
@@ -169,6 +168,8 @@ class RetryPolicy(Generic[T]):
             self,
             condition=AnyCondition((self.condition, ResultCondition(predicate))),
         )
+
+    # --------------------------------------------------------------- delays
 
     def fixed_delay(self, seconds: float) -> RetryPolicy[T]:
         """Return a new policy with a fixed delay strategy."""
@@ -264,8 +265,31 @@ class RetryPolicy(Generic[T]):
         return replace(self, delay_strategy=AdditiveDelay((self.delay_strategy, strategy)))
 
     def custom_delay(self, callback: Callable[[int], float]) -> RetryPolicy[T]:
-        """Return a new policy with a custom delay callback."""
+        """Return a new policy with a custom delay callback (receives attempt number)."""
         return replace(self, delay_strategy=CustomDelay(callback))
+
+    def stateful_delay(self, callback: StatefulDelayCallback) -> RetryPolicy[T]:
+        """
+        Return a new policy with a state-aware delay callback.
+
+        The callback receives a RetryState snapshot before each sleep and must
+        return a non-negative float (seconds). This enables delays that adapt
+        based on the last error, last value, elapsed time, or response headers.
+
+        Example:
+            policy = RetryPolicy().stateful_delay(lambda state: state.attempt_number * 0.5)
+
+        For HTTP Retry-After support:
+            from retryflow.http import retry_after_delay
+            policy = (
+                RetryPolicy()
+                .retry_if_result(retry_if_status({429, 503}))
+                .stateful_delay(retry_after_delay(default=1.0, maximum=60.0))
+            )
+        """
+        return replace(self, delay_strategy=StatefulCustomDelay(callback))
+
+    # -------------------------------------------------- exhausted behavior
 
     def raise_last(self) -> RetryPolicy[T]:
         """Return a new policy that re-raises the last original exception."""
@@ -279,8 +303,8 @@ class RetryPolicy(Generic[T]):
         """
         Return a new policy that raises RetryExhaustedError when result retry is exhausted.
 
-        This is optional. The default behavior keeps user freedom and returns the
-        last value for result-based retries unless `return_result()` is enabled.
+        The default behavior returns the last value silently. This option makes
+        exhaustion explicit.
         """
         return replace(self, result_exhausted_behavior="raise")
 
@@ -290,10 +314,10 @@ class RetryPolicy(Generic[T]):
 
     def on_exhausted_return(self, callback: ExhaustedCallback) -> RetryPolicy[T]:
         """
-        Return a new policy that calls a callback when retry attempts are exhausted.
+        Return a new policy that calls a fallback when retry attempts are exhausted.
 
         The callback receives RetryResult and its return value becomes the final
-        return value. This is useful for fallbacks.
+        return value.
         """
         return replace(
             self,
@@ -356,6 +380,8 @@ class RetryPolicy(Generic[T]):
             should_return_result=False,
         )
 
+    # -------------------------------------------------- sleep / test hooks
+
     def with_sleep(
         self,
         sleep: Callable[[float], None],
@@ -364,13 +390,15 @@ class RetryPolicy(Generic[T]):
         """
         Return a new policy with custom sleep functions.
 
-        This is useful for tests, simulations, and advanced integrations.
+        Useful for tests (with no_sleep()) and advanced integrations.
         """
         return replace(
             self,
             sleep=sleep,
             async_sleep=async_sleep if async_sleep is not None else self.async_sleep,
         )
+
+    # ------------------------------------------------------------ events
 
     def on_event(self, name: EventName, handler: EventHandler) -> RetryPolicy[T]:
         """Return a new policy with an additional event handler."""
@@ -415,46 +443,20 @@ class RetryPolicy(Generic[T]):
         """
         Return a new policy that logs retry activity using the standard library.
 
-        By default logs before each sleep (attempt failed, retry coming) and
-        after giving up. Successful attempts are not logged to avoid noise.
+        Logs before each sleep and after giving up. Successful first attempts
+        are not logged to avoid noise.
 
         Args:
             level: Python logging level. Defaults to WARNING.
-            logger: Logger to use. Defaults to the 'retryflow' logger.
+            logger: Logger instance to use. Defaults to the 'retryflow' logger.
 
         Example:
-            import logging
             policy = RetryPolicy().attempts(3).with_logging(level=logging.INFO)
         """
+        from retryflow.internal.policy_logging import make_logging_handler
+
         _logger = logger if logger is not None else logging.getLogger("retryflow")
-
-        def handler(event: RetryEvent) -> None:
-            if event.name == "before_sleep":
-                _logger.log(
-                    level,
-                    "Attempt %d failed (%s), retrying in %.2fs",
-                    event.attempt_number,
-                    event.error.__class__.__name__
-                    if event.error is not None
-                    else "result rejected",
-                    event.delay if event.delay is not None else 0.0,
-                )
-            elif event.name == "after_giveup":
-                if event.error is not None:
-                    _logger.log(
-                        level,
-                        "Giving up after attempt %d: %s: %s",
-                        event.attempt_number,
-                        event.error.__class__.__name__,
-                        event.error,
-                    )
-                else:
-                    _logger.log(
-                        level,
-                        "Giving up after attempt %d: result retry exhausted",
-                        event.attempt_number,
-                    )
-
+        handler = make_logging_handler(level, _logger)
         policy: RetryPolicy[T] = self
         for event_name in ("before_sleep", "after_giveup"):
             policy = policy.on_event(event_name, handler)
@@ -466,211 +468,45 @@ class RetryPolicy(Generic[T]):
             if name == event.name:
                 handler(event)
 
+    # --------------------------------------------------------- diagnostics
+
     def warnings(self) -> tuple[PolicyWarning, ...]:
         """
-        Return non-blocking warnings about this policy.
+        Return non-blocking advisory warnings about this policy.
 
-        RetryFlow does not prevent risky application-level choices, but this
-        method helps users notice them.
+        RetryFlow does not block application-level choices. Warnings help users
+        notice risky configurations before production.
         """
-        warnings: list[PolicyWarning] = []
+        from retryflow.internal.policy_diagnostics import compute_warnings
 
-        stop_name = self.stop_strategy.__class__.__name__
-        delay_name = self.delay_strategy.__class__.__name__
-        condition_name = self.condition.__class__.__name__
-
-        is_forever = stop_name == "StopForever"
-
-        if is_forever:
-            warnings.append(
-                PolicyWarning(
-                    code="forever",
-                    message="This policy can retry forever.",
-                    hint="Use forever() only when the caller controls cancellation or shutdown.",
-                )
-            )
-
-        if delay_name == "FixedDelay" and getattr(self.delay_strategy, "seconds", None) == 0:
-            warnings.append(
-                PolicyWarning(
-                    code="no_delay",
-                    message="This policy has no delay between attempts.",
-                    hint="Consider jitter or backoff for external services.",
-                )
-            )
-
-        is_broad_exception = False
-        if condition_name == "ExceptionCondition":
-            exception_types = getattr(self.condition, "exception_types", ())
-            if exception_types == (Exception,):
-                is_broad_exception = True
-                warnings.append(
-                    PolicyWarning(
-                        code="broad_exception",
-                        message="This policy retries all Exception subclasses.",
-                        hint="Prefer specific exception types when possible.",
-                    )
-                )
-
-        # many_attempts: more than 10 configured attempts
-        if isinstance(self.stop_strategy, StopAfterAttempt) and self.stop_strategy.maximum > 10:
-            warnings.append(
-                PolicyWarning(
-                    code="many_attempts",
-                    message=f"This policy uses {self.stop_strategy.maximum} attempts.",
-                    hint=(
-                        "High attempt counts increase load on downstream services during incidents."
-                    ),
-                )
-            )
-
-        # high_total_sleep: simulated total sleep is very large
-        if not is_forever:
-            try:
-                sim_count = (
-                    self.stop_strategy.maximum
-                    if isinstance(self.stop_strategy, StopAfterAttempt)
-                    else 10
-                )
-                simulation = self.simulate(attempts=sim_count)
-                if simulation.total_sleep > 300:
-                    warnings.append(
-                        PolicyWarning(
-                            code="high_total_sleep",
-                            message=(
-                                f"Simulated total sleep is {simulation.total_sleep:.1f}s "
-                                f"across {sim_count} attempts."
-                            ),
-                            hint=(
-                                "Verify that upstream services and callers can wait this long "
-                                "before adding a stricter time limit."
-                            ),
-                        )
-                    )
-            except Exception:  # noqa: BLE001
-                pass
-
-        if self.should_return_result and (
-            self.exhausted_callback is not None or self.exhausted_exception_factory is not None
-        ):
-            warnings.append(
-                PolicyWarning(
-                    code="return_result_precedence",
-                    message="return_result() takes precedence over fallback and exhausted errors.",
-                    hint=(
-                        "Configure fallback/on_exhausted_raise after deciding "
-                        "whether to return RetryResult."
-                    ),
-                )
-            )
-
-        # result_retry_without_observation: result-based retry with no way to observe exhaustion
-        if (
-            _has_result_condition(self.condition)
-            and not self.should_return_result
-            and self.exhausted_callback is None
-            and self.exhausted_exception_factory is None
-            and self.result_exhausted_behavior != "raise"
-        ):
-            warnings.append(
-                PolicyWarning(
-                    code="result_retry_without_observation",
-                    message=(
-                        "Result-based retry is configured without return_result(), "
-                        "fallback, or raise-on-exhausted behavior."
-                    ),
-                    hint=(
-                        "Add .return_result(), .fallback(...), or "
-                        ".raise_on_result_exhausted() to observe when "
-                        "result retry is exhausted."
-                    ),
-                )
-            )
-
-        # background_broad_exception: broad exception in a high-attempt or forever policy
-        is_high_attempt = (
-            isinstance(self.stop_strategy, StopAfterAttempt) and self.stop_strategy.maximum >= 10
-        )
-        if is_broad_exception and (is_forever or is_high_attempt):
-            warnings.append(
-                PolicyWarning(
-                    code="background_broad_exception",
-                    message=(
-                        "Broad exception handling is combined with many attempts or forever retry."
-                    ),
-                    hint=(
-                        "Background jobs catching all exceptions can mask bugs and amplify load. "
-                        "Consider narrowing the exception types or adding a circuit breaker."
-                    ),
-                )
-            )
-
-        return tuple(warnings)
+        return compute_warnings(self)
 
     def simulate(self, attempts: int = 5) -> RetrySimulation:
         """
         Simulate the delay timeline without executing user code.
 
-        The simulation is advisory. It helps users understand wait behavior before
-        using a policy in production.
+        The simulation is advisory and deterministic for fixed delays. For
+        StatefulCustomDelay, it uses a minimal state (no last_value/error).
         """
-        if attempts <= 0:
-            raise InvalidRetryConfigError("attempts must be greater than zero")
+        from retryflow.internal.policy_simulation import simulate_policy
 
-        simulated_attempts: list[RetrySimulationAttempt] = []
-        elapsed = 0.0
-        cumulative = 0.0
-
-        for attempt_number in range(1, attempts + 1):
-            should_stop = self.stop_strategy.should_stop(attempt_number, elapsed)
-            delay = 0.0 if should_stop else self.delay_strategy.next_delay(attempt_number)
-            cumulative += delay
-            simulated_attempts.append(
-                RetrySimulationAttempt(
-                    attempt_number=attempt_number,
-                    delay_before_next_attempt=delay,
-                    stops_after_attempt=should_stop,
-                    cumulative_sleep=cumulative,
-                )
-            )
-            elapsed += delay
-            if should_stop:
-                break
-
-        return RetrySimulation(tuple(simulated_attempts))
+        return simulate_policy(self, attempts)
 
     def explain(self) -> str:
-        """Return a readable explanation of this policy."""
-        lines = [
-            "RetryFlow policy",
-            "",
-            f"Stop strategy: {self.stop_strategy.__class__.__name__}",
-            f"Delay strategy: {self.delay_strategy.__class__.__name__}",
-            f"Condition: {self.condition.__class__.__name__}",
-            f"Raise last exception: {self.should_raise_last}",
-            f"Return RetryResult: {self.should_return_result}",
-            f"Result exhausted behavior: {self.result_exhausted_behavior}",
-            f"Has exhausted callback: {self.exhausted_callback is not None}",
-            f"Has exhausted exception factory: {self.exhausted_exception_factory is not None}",
-            f"Event handlers: {len(self.event_handlers)}",
-        ]
+        """Return a human-readable explanation of this policy and any warnings."""
+        from retryflow.internal.policy_simulation import explain_policy
 
-        policy_warnings = self.warnings()
-        if policy_warnings:
-            lines.extend(["", "Warnings:"])
-            for warning in policy_warnings:
-                lines.append(f"- {warning.code}: {warning.message}")
-
-        return "\n".join(lines)
+        return explain_policy(self)
 
     def timeline(self, attempts: int = 5) -> str:
         """
-        Return an estimated delay timeline.
+        Return an estimated delay timeline as a readable string.
 
-        This method does not execute the function. It only helps users understand
-        the selected delay strategy.
+        This is a shortcut for simulate(attempts).describe().
         """
         return self.simulate(attempts=attempts).describe()
+
+    # -------------------------------------------------- iteration / blocks
 
     def iter(self, *, name: str = "retry_block") -> RetryBlockIterator:
         """Return a sync retry-block iterator."""
@@ -688,6 +524,8 @@ class RetryPolicy(Generic[T]):
         """Allow `async for attempt in policy:` syntax for retry blocks."""
         return self.async_iter()
 
+    # ------------------------------------------------- execution shortcuts
+
     def run(self, function: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> Any:
         """Run a synchronous function with this policy."""
         return execute_sync(self, function, *args, **kwargs)
@@ -701,40 +539,7 @@ class RetryPolicy(Generic[T]):
         """Run an asynchronous function with this policy."""
         return await execute_async(self, function, *args, **kwargs)
 
-    def _resolve_tracked_result(self, result: RetryResult[Any]) -> Any:
-        """
-        Convert a tracked RetryResult back to the behavior configured by this policy.
-
-        Decorated functions use this method so RetryFlow can always collect
-        statistics while preserving the user's chosen return/raise behavior.
-        """
-        if self.should_return_result:
-            return result
-
-        if result.exhausted:
-            if self.exhausted_callback is not None:
-                return self.exhausted_callback(result)
-
-            if self.exhausted_exception_factory is not None:
-                raise self.exhausted_exception_factory(result)
-
-            if result.error is not None and self.should_raise_last:
-                raise result.error
-
-            if result.exhausted_by_result and self.result_exhausted_behavior == "raise":
-                raise RetryExhaustedError(
-                    "Retry attempts were exhausted by rejected return values.",
-                    result=result,
-                )
-
-            return result.value
-
-        if result.error is not None:
-            if self.should_raise_last:
-                raise result.error
-            return None
-
-        return result.value
+    # ---------------------------------------------- decorator / __call__
 
     @overload
     def __call__(self, function: Callable[P, T]) -> Callable[P, T]: ...
@@ -746,42 +551,24 @@ class RetryPolicy(Generic[T]):
         """
         Decorate a sync or async function.
 
-        Decorated functions receive:
-            - retry_stats: in-memory statistics
-            - retry_policy: the policy used by the function
-            - with_policy(policy): helper to decorate the same function with another policy
+        Decorated functions receive three extra attributes:
+            - retry_stats: in-memory statistics for this function
+            - retry_policy: the policy used by this function
+            - with_policy(policy): re-decorate with a different policy
         """
-        import inspect
+        from retryflow.internal.decorator import make_decorated
 
-        stats = RetryStats()
+        return make_decorated(self, function)
 
-        def with_policy(policy: RetryPolicy[Any]) -> Callable[..., Any]:
-            return policy(function)
+    # ------------------------------------------ internal result resolution
 
-        if inspect.iscoroutinefunction(function):
+    def _resolve_tracked_result(self, result: RetryResult[Any]) -> Any:
+        """
+        Convert a tracked RetryResult to the behavior configured by this policy.
 
-            @wraps(function)
-            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
-                tracking_policy = self.return_result()
-                result = await tracking_policy.run_async(function, *args, **kwargs)
-                stats.record(result)
-                return self._resolve_tracked_result(result)
+        Used by the decorator so statistics can be collected regardless of the
+        configured exhausted behavior.
+        """
+        from retryflow.internal.exhaustion import resolve_tracked_result
 
-            async_wrapper_any = cast(Any, async_wrapper)
-            async_wrapper_any.retry_stats = stats
-            async_wrapper_any.retry_policy = self
-            async_wrapper_any.with_policy = with_policy
-            return async_wrapper
-
-        @wraps(function)
-        def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
-            tracking_policy = self.return_result()
-            result = tracking_policy.run(function, *args, **kwargs)
-            stats.record(result)
-            return self._resolve_tracked_result(result)
-
-        sync_wrapper_any = cast(Any, sync_wrapper)
-        sync_wrapper_any.retry_stats = stats
-        sync_wrapper_any.retry_policy = self
-        sync_wrapper_any.with_policy = with_policy
-        return sync_wrapper
+        return resolve_tracked_result(self, result)

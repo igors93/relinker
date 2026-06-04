@@ -44,6 +44,9 @@ RetryPolicy().random_delay(minimum=0, maximum=1)
 RetryPolicy().random_exponential_delay(base=1, maximum=30)
 RetryPolicy().jitter(maximum=0.5)
 RetryPolicy().custom_delay(lambda attempt: attempt * 0.5)
+
+# State-aware delay — callback receives RetryState
+RetryPolicy().stateful_delay(lambda state: state.attempt_number * 0.5)
 ```
 
 ### Exhausted behavior

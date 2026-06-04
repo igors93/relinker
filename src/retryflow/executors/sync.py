@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from dataclasses import replace as _dc_replace
 from typing import TYPE_CHECKING, Any
 
 from retryflow.attempt import AttemptRecord
+from retryflow.delays.stateful import resolve_delay
 from retryflow.event import RetryEvent
-from retryflow.exceptions import RetryExhaustedError, TryAgain
+from retryflow.exceptions import TryAgain
 from retryflow.internal.clock import now
+from retryflow.internal.exhaustion import finish_exhausted
 from retryflow.result import RetryResult
 from retryflow.state import RetryCause, RetryState
 
@@ -58,29 +61,6 @@ def _state(
         will_retry=will_retry,
         will_stop=will_stop,
     )
-
-
-def _finish_exhausted(policy: RetryPolicy[Any], result: RetryResult[Any]) -> Any:
-    """Apply final exhausted behavior configured by the policy."""
-    if policy.should_return_result:
-        return result
-
-    if policy.exhausted_callback is not None:
-        return policy.exhausted_callback(result)
-
-    if policy.exhausted_exception_factory is not None:
-        raise policy.exhausted_exception_factory(result)
-
-    if result.error is not None and policy.should_raise_last:
-        raise result.error
-
-    if result.exhausted_by_result and policy.result_exhausted_behavior == "raise":
-        raise RetryExhaustedError(
-            "Retry attempts were exhausted by rejected return values.",
-            result=result,
-        )
-
-    return result.value
 
 
 def execute_sync(
@@ -178,8 +158,17 @@ def execute_sync(
                         ),
                     )
                 )
-                return _finish_exhausted(policy, result)
-            delay = policy.delay_strategy.next_delay(attempt_number)
+                return finish_exhausted(policy, result)
+            pre_sleep_state = _state(
+                function_name=function_name,
+                attempt_number=attempt_number,
+                execution_started_at=execution_started_at,
+                attempts=attempts,
+                last_error=error,
+                retry_cause="exception",
+                will_retry=True,
+            )
+            delay = resolve_delay(policy.delay_strategy, attempt_number, pre_sleep_state)
             policy.emit(
                 RetryEvent(
                     name="before_sleep",
@@ -187,16 +176,7 @@ def execute_sync(
                     function_name=function_name,
                     delay=delay,
                     error=error,
-                    state=_state(
-                        function_name=function_name,
-                        attempt_number=attempt_number,
-                        execution_started_at=execution_started_at,
-                        attempts=attempts,
-                        last_error=error,
-                        next_delay=delay,
-                        retry_cause="exception",
-                        will_retry=True,
-                    ),
+                    state=_dc_replace(pre_sleep_state, next_delay=delay),
                 )
             )
             policy.sleep(delay)
@@ -282,9 +262,18 @@ def execute_sync(
                         ),
                     )
                 )
-                return _finish_exhausted(policy, result)
+                return finish_exhausted(policy, result)
 
-            delay = policy.delay_strategy.next_delay(attempt_number)
+            pre_sleep_state = _state(
+                function_name=function_name,
+                attempt_number=attempt_number,
+                execution_started_at=execution_started_at,
+                attempts=attempts,
+                last_error=error,
+                retry_cause="exception",
+                will_retry=True,
+            )
+            delay = resolve_delay(policy.delay_strategy, attempt_number, pre_sleep_state)
             policy.emit(
                 RetryEvent(
                     name="before_sleep",
@@ -292,16 +281,7 @@ def execute_sync(
                     function_name=function_name,
                     delay=delay,
                     error=error,
-                    state=_state(
-                        function_name=function_name,
-                        attempt_number=attempt_number,
-                        execution_started_at=execution_started_at,
-                        attempts=attempts,
-                        last_error=error,
-                        next_delay=delay,
-                        retry_cause="exception",
-                        will_retry=True,
-                    ),
+                    state=_dc_replace(pre_sleep_state, next_delay=delay),
                 )
             )
             policy.sleep(delay)
@@ -373,9 +353,18 @@ def execute_sync(
                     ),
                 )
             )
-            return _finish_exhausted(policy, result)
+            return finish_exhausted(policy, result)
 
-        delay = policy.delay_strategy.next_delay(attempt_number)
+        pre_sleep_state = _state(
+            function_name=function_name,
+            attempt_number=attempt_number,
+            execution_started_at=execution_started_at,
+            attempts=attempts,
+            last_value=value,
+            retry_cause="result",
+            will_retry=True,
+        )
+        delay = resolve_delay(policy.delay_strategy, attempt_number, pre_sleep_state)
         policy.emit(
             RetryEvent(
                 name="before_sleep",
@@ -383,16 +372,7 @@ def execute_sync(
                 function_name=function_name,
                 delay=delay,
                 value=value,
-                state=_state(
-                    function_name=function_name,
-                    attempt_number=attempt_number,
-                    execution_started_at=execution_started_at,
-                    attempts=attempts,
-                    last_value=value,
-                    next_delay=delay,
-                    retry_cause="result",
-                    will_retry=True,
-                ),
+                state=_dc_replace(pre_sleep_state, next_delay=delay),
             )
         )
         policy.sleep(delay)

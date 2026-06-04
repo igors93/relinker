@@ -8,9 +8,11 @@ block into a separate function.
 
 from __future__ import annotations
 
+from dataclasses import replace as _dc_replace
 from typing import TYPE_CHECKING, Any
 
 from retryflow.attempt import AttemptRecord
+from retryflow.delays.stateful import resolve_delay
 from retryflow.event import RetryEvent
 from retryflow.exceptions import RetryExhaustedError, TryAgain
 from retryflow.internal.clock import now
@@ -218,7 +220,16 @@ class RetryAttemptContext:
             )
             return False
 
-        delay = self.policy.delay_strategy.next_delay(self.number)
+        pre_sleep_state = _state(
+            function_name=self.iterator.name,
+            attempt_number=self.number,
+            started_at=self.iterator.started_at,
+            attempts=self.iterator.attempts,
+            last_error=error,
+            retry_cause="exception",
+            will_retry=True,
+        )
+        delay = resolve_delay(self.policy.delay_strategy, self.number, pre_sleep_state)
         self.policy.emit(
             RetryEvent(
                 name="before_sleep",
@@ -226,16 +237,7 @@ class RetryAttemptContext:
                 function_name=self.iterator.name,
                 delay=delay,
                 error=error,
-                state=_state(
-                    function_name=self.iterator.name,
-                    attempt_number=self.number,
-                    started_at=self.iterator.started_at,
-                    attempts=self.iterator.attempts,
-                    last_error=error,
-                    next_delay=delay,
-                    retry_cause="exception",
-                    will_retry=True,
-                ),
+                state=_dc_replace(pre_sleep_state, next_delay=delay),
             )
         )
         self.policy.sleep(delay)
@@ -318,7 +320,16 @@ class RetryAttemptContext:
                 )
             return False
 
-        delay = self.policy.delay_strategy.next_delay(self.number)
+        pre_sleep_state = _state(
+            function_name=self.iterator.name,
+            attempt_number=self.number,
+            started_at=self.iterator.started_at,
+            attempts=self.iterator.attempts,
+            last_value=value,
+            retry_cause="result",
+            will_retry=True,
+        )
+        delay = resolve_delay(self.policy.delay_strategy, self.number, pre_sleep_state)
         self.policy.emit(
             RetryEvent(
                 name="before_sleep",
@@ -326,16 +337,7 @@ class RetryAttemptContext:
                 function_name=self.iterator.name,
                 delay=delay,
                 value=value,
-                state=_state(
-                    function_name=self.iterator.name,
-                    attempt_number=self.number,
-                    started_at=self.iterator.started_at,
-                    attempts=self.iterator.attempts,
-                    last_value=value,
-                    next_delay=delay,
-                    retry_cause="result",
-                    will_retry=True,
-                ),
+                state=_dc_replace(pre_sleep_state, next_delay=delay),
             )
         )
         self.policy.sleep(delay)
@@ -493,7 +495,16 @@ class AsyncRetryAttemptContext:
             )
             return False
 
-        delay = self.policy.delay_strategy.next_delay(self.number)
+        pre_sleep_state = _state(
+            function_name=self.iterator.name,
+            attempt_number=self.number,
+            started_at=self.iterator.started_at,
+            attempts=self.iterator.attempts,
+            last_error=error,
+            retry_cause="exception",
+            will_retry=True,
+        )
+        delay = resolve_delay(self.policy.delay_strategy, self.number, pre_sleep_state)
         self.policy.emit(
             RetryEvent(
                 name="before_sleep",
@@ -501,16 +512,7 @@ class AsyncRetryAttemptContext:
                 function_name=self.iterator.name,
                 delay=delay,
                 error=error,
-                state=_state(
-                    function_name=self.iterator.name,
-                    attempt_number=self.number,
-                    started_at=self.iterator.started_at,
-                    attempts=self.iterator.attempts,
-                    last_error=error,
-                    next_delay=delay,
-                    retry_cause="exception",
-                    will_retry=True,
-                ),
+                state=_dc_replace(pre_sleep_state, next_delay=delay),
             )
         )
         await self.policy.async_sleep(delay)
@@ -593,7 +595,16 @@ class AsyncRetryAttemptContext:
                 )
             return False
 
-        delay = self.policy.delay_strategy.next_delay(self.number)
+        pre_sleep_state = _state(
+            function_name=self.iterator.name,
+            attempt_number=self.number,
+            started_at=self.iterator.started_at,
+            attempts=self.iterator.attempts,
+            last_value=value,
+            retry_cause="result",
+            will_retry=True,
+        )
+        delay = resolve_delay(self.policy.delay_strategy, self.number, pre_sleep_state)
         self.policy.emit(
             RetryEvent(
                 name="before_sleep",
@@ -601,16 +612,7 @@ class AsyncRetryAttemptContext:
                 function_name=self.iterator.name,
                 delay=delay,
                 value=value,
-                state=_state(
-                    function_name=self.iterator.name,
-                    attempt_number=self.number,
-                    started_at=self.iterator.started_at,
-                    attempts=self.iterator.attempts,
-                    last_value=value,
-                    next_delay=delay,
-                    retry_cause="result",
-                    will_retry=True,
-                ),
+                state=_dc_replace(pre_sleep_state, next_delay=delay),
             )
         )
         await self.policy.async_sleep(delay)

@@ -26,6 +26,10 @@ debuggability.
 
 - [TryAgain](try-again.md) — explicit retry signal from inside a function
 
+## Advanced delays
+
+- [State](state.md) — RetryState for delays, events, and observability
+
 ## Observability and diagnostics
 
 - [Diagnostics](diagnostics.md) — warnings, simulation, policy explanation
@@ -33,7 +37,7 @@ debuggability.
 
 ## Integrations
 
-- [HTTP helpers](http.md) — dependency-free HTTP status and header helpers
+- [HTTP helpers](http.md) — dependency-free HTTP status and Retry-After header helpers
 
 ## Practical guidance
 

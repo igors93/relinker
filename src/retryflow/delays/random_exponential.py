@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from random import Random
 
 from retryflow.delays.base import DelayMixin
+from retryflow.exceptions import InvalidRetryConfigError
 from retryflow.internal.validation import ensure_non_negative, ensure_positive
 
 
@@ -32,6 +33,8 @@ class RandomExponentialDelay(DelayMixin):
         ensure_non_negative("minimum", self.minimum)
         if self.maximum is not None:
             ensure_non_negative("maximum", self.maximum)
+            if self.maximum < self.minimum:
+                raise InvalidRetryConfigError("maximum must be greater than or equal to minimum")
 
     def next_delay(self, attempt_number: int) -> float:
         """Return a random exponential delay for the given attempt."""

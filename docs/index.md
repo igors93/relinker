@@ -8,10 +8,13 @@ debuggability.
 - [Quickstart](quickstart.md)
 - [Policy](policy.md)
 - [Delays](delays.md)
+- [Diagnostics](diagnostics.md)
 - [Error handling](error-handling.md)
 - [Statistics](statistics.md)
 - [Async](async.md)
 - [Events](events.md)
+- [Safety](safety.md)
+- [When not to retry](when-not-to-retry.md)
 - [Testing](testing.md)
 - [Development](development.md)
 

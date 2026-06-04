@@ -8,6 +8,7 @@ Internal modules can change, but these names should remain stable whenever possi
 from __future__ import annotations
 
 from retryflow.context import AsyncRetryAttemptContext, RetryAttemptContext
+from retryflow.diagnostics import PolicyWarning, RetrySimulation, RetrySimulationAttempt
 from retryflow.exceptions import (
     InvalidRetryConfigError,
     RetryExhaustedError,
@@ -22,11 +23,14 @@ from retryflow.stats import RetryStats, RetryStatsSnapshot
 __all__ = [
     "AsyncRetryAttemptContext",
     "InvalidRetryConfigError",
+    "PolicyWarning",
     "RetryAttemptContext",
     "RetryExhaustedError",
     "RetryFlowError",
     "RetryPolicy",
     "RetryResult",
+    "RetrySimulation",
+    "RetrySimulationAttempt",
     "RetryState",
     "RetryStats",
     "RetryStatsSnapshot",

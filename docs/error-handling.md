@@ -21,6 +21,9 @@ result = (
     .return_result()
     .run(call_api)
 )
+
+if result.failed:
+    print(result.story())
 ```
 
 ## Return a fallback value
@@ -58,11 +61,42 @@ policy = (
 )
 ```
 
-## Raise from a factory
+## Behavior precedence
+
+RetryFlow keeps behavior explicit. The last behavior method you call usually
+expresses your intention.
+
+Examples:
 
 ```python
-def make_error(result):
-    return RuntimeError(f"Failed after {result.attempt_count} attempts")
+RetryPolicy().fallback_value("safe").return_result()
+```
 
-policy = RetryPolicy().attempts(3).on(TimeoutError).on_exhausted_raise(make_error)
+This returns `RetryResult`, because `return_result()` is configured last.
+
+```python
+RetryPolicy().return_result().fallback_value("safe")
+```
+
+This returns `"safe"` when attempts are exhausted, because `fallback_value()` is
+configured last and disables `return_result()`.
+
+Recommended rule:
+
+- Use `return_result()` when you want inspection.
+- Use `fallback()` or `fallback_value()` when you want graceful degradation.
+- Use `on_exhausted_raise()` when callers should handle a domain-specific error.
+
+## Result-based exhaustion
+
+When retry is caused by returned values, you can choose whether to return the
+last value or raise.
+
+```python
+policy = (
+    RetryPolicy()
+    .attempts(3)
+    .retry_if_result(lambda value: value is None)
+    .raise_on_result_exhausted()
+)
 ```

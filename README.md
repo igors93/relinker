@@ -15,6 +15,7 @@ It gives you:
 - Composable stop strategies.
 - Rich execution results.
 - Per-function retry statistics.
+- Policy diagnostics with `warnings()` and `simulate()`.
 - Better exhausted-retry handling with fallbacks and custom exceptions.
 - Event state for logging and observability.
 - Context manager support for retrying blocks.
@@ -22,7 +23,7 @@ It gives you:
 
 ## Current status
 
-RetryFlow is in early development.
+RetryFlow is in early development. The current package version is `0.3.0`.
 
 Until the package is published on PyPI, install it directly from GitHub:
 
@@ -42,11 +43,37 @@ def unstable_task() -> str:
 print(unstable_task())
 ```
 
-## More delay options
+## Advanced policy
 
 ```python
 from retryflow import RetryPolicy
 
+policy = (
+    RetryPolicy()
+    .attempts(5)
+    .on(TimeoutError, ConnectionError)
+    .exponential_delay(base=1, maximum=30)
+    .jitter(maximum=0.5)
+)
+```
+
+## Diagnostics
+
+RetryFlow does not block application-level choices, but it can help users notice
+risky policies.
+
+```python
+policy = RetryPolicy().forever().on(Exception).no_delay()
+
+for warning in policy.warnings():
+    print(warning.code, warning.message)
+
+print(policy.simulate(attempts=5).describe())
+```
+
+## More delay options
+
+```python
 RetryPolicy().linear_delay(start=1, step=2, maximum=10)
 RetryPolicy().chain_delay([0.1, 0.5, 1, 2])
 RetryPolicy().random_exponential_delay(base=1, maximum=30)
@@ -71,8 +98,6 @@ print(fetch_data.retry_stats.to_dict())
 ## Exhausted retry control
 
 ```python
-from retryflow import RetryPolicy
-
 policy = (
     RetryPolicy()
     .attempts(3)

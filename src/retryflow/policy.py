@@ -28,6 +28,7 @@ from retryflow.delays.fixed import FixedDelay
 from retryflow.delays.linear import LinearDelay
 from retryflow.delays.random_delay import RandomDelay
 from retryflow.delays.random_exponential import RandomExponentialDelay
+from retryflow.diagnostics import PolicyWarning, RetrySimulation, RetrySimulationAttempt
 from retryflow.event import EventHandler, EventName, RetryEvent
 from retryflow.exceptions import InvalidRetryConfigError, RetryExhaustedError
 from retryflow.executors.async_ import execute_async
@@ -38,7 +39,6 @@ from retryflow.result import RetryResult
 from retryflow.stats import RetryStats
 from retryflow.stop.attempts import StopAfterAttempt
 from retryflow.stop.base import StopStrategy
-from retryflow.stop.composite import AllStopStrategy, AnyStopStrategy
 from retryflow.stop.forever import StopForever
 from retryflow.stop.max_time import StopAfterDelay
 from retryflow.typing import P, T
@@ -87,6 +87,8 @@ class RetryPolicy(Generic[T]):
 
     def or_stop_after_attempts(self, maximum: int) -> RetryPolicy[T]:
         """Return a new policy that stops on current strategy OR attempt limit."""
+        from retryflow.stop.composite import AnyStopStrategy
+
         return replace(
             self,
             stop_strategy=AnyStopStrategy((self.stop_strategy, StopAfterAttempt(maximum))),
@@ -94,6 +96,8 @@ class RetryPolicy(Generic[T]):
 
     def or_stop_after_time(self, seconds: float) -> RetryPolicy[T]:
         """Return a new policy that stops on current strategy OR elapsed time."""
+        from retryflow.stop.composite import AnyStopStrategy
+
         return replace(
             self,
             stop_strategy=AnyStopStrategy((self.stop_strategy, StopAfterDelay(seconds))),
@@ -101,6 +105,8 @@ class RetryPolicy(Generic[T]):
 
     def and_stop_after_attempts(self, maximum: int) -> RetryPolicy[T]:
         """Return a new policy that stops only when both strategies stop."""
+        from retryflow.stop.composite import AllStopStrategy
+
         return replace(
             self,
             stop_strategy=AllStopStrategy((self.stop_strategy, StopAfterAttempt(maximum))),
@@ -108,6 +114,8 @@ class RetryPolicy(Generic[T]):
 
     def and_stop_after_time(self, seconds: float) -> RetryPolicy[T]:
         """Return a new policy that stops only when both strategies stop."""
+        from retryflow.stop.composite import AllStopStrategy
+
         return replace(
             self,
             stop_strategy=AllStopStrategy((self.stop_strategy, StopAfterDelay(seconds))),
@@ -394,23 +402,116 @@ class RetryPolicy(Generic[T]):
             if name == event.name:
                 handler(event)
 
+    def warnings(self) -> tuple[PolicyWarning, ...]:
+        """
+        Return non-blocking warnings about this policy.
+
+        RetryFlow does not prevent risky application-level choices, but this
+        method helps users notice them.
+        """
+        warnings: list[PolicyWarning] = []
+
+        stop_name = self.stop_strategy.__class__.__name__
+        delay_name = self.delay_strategy.__class__.__name__
+        condition_name = self.condition.__class__.__name__
+
+        if stop_name == "StopForever":
+            warnings.append(
+                PolicyWarning(
+                    code="forever",
+                    message="This policy can retry forever.",
+                    hint="Use forever() only when the caller controls cancellation or shutdown.",
+                )
+            )
+
+        if delay_name == "FixedDelay" and getattr(self.delay_strategy, "seconds", None) == 0:
+            warnings.append(
+                PolicyWarning(
+                    code="no_delay",
+                    message="This policy has no delay between attempts.",
+                    hint="Consider jitter or backoff for external services.",
+                )
+            )
+
+        if condition_name == "ExceptionCondition":
+            exception_types = getattr(self.condition, "exception_types", ())
+            if exception_types == (Exception,):
+                warnings.append(
+                    PolicyWarning(
+                        code="broad_exception",
+                        message="This policy retries all Exception subclasses.",
+                        hint="Prefer specific exception types when possible.",
+                    )
+                )
+
+        if self.should_return_result and (
+            self.exhausted_callback is not None or self.exhausted_exception_factory is not None
+        ):
+            warnings.append(
+                PolicyWarning(
+                    code="return_result_precedence",
+                    message="return_result() takes precedence over fallback and exhausted errors.",
+                    hint=(
+                        "Configure fallback/on_exhausted_raise after deciding "
+                        "whether to return RetryResult."
+                    ),
+                )
+            )
+
+        return tuple(warnings)
+
+    def simulate(self, attempts: int = 5) -> RetrySimulation:
+        """
+        Simulate the delay timeline without executing user code.
+
+        The simulation is advisory. It helps users understand wait behavior before
+        using a policy in production.
+        """
+        if attempts <= 0:
+            raise InvalidRetryConfigError("attempts must be greater than zero")
+
+        simulated_attempts: list[RetrySimulationAttempt] = []
+        elapsed = 0.0
+
+        for attempt_number in range(1, attempts + 1):
+            should_stop = self.stop_strategy.should_stop(attempt_number, elapsed)
+            delay = 0.0 if should_stop else self.delay_strategy.next_delay(attempt_number)
+            simulated_attempts.append(
+                RetrySimulationAttempt(
+                    attempt_number=attempt_number,
+                    delay_before_next_attempt=delay,
+                    stops_after_attempt=should_stop,
+                )
+            )
+            elapsed += delay
+            if should_stop:
+                break
+
+        return RetrySimulation(tuple(simulated_attempts))
+
     def explain(self) -> str:
         """Return a readable explanation of this policy."""
-        return "\n".join(
-            [
-                "RetryFlow policy",
-                "",
-                f"Stop strategy: {self.stop_strategy.__class__.__name__}",
-                f"Delay strategy: {self.delay_strategy.__class__.__name__}",
-                f"Condition: {self.condition.__class__.__name__}",
-                f"Raise last exception: {self.should_raise_last}",
-                f"Return RetryResult: {self.should_return_result}",
-                f"Result exhausted behavior: {self.result_exhausted_behavior}",
-                f"Has exhausted callback: {self.exhausted_callback is not None}",
-                f"Has exhausted exception factory: {self.exhausted_exception_factory is not None}",
-                f"Event handlers: {len(self.event_handlers)}",
-            ]
-        )
+        lines = [
+            "RetryFlow policy",
+            "",
+            f"Stop strategy: {self.stop_strategy.__class__.__name__}",
+            f"Delay strategy: {self.delay_strategy.__class__.__name__}",
+            f"Condition: {self.condition.__class__.__name__}",
+            f"Raise last exception: {self.should_raise_last}",
+            f"Return RetryResult: {self.should_return_result}",
+            f"Result exhausted behavior: {self.result_exhausted_behavior}",
+            f"Has exhausted callback: {self.exhausted_callback is not None}",
+            f"Has exhausted exception factory: {self.exhausted_exception_factory is not None}",
+            f"Event handlers: {len(self.event_handlers)}",
+        ]
+
+        policy_warnings = self.warnings()
+        if policy_warnings:
+            lines.extend(["", "Warnings:"])
+            for warning in policy_warnings:
+                lines.append(f"- {warning.code}: {warning.message}")
+
+        return "\n".join(lines)
 
     def timeline(self, attempts: int = 5) -> str:
         """
@@ -419,11 +520,7 @@ class RetryPolicy(Generic[T]):
         This method does not execute the function. It only helps users understand
         the selected delay strategy.
         """
-        lines = ["RetryFlow estimated timeline", ""]
-        for attempt_number in range(1, attempts + 1):
-            delay = self.delay_strategy.next_delay(attempt_number)
-            lines.append(f"After attempt {attempt_number}: wait {delay:.4f}s")
-        return "\n".join(lines)
+        return self.simulate(attempts=attempts).describe()
 
     def iter(self, *, name: str = "retry_block") -> RetryBlockIterator:
         """Return a sync retry-block iterator."""

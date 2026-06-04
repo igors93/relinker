@@ -1,15 +1,16 @@
 import asyncio
 
-from retryflow import retry
+from retryflow import network
 
 
-@retry(attempts=3)
-async def async_task() -> str:
-    return "ok"
+@network()
+async def fetch_user() -> dict[str, int]:
+    return {"id": 1}
 
 
 async def main() -> None:
-    print(await async_task())
+    print(await fetch_user())
 
 
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())

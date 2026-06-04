@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "retryflow"
-version = "0.3.0"
+version = "0.4.0"
 description = "A clear, modular, and debuggable retry library for Python."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -27,7 +27,7 @@ dependencies = []
 
 [project.optional-dependencies]
 dev = [
-  "build>=1.5.0",
+  "build>=1.2",
   "pytest>=9.0.3",
   "pytest-asyncio>=1.4.0",
   "ruff>=0.15.15",

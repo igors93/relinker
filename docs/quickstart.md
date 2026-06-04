@@ -1,6 +1,10 @@
 # Quickstart
 
-This guide shows the smallest useful RetryFlow examples.
+RetryFlow has three levels of usage:
+
+1. `@retry` for simple cases.
+2. Presets for common production scenarios.
+3. `RetryPolicy` for full control.
 
 ## Install from GitHub
 
@@ -18,7 +22,7 @@ cd retryflow
 pip install -e ".[dev]"
 ```
 
-## Basic decorator
+## Simple decorator
 
 ```python
 from retryflow import retry
@@ -26,6 +30,16 @@ from retryflow import retry
 @retry(attempts=3, delay=1)
 def fetch_data() -> str:
     return "ok"
+```
+
+## Preset
+
+```python
+from retryflow import network
+
+@network()
+def call_api() -> str:
+    return "response"
 ```
 
 ## Fluent policy
@@ -63,39 +77,13 @@ print(result.failed)
 print(result.exhausted_by_result)
 ```
 
-## Context manager
+## Diagnostics
 
 ```python
-from retryflow import RetryPolicy
+policy = RetryPolicy().forever().on(Exception).no_delay()
 
-policy = RetryPolicy().attempts(3).on(RuntimeError)
+for warning in policy.warnings():
+    print(warning.code, warning.message)
 
-for attempt in policy.iter(name="database_block"):
-    with attempt:
-        save_to_database()
-```
-
-## Context manager with result retry
-
-```python
-from retryflow import RetryPolicy
-
-policy = RetryPolicy().attempts(3).retry_if_result(lambda value: value is None)
-
-for attempt in policy.iter(name="result_block"):
-    with attempt:
-        value = maybe_return_none()
-        attempt.set_result(value)
-```
-
-## Async context manager
-
-```python
-from retryflow import RetryPolicy
-
-policy = RetryPolicy().attempts(3).on(TimeoutError)
-
-async for attempt in policy.async_iter(name="async_block"):
-    async with attempt:
-        await call_async_service()
+print(policy.timeline(attempts=3))
 ```

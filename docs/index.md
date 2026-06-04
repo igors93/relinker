@@ -6,6 +6,8 @@ debuggability.
 ## Main guides
 
 - [Quickstart](quickstart.md)
+- [Presets](presets.md)
+- [Examples](examples.md)
 - [Policy](policy.md)
 - [Delays](delays.md)
 - [Diagnostics](diagnostics.md)
@@ -15,6 +17,7 @@ debuggability.
 - [Events](events.md)
 - [Safety](safety.md)
 - [When not to retry](when-not-to-retry.md)
+- [API reference](api-reference.md)
 - [Testing](testing.md)
 - [Development](development.md)
 

@@ -1,9 +1,10 @@
 from retryflow import retry
 
 
-@retry(attempts=3, delay=0.2)
+@retry(attempts=3, delay=0.1)
 def unstable_task() -> str:
     return "ok"
 
 
-print(unstable_task())
+if __name__ == "__main__":
+    print(unstable_task())

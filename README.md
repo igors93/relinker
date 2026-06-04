@@ -7,6 +7,7 @@ RetryFlow is a Python retry library focused on clarity, control, and debuggabili
 It gives you:
 
 - A simple `@retry` decorator.
+- Ready-to-use presets such as `network()`, `database()`, and `background_job()`.
 - A fluent `RetryPolicy` builder.
 - Sync and async execution.
 - Retry by exception, result, or custom condition.
@@ -23,7 +24,7 @@ It gives you:
 
 ## Current status
 
-RetryFlow is in early development. The current package version is `0.3.0`.
+RetryFlow is in early development. The current package version is `0.4.0`.
 
 Until the package is published on PyPI, install it directly from GitHub:
 
@@ -31,7 +32,9 @@ Until the package is published on PyPI, install it directly from GitHub:
 pip install git+https://github.com/igors93/retryflow.git
 ```
 
-## Quick example
+## Simple usage
+
+Use `@retry` for quick cases:
 
 ```python
 from retryflow import retry
@@ -39,11 +42,19 @@ from retryflow import retry
 @retry(attempts=3, delay=1)
 def unstable_task() -> str:
     return "ok"
-
-print(unstable_task())
 ```
 
-## Advanced policy
+Use presets for common production scenarios:
+
+```python
+from retryflow import network
+
+@network()
+def call_external_api() -> str:
+    return "response"
+```
+
+Use `RetryPolicy` when you want full control:
 
 ```python
 from retryflow import RetryPolicy
@@ -71,22 +82,14 @@ for warning in policy.warnings():
 print(policy.simulate(attempts=5).describe())
 ```
 
-## More delay options
-
-```python
-RetryPolicy().linear_delay(start=1, step=2, maximum=10)
-RetryPolicy().chain_delay([0.1, 0.5, 1, 2])
-RetryPolicy().random_exponential_delay(base=1, maximum=30)
-```
-
 ## Statistics
 
 Decorated functions receive retry statistics:
 
 ```python
-from retryflow import retry
+from retryflow import network
 
-@retry(attempts=3)
+@network()
 def fetch_data() -> str:
     return "ok"
 
@@ -123,9 +126,9 @@ policy = (
 ## Async
 
 ```python
-from retryflow import retry
+from retryflow import network
 
-@retry(attempts=3)
+@network()
 async def fetch_user() -> dict:
     return {"id": 1}
 ```

@@ -15,6 +15,7 @@ from retryflow.exceptions import (
     RetryFlowError,
 )
 from retryflow.policy import RetryPolicy
+from retryflow.presets import background_job, database, fast, network, patient
 from retryflow.result import RetryResult
 from retryflow.retry import retry
 from retryflow.state import RetryState
@@ -34,7 +35,12 @@ __all__ = [
     "RetryState",
     "RetryStats",
     "RetryStatsSnapshot",
+    "background_job",
+    "database",
+    "fast",
+    "network",
+    "patient",
     "retry",
 ]
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"

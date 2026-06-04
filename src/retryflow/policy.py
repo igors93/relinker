@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
 from functools import wraps
-from typing import Any, Generic, Literal, overload
+from typing import Any, Generic, Literal, cast, overload
 
 from retryflow.conditions.base import RetryCondition
 from retryflow.conditions.composite import AllCondition, AnyCondition
@@ -20,16 +20,22 @@ from retryflow.conditions.exception import ExceptionCondition
 from retryflow.conditions.result import ResultCondition
 from retryflow.context import AsyncRetryBlockIterator, RetryBlockIterator
 from retryflow.delays.base import DelayStrategy
+from retryflow.delays.chain import ChainDelay
 from retryflow.delays.composite import AdditiveDelay
 from retryflow.delays.custom import CustomDelay
 from retryflow.delays.exponential import ExponentialDelay
 from retryflow.delays.fixed import FixedDelay
+from retryflow.delays.linear import LinearDelay
 from retryflow.delays.random_delay import RandomDelay
+from retryflow.delays.random_exponential import RandomExponentialDelay
 from retryflow.event import EventHandler, EventName, RetryEvent
+from retryflow.exceptions import InvalidRetryConfigError, RetryExhaustedError
 from retryflow.executors.async_ import execute_async
 from retryflow.executors.sync import execute_sync
 from retryflow.internal.sleep import async_sleep as default_async_sleep
 from retryflow.internal.sleep import sleep as default_sleep
+from retryflow.result import RetryResult
+from retryflow.stats import RetryStats
 from retryflow.stop.attempts import StopAfterAttempt
 from retryflow.stop.base import StopStrategy
 from retryflow.stop.composite import AllStopStrategy, AnyStopStrategy
@@ -38,6 +44,8 @@ from retryflow.stop.max_time import StopAfterDelay
 from retryflow.typing import P, T
 
 ResultExhaustedBehavior = Literal["return_last", "raise"]
+ExhaustedCallback = Callable[[RetryResult[Any]], Any]
+ExceptionFactory = Callable[[RetryResult[Any]], BaseException]
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,6 +63,8 @@ class RetryPolicy(Generic[T]):
     should_raise_last: bool = True
     should_return_result: bool = False
     result_exhausted_behavior: ResultExhaustedBehavior = "return_last"
+    exhausted_callback: ExhaustedCallback | None = None
+    exhausted_exception_factory: ExceptionFactory | None = None
     event_handlers: tuple[tuple[EventName, EventHandler], ...] = ()
     sleep: Callable[[float], None] = default_sleep
     async_sleep: Callable[[float], Awaitable[None]] = default_async_sleep
@@ -150,6 +160,24 @@ class RetryPolicy(Generic[T]):
         """Return a new policy with zero delay."""
         return self.fixed_delay(0)
 
+    def linear_delay(
+        self,
+        *,
+        start: float = 0.0,
+        step: float = 1.0,
+        maximum: float | None = None,
+    ) -> RetryPolicy[T]:
+        """Return a new policy with linear delay."""
+        return replace(self, delay_strategy=LinearDelay(start=start, step=step, maximum=maximum))
+
+    def chain_delay(self, delays: list[float] | tuple[float, ...]) -> RetryPolicy[T]:
+        """
+        Return a new policy with a predefined delay sequence.
+
+        When attempts exceed the sequence length, the last delay is reused.
+        """
+        return replace(self, delay_strategy=ChainDelay(tuple(delays)))
+
     def exponential_delay(
         self,
         *,
@@ -161,6 +189,27 @@ class RetryPolicy(Generic[T]):
         return replace(
             self,
             delay_strategy=ExponentialDelay(base=base, factor=factor, maximum=maximum),
+        )
+
+    def random_exponential_delay(
+        self,
+        *,
+        base: float = 1.0,
+        factor: float = 2.0,
+        minimum: float = 0.0,
+        maximum: float | None = None,
+        seed: int | None = None,
+    ) -> RetryPolicy[T]:
+        """Return a new policy with random exponential delay."""
+        return replace(
+            self,
+            delay_strategy=RandomExponentialDelay(
+                base=base,
+                factor=factor,
+                minimum=minimum,
+                maximum=maximum,
+                seed=seed,
+            ),
         )
 
     def random_delay(
@@ -220,6 +269,74 @@ class RetryPolicy(Generic[T]):
     def return_last_on_result_exhausted(self) -> RetryPolicy[T]:
         """Return a new policy that returns the last value when result retry is exhausted."""
         return replace(self, result_exhausted_behavior="return_last")
+
+    def on_exhausted_return(self, callback: ExhaustedCallback) -> RetryPolicy[T]:
+        """
+        Return a new policy that calls a callback when retry attempts are exhausted.
+
+        The callback receives RetryResult and its return value becomes the final
+        return value. This is useful for fallbacks.
+        """
+        return replace(
+            self,
+            exhausted_callback=callback,
+            exhausted_exception_factory=None,
+            should_return_result=False,
+        )
+
+    def on_exhausted_return_value(self, value: Any) -> RetryPolicy[T]:
+        """Return a new policy that returns a fixed value when retries are exhausted."""
+
+        def callback(result: RetryResult[Any]) -> Any:
+            return value
+
+        return self.on_exhausted_return(callback)
+
+    def fallback(self, callback: ExhaustedCallback) -> RetryPolicy[T]:
+        """Alias for on_exhausted_return with a shorter name."""
+        return self.on_exhausted_return(callback)
+
+    def fallback_value(self, value: Any) -> RetryPolicy[T]:
+        """Alias for on_exhausted_return_value with a shorter name."""
+        return self.on_exhausted_return_value(value)
+
+    def on_exhausted_raise(
+        self,
+        exception: BaseException | type[BaseException] | ExceptionFactory,
+    ) -> RetryPolicy[T]:
+        """
+        Return a new policy that raises a custom exception when retries are exhausted.
+
+        Accepted values:
+            - an exception instance
+            - an exception class
+            - a factory that receives RetryResult and returns an exception
+        """
+        resolved_factory: ExceptionFactory
+
+        if isinstance(exception, type) and issubclass(exception, BaseException):
+
+            def make_from_class(result: RetryResult[Any]) -> BaseException:
+                return exception("Retry attempts were exhausted.")
+
+            resolved_factory = make_from_class
+        elif isinstance(exception, BaseException):
+
+            def make_from_instance(result: RetryResult[Any]) -> BaseException:
+                return exception
+
+            resolved_factory = make_from_instance
+        elif callable(exception):
+            resolved_factory = cast(ExceptionFactory, exception)
+        else:
+            raise InvalidRetryConfigError("exception must be an exception, class, or factory")
+
+        return replace(
+            self,
+            exhausted_exception_factory=resolved_factory,
+            exhausted_callback=None,
+            should_return_result=False,
+        )
 
     def with_sleep(
         self,
@@ -289,6 +406,8 @@ class RetryPolicy(Generic[T]):
                 f"Raise last exception: {self.should_raise_last}",
                 f"Return RetryResult: {self.should_return_result}",
                 f"Result exhausted behavior: {self.result_exhausted_behavior}",
+                f"Has exhausted callback: {self.exhausted_callback is not None}",
+                f"Has exhausted exception factory: {self.exhausted_exception_factory is not None}",
                 f"Event handlers: {len(self.event_handlers)}",
             ]
         )
@@ -335,6 +454,41 @@ class RetryPolicy(Generic[T]):
         """Run an asynchronous function with this policy."""
         return await execute_async(self, function, *args, **kwargs)
 
+    def _resolve_tracked_result(self, result: RetryResult[Any]) -> Any:
+        """
+        Convert a tracked RetryResult back to the behavior configured by this policy.
+
+        Decorated functions use this method so RetryFlow can always collect
+        statistics while preserving the user's chosen return/raise behavior.
+        """
+        if self.should_return_result:
+            return result
+
+        if result.exhausted:
+            if self.exhausted_callback is not None:
+                return self.exhausted_callback(result)
+
+            if self.exhausted_exception_factory is not None:
+                raise self.exhausted_exception_factory(result)
+
+            if result.error is not None and self.should_raise_last:
+                raise result.error
+
+            if result.exhausted_by_result and self.result_exhausted_behavior == "raise":
+                raise RetryExhaustedError(
+                    "Retry attempts were exhausted by rejected return values.",
+                    result=result,
+                )
+
+            return result.value
+
+        if result.error is not None:
+            if self.should_raise_last:
+                raise result.error
+            return None
+
+        return result.value
+
     @overload
     def __call__(self, function: Callable[P, T]) -> Callable[P, T]: ...
 
@@ -345,20 +499,42 @@ class RetryPolicy(Generic[T]):
         """
         Decorate a sync or async function.
 
-        RetryFlow detects coroutine functions and routes them to the async executor.
+        Decorated functions receive:
+            - retry_stats: in-memory statistics
+            - retry_policy: the policy used by the function
+            - with_policy(policy): helper to decorate the same function with another policy
         """
         import inspect
+
+        stats = RetryStats()
+
+        def with_policy(policy: RetryPolicy[Any]) -> Callable[..., Any]:
+            return policy(function)
 
         if inspect.iscoroutinefunction(function):
 
             @wraps(function)
             async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
-                return await self.run_async(function, *args, **kwargs)
+                tracking_policy = self.return_result()
+                result = await tracking_policy.run_async(function, *args, **kwargs)
+                stats.record(result)
+                return self._resolve_tracked_result(result)
 
+            async_wrapper_any = cast(Any, async_wrapper)
+            async_wrapper_any.retry_stats = stats
+            async_wrapper_any.retry_policy = self
+            async_wrapper_any.with_policy = with_policy
             return async_wrapper
 
         @wraps(function)
         def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
-            return self.run(function, *args, **kwargs)
+            tracking_policy = self.return_result()
+            result = tracking_policy.run(function, *args, **kwargs)
+            stats.record(result)
+            return self._resolve_tracked_result(result)
 
+        sync_wrapper_any = cast(Any, sync_wrapper)
+        sync_wrapper_any.retry_stats = stats
+        sync_wrapper_any.retry_policy = self
+        sync_wrapper_any.with_policy = with_policy
         return sync_wrapper

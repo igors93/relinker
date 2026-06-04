@@ -17,6 +17,7 @@ from retryflow.policy import RetryPolicy
 from retryflow.result import RetryResult
 from retryflow.retry import retry
 from retryflow.state import RetryState
+from retryflow.stats import RetryStats, RetryStatsSnapshot
 
 __all__ = [
     "AsyncRetryAttemptContext",
@@ -27,7 +28,9 @@ __all__ = [
     "RetryPolicy",
     "RetryResult",
     "RetryState",
+    "RetryStats",
+    "RetryStatsSnapshot",
     "retry",
 ]
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"

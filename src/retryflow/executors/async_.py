@@ -60,6 +60,29 @@ def _state(
     )
 
 
+def _finish_exhausted(policy: RetryPolicy[Any], result: RetryResult[Any]) -> Any:
+    """Apply final exhausted behavior configured by the policy."""
+    if policy.should_return_result:
+        return result
+
+    if policy.exhausted_callback is not None:
+        return policy.exhausted_callback(result)
+
+    if policy.exhausted_exception_factory is not None:
+        raise policy.exhausted_exception_factory(result)
+
+    if result.error is not None and policy.should_raise_last:
+        raise result.error
+
+    if result.exhausted_by_result and policy.result_exhausted_behavior == "raise":
+        raise RetryExhaustedError(
+            "Retry attempts were exhausted by rejected return values.",
+            result=result,
+        )
+
+    return result.value
+
+
 async def execute_async(
     policy: RetryPolicy[Any],
     function: Callable[..., Any],
@@ -132,14 +155,35 @@ async def execute_async(
                 )
             )
 
-            if not should_retry or should_stop:
+            if not should_retry:
                 result: RetryResult[Any] = RetryResult(
                     attempts=tuple(attempts),
                     error=error,
                     started_at=execution_started_at,
                     ended_at=now(),
-                    exhausted=should_retry and should_stop,
-                    retry_cause="exception" if should_retry and should_stop else None,
+                )
+                policy.emit(
+                    RetryEvent(
+                        name="after_giveup",
+                        attempt_number=attempt_number,
+                        function_name=function_name,
+                        error=error,
+                    )
+                )
+                if policy.should_return_result:
+                    return result
+                if policy.should_raise_last:
+                    raise error
+                return None
+
+            if should_stop:
+                result = RetryResult(
+                    attempts=tuple(attempts),
+                    error=error,
+                    started_at=execution_started_at,
+                    ended_at=now(),
+                    exhausted=True,
+                    retry_cause="exception",
                 )
                 policy.emit(
                     RetryEvent(
@@ -158,11 +202,7 @@ async def execute_async(
                         ),
                     )
                 )
-                if policy.should_return_result:
-                    return result
-                if policy.should_raise_last:
-                    raise error
-                return None
+                return _finish_exhausted(policy, result)
 
             delay = policy.delay_strategy.next_delay(attempt_number)
             policy.emit(
@@ -253,14 +293,7 @@ async def execute_async(
                     ),
                 )
             )
-            if policy.should_return_result:
-                return result
-            if policy.result_exhausted_behavior == "raise":
-                raise RetryExhaustedError(
-                    "Retry attempts were exhausted by rejected return values.",
-                    result=result,
-                )
-            return value
+            return _finish_exhausted(policy, result)
 
         delay = policy.delay_strategy.next_delay(attempt_number)
         policy.emit(

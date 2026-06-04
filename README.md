@@ -10,10 +10,12 @@ It gives you:
 - A fluent `RetryPolicy` builder.
 - Sync and async execution.
 - Retry by exception, result, or custom condition.
-- Fixed, exponential, random, custom, and additive delays.
+- Fixed, linear, chain, exponential, random, random exponential, custom, and additive delays.
 - Composable retry conditions.
 - Composable stop strategies.
 - Rich execution results.
+- Per-function retry statistics.
+- Better exhausted-retry handling with fallbacks and custom exceptions.
 - Event state for logging and observability.
 - Context manager support for retrying blocks.
 - Testing helpers to avoid real sleeping in tests.
@@ -28,14 +30,6 @@ Until the package is published on PyPI, install it directly from GitHub:
 pip install git+https://github.com/igors93/retryflow.git
 ```
 
-For local development:
-
-```bash
-git clone https://github.com/igors93/retryflow.git
-cd retryflow
-pip install -e ".[dev]"
-```
-
 ## Quick example
 
 ```python
@@ -48,26 +42,33 @@ def unstable_task() -> str:
 print(unstable_task())
 ```
 
-## Policy example
+## More delay options
 
 ```python
 from retryflow import RetryPolicy
 
-policy = (
-    RetryPolicy()
-    .attempts(5)
-    .on(TimeoutError, ConnectionError)
-    .exponential_delay(base=1, maximum=30)
-    .jitter(maximum=0.5)
-    .debug()
-)
-
-@policy
-def fetch_data() -> str:
-    return "data"
+RetryPolicy().linear_delay(start=1, step=2, maximum=10)
+RetryPolicy().chain_delay([0.1, 0.5, 1, 2])
+RetryPolicy().random_exponential_delay(base=1, maximum=30)
 ```
 
-## Result-aware retry
+## Statistics
+
+Decorated functions receive retry statistics:
+
+```python
+from retryflow import retry
+
+@retry(attempts=3)
+def fetch_data() -> str:
+    return "ok"
+
+fetch_data()
+
+print(fetch_data.retry_stats.to_dict())
+```
+
+## Exhausted retry control
 
 ```python
 from retryflow import RetryPolicy
@@ -75,32 +76,36 @@ from retryflow import RetryPolicy
 policy = (
     RetryPolicy()
     .attempts(3)
-    .retry_if_result(lambda value: value is None)
-    .return_result()
+    .on(TimeoutError)
+    .fallback_value({"status": "unavailable"})
 )
-
-result = policy.run(lambda: None)
-
-print(result.failed)
-print(result.exhausted)
-print(result.story())
 ```
 
-## Context manager
+Or raise a custom exception:
 
 ```python
-from retryflow import RetryPolicy
+class ServiceUnavailableError(RuntimeError):
+    pass
 
-policy = RetryPolicy().attempts(3).on(RuntimeError)
+policy = (
+    RetryPolicy()
+    .attempts(3)
+    .on(TimeoutError)
+    .on_exhausted_raise(ServiceUnavailableError)
+)
+```
 
-for attempt in policy.iter(name="important_block"):
-    with attempt:
-        risky_operation()
+## Async
+
+```python
+from retryflow import retry
+
+@retry(attempts=3)
+async def fetch_user() -> dict:
+    return {"id": 1}
 ```
 
 ## Development checks
-
-Run the same checks used by GitHub Actions:
 
 ```bash
 ./scripts/ci.sh

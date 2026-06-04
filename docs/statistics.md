@@ -3,7 +3,7 @@
 Decorated functions automatically receive in-memory retry statistics.
 
 ```python
-from retryflow import retry
+from relinker import retry
 
 @retry(attempts=3)
 def fetch_data() -> str:

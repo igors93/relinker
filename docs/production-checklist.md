@@ -36,7 +36,7 @@ Use this checklist before deploying retry behavior.
 - [ ] Are fallback paths tested?
 - [ ] Are async retry paths tested if used?
 
-## RetryFlow checks
+## Relinker checks
 
 Run:
 

@@ -1,4 +1,4 @@
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 
 def test_sync_context_manager_retries_exception() -> None:

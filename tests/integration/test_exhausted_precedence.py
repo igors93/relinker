@@ -1,4 +1,4 @@
-from retryflow import RetryPolicy, RetryResult
+from relinker import RetryPolicy, RetryResult
 
 
 def test_return_result_configured_last_takes_precedence_over_fallback() -> None:

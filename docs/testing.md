@@ -1,11 +1,11 @@
 # Testing Retry Code
 
-Retry code can make tests slow if it sleeps for real. RetryFlow lets you inject custom sleep functions.
+Retry code can make tests slow if it sleeps for real. Relinker lets you inject custom sleep functions.
 
 ## Disable sleep in tests
 
 ```python
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 policy = (
     RetryPolicy()

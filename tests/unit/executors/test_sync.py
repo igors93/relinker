@@ -1,7 +1,7 @@
 import pytest
 
-from retryflow import RetryPolicy
-from retryflow.exceptions import RetryExhaustedError
+from relinker import RetryPolicy
+from relinker.exceptions import RetryExhaustedError
 
 
 def test_sync_executor_return_result() -> None:

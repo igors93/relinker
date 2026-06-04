@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 
 from examples.fake_services import FlakyService
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 

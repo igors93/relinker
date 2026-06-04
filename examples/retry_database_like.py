@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from examples.fake_services import FlakyService
-from retryflow import database
+from relinker import database
 
 service = FlakyService(failures_before_success=2, error_type=ConnectionError)
 policy = database(ConnectionError).with_sleep(lambda seconds: None)

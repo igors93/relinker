@@ -1,6 +1,6 @@
 # Quickstart
 
-RetryFlow has three levels of usage:
+Relinker has three levels of usage:
 
 1. `@retry` for simple cases.
 2. Presets for common production scenarios.
@@ -8,24 +8,24 @@ RetryFlow has three levels of usage:
 
 ## Install from GitHub
 
-Until RetryFlow is published on PyPI:
+Until Relinker is published on PyPI:
 
 ```bash
-pip install git+https://github.com/igors93/retryflow.git
+pip install git+https://github.com/igors93/relinker.git
 ```
 
 For local development:
 
 ```bash
-git clone https://github.com/igors93/retryflow.git
-cd retryflow
+git clone https://github.com/igors93/relinker.git
+cd relinker
 pip install -e ".[dev]"
 ```
 
 ## Simple decorator
 
 ```python
-from retryflow import retry
+from relinker import retry
 
 @retry(attempts=3, delay=1)
 def fetch_data() -> str:
@@ -35,7 +35,7 @@ def fetch_data() -> str:
 ## Preset
 
 ```python
-from retryflow import network
+from relinker import network
 
 @network()
 def call_api() -> str:
@@ -45,7 +45,7 @@ def call_api() -> str:
 ## Fluent policy
 
 ```python
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 policy = (
     RetryPolicy()
@@ -63,7 +63,7 @@ def call_api() -> str:
 ## Retry by returned value
 
 ```python
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 result = (
     RetryPolicy()

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from examples.fake_services import FlakyService
-from retryflow import retry
+from relinker import retry
 
 service = FlakyService(failures_before_success=1)
 

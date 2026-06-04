@@ -1,6 +1,6 @@
 # HTTP Retry
 
-RetryFlow includes HTTP helpers without adding runtime dependencies.
+Relinker includes HTTP helpers without adding runtime dependencies.
 
 They work with:
 
@@ -12,7 +12,7 @@ They work with:
 ## Ready-to-use HTTP policy
 
 ```python
-from retryflow import http_retry_policy
+from relinker import http_retry_policy
 
 policy = http_retry_policy(
     attempts=5,
@@ -24,7 +24,7 @@ policy = http_retry_policy(
 ## Retry by status code
 
 ```python
-from retryflow import RetryPolicy, retry_if_status
+from relinker import RetryPolicy, retry_if_status
 
 policy = (
     RetryPolicy()
@@ -36,7 +36,7 @@ policy = (
 ## Honor Retry-After
 
 ```python
-from retryflow import RetryPolicy, retry_after_delay, retry_if_status
+from relinker import RetryPolicy, retry_after_delay, retry_if_status
 
 policy = (
     RetryPolicy()
@@ -51,7 +51,7 @@ The delay callback reads `state.last_value`, so it works naturally with result-b
 ## Parse Retry-After manually
 
 ```python
-from retryflow import parse_retry_after
+from relinker import parse_retry_after
 
 seconds = parse_retry_after("120", default=1.0)
 ```
@@ -79,4 +79,4 @@ Be careful with:
 - `PATCH`
 - non-idempotent operations
 
-RetryFlow does not block these operations because application context matters, but you should review them carefully.
+Relinker does not block these operations because application context matters, but you should review them carefully.

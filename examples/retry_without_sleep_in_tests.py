@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from examples.fake_services import FlakyService
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 sleeps: list[float] = []
 service = FlakyService(failures_before_success=2)

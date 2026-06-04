@@ -1,6 +1,6 @@
 from typing import Any
 
-from retryflow import network
+from relinker import network
 
 
 def test_network_preset_can_decorate_function_and_collect_stats() -> None:

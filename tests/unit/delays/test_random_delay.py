@@ -1,7 +1,7 @@
 import pytest
 
-from retryflow import InvalidRetryConfigError
-from retryflow.delays.random_delay import RandomDelay
+from relinker import InvalidRetryConfigError
+from relinker.delays.random_delay import RandomDelay
 
 
 def test_random_delay_is_inside_range() -> None:

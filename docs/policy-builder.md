@@ -1,9 +1,9 @@
 # Policy Builder
 
-`RetryPolicy` is the main object in RetryFlow. It is an immutable builder: every method returns a new policy instead of mutating the original.
+`RetryPolicy` is the main object in Relinker. It is an immutable builder: every method returns a new policy instead of mutating the original.
 
 ```python
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 base = RetryPolicy().attempts(3)
 network_policy = base.on(TimeoutError).exponential_delay(base=1)
@@ -20,7 +20,7 @@ RetryPolicy().max_time(30)
 RetryPolicy().forever()
 ```
 
-Use `forever()` carefully. It is valid, but RetryFlow will warn because retrying forever can be dangerous without cancellation, delays, or external supervision.
+Use `forever()` carefully. It is valid, but Relinker will warn because retrying forever can be dangerous without cancellation, delays, or external supervision.
 
 ## Retry conditions
 
@@ -65,7 +65,7 @@ RetryPolicy().exponential_delay(base=1, maximum=30).jitter(maximum=0.5)
 Use `stateful_delay()` when the delay depends on the retry state.
 
 ```python
-from retryflow import RetryPolicy, RetryState
+from relinker import RetryPolicy, RetryState
 
 def delay_from_state(state: RetryState) -> float:
     if state.last_error is not None:

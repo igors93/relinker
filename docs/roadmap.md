@@ -1,13 +1,13 @@
 # Roadmap
 
-RetryFlow is still evolving. This roadmap describes direction, not guaranteed deadlines.
+Relinker is still evolving. This roadmap describes direction, not guaranteed deadlines.
 
 ## Documentation
 
 - Expand examples for common production scenarios.
 - Add a full PyPI-ready README.
 - Add guides for migration from manual retry loops.
-- Add comparison notes explaining RetryFlow's philosophy.
+- Add comparison notes explaining Relinker's philosophy.
 
 ## API and usability
 

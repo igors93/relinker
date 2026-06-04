@@ -1,4 +1,4 @@
-from retryflow.attempt import AttemptRecord
+from relinker.attempt import AttemptRecord
 
 
 def test_attempt_duration_and_status() -> None:

@@ -1,6 +1,6 @@
 # Contributing
 
-Thank you for considering contributing to RetryFlow.
+Thank you for considering contributing to Relinker.
 
 ## Local setup
 

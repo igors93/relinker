@@ -1,4 +1,4 @@
-from retryflow.delays.fixed import FixedDelay
+from relinker.delays.fixed import FixedDelay
 
 
 def test_fixed_delay() -> None:

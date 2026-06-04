@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-from retryflow import RetryPolicy, RetryState
-from retryflow.delays.fixed import FixedDelay
-from retryflow.delays.stateful import StatefulCustomDelay, resolve_delay
-from retryflow.exceptions import InvalidRetryConfigError
+from relinker import RetryPolicy, RetryState
+from relinker.delays.fixed import FixedDelay
+from relinker.delays.stateful import StatefulCustomDelay, resolve_delay
+from relinker.exceptions import InvalidRetryConfigError
 
 # ----------------------------------------------------------------- basic API
 
@@ -200,7 +200,7 @@ def test_exponential_delay_still_works() -> None:
 
 
 def test_resolve_delay_uses_attempt_number_for_regular_strategy() -> None:
-    from retryflow.state import RetryState
+    from relinker.state import RetryState
 
     strategy = FixedDelay(2.0)
     state = RetryState(
@@ -213,7 +213,7 @@ def test_resolve_delay_uses_attempt_number_for_regular_strategy() -> None:
 
 
 def test_resolve_delay_uses_state_for_stateful_strategy() -> None:
-    from retryflow.state import RetryState
+    from relinker.state import RetryState
 
     received: list[RetryState] = []
 
@@ -259,7 +259,7 @@ def test_stateful_delay_state_visible_in_before_sleep_event() -> None:
     seen_states: list[RetryState | None] = []
 
     def on_sleep(event: object) -> None:
-        from retryflow.event import RetryEvent
+        from relinker.event import RetryEvent
 
         if isinstance(event, RetryEvent) and event.name == "before_sleep":
             seen_states.append(event.state)

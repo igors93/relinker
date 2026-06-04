@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 policy = (
     RetryPolicy()

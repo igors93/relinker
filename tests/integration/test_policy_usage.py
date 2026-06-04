@@ -1,4 +1,4 @@
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 
 def test_policy_usage() -> None:

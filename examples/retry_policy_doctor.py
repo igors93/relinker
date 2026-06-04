@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 safe_policy = RetryPolicy().attempts(3).on(TimeoutError).fixed_delay(1)
 risky_policy = RetryPolicy().forever().on(Exception).no_delay()

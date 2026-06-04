@@ -1,6 +1,6 @@
 # Design Principles
 
-RetryFlow is guided by one central idea:
+Relinker is guided by one central idea:
 
 > Simple by default, powerful by composition, safe by guidance.
 
@@ -40,15 +40,15 @@ Avoid names that force users to understand internal implementation details.
 
 ## 5. Defaults should be safe
 
-RetryFlow should avoid surprising defaults that can overload services or hide serious failures.
+Relinker should avoid surprising defaults that can overload services or hide serious failures.
 
 ## 6. Dangerous policies should produce warnings
 
-RetryFlow should not block valid application-level choices, but it should warn when something looks risky.
+Relinker should not block valid application-level choices, but it should warn when something looks risky.
 
 ## 7. The user stays in control
 
-RetryFlow gives tools and guidance. It does not take ownership of application semantics.
+Relinker gives tools and guidance. It does not take ownership of application semantics.
 
 ## 8. Debugging should be built in
 

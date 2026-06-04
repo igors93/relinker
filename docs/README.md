@@ -1,17 +1,17 @@
-# RetryFlow Documentation
+# Relinker Documentation
 
 **Simple by default, powerful by composition, safe by guidance.**
 
 This documentation is organized for two audiences:
 
 - users who want to add retry behavior quickly
-- maintainers who want to understand how RetryFlow is designed
+- maintainers who want to understand how Relinker is designed
 
 ## Navigation
 
 | Section | Purpose |
 |---|---|
-| [Getting started](getting-started.md) | Install and use RetryFlow in minutes |
+| [Getting started](getting-started.md) | Install and use Relinker in minutes |
 | [Policy builder](policy-builder.md) | Learn the fluent `RetryPolicy` API |
 | [Diagnostics and guidance](diagnostics.md) | Use warnings, doctor, preview, and explain |
 | [HTTP retry](http.md) | Retry HTTP status codes and `Retry-After` |

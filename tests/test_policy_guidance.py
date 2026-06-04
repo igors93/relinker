@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 
 def test_doctor_reports_risky_tight_loop() -> None:
@@ -20,5 +20,5 @@ def test_explain_is_human_readable() -> None:
 def test_preview_shows_timeline() -> None:
     preview = RetryPolicy().attempts(3).fixed_delay(1).preview(attempts=3)
 
-    assert "RetryFlow preview" in preview
+    assert "Relinker preview" in preview
     assert "Attempt 1" in preview

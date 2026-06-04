@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from retryflow import RetryExhaustedError, RetryPolicy, TryAgain
+from relinker import RetryExhaustedError, RetryPolicy, TryAgain
 
 
 def test_try_again_sync_then_succeeds() -> None:
@@ -264,7 +264,7 @@ def test_try_again_error_in_logs_via_with_logging(caplog: pytest.LogCaptureFixtu
 
     policy = RetryPolicy().attempts(5).fixed_delay(0).with_logging(level=logging.WARNING)
 
-    with caplog.at_level(logging.WARNING, logger="retryflow"):
+    with caplog.at_level(logging.WARNING, logger="relinker"):
         policy.run(task)
 
     assert any("TryAgain" in r.message for r in caplog.records)

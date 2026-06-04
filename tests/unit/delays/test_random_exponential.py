@@ -1,7 +1,7 @@
 import pytest
 
-from retryflow import InvalidRetryConfigError
-from retryflow.delays.random_exponential import RandomExponentialDelay
+from relinker import InvalidRetryConfigError
+from relinker.delays.random_exponential import RandomExponentialDelay
 
 
 def test_random_exponential_delay_rejects_maximum_smaller_than_minimum() -> None:

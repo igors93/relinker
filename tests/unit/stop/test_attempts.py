@@ -1,4 +1,4 @@
-from retryflow.stop.attempts import StopAfterAttempt
+from relinker.stop.attempts import StopAfterAttempt
 
 
 def test_stop_after_attempt() -> None:

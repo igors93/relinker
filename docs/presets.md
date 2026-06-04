@@ -6,7 +6,7 @@ They are not special classes. They return normal policies, so users can keep
 customizing them.
 
 ```python
-from retryflow import network
+from relinker import network
 
 policy = network().attempts(10)
 ```
@@ -24,7 +24,7 @@ policy = network().attempts(10)
 ## fast
 
 ```python
-from retryflow import fast
+from relinker import fast
 
 @fast()
 def task() -> str:
@@ -40,7 +40,7 @@ Default:
 ## network
 
 ```python
-from retryflow import network
+from relinker import network
 
 @network()
 def call_api() -> str:
@@ -56,7 +56,7 @@ Default:
 ## database
 
 ```python
-from retryflow import database
+from relinker import database
 
 @database()
 def query() -> str:
@@ -72,7 +72,7 @@ Default:
 ## patient
 
 ```python
-from retryflow import patient
+from relinker import patient
 
 @patient()
 def synchronize() -> str:
@@ -88,7 +88,7 @@ Default:
 ## background_job
 
 ```python
-from retryflow import background_job
+from relinker import background_job
 
 @background_job()
 def process_job() -> None:
@@ -102,7 +102,7 @@ Default:
 - retries `Exception`
 
 This preset intentionally retries broad exceptions because background jobs often
-centralize error handling. RetryFlow will still expose this through
+centralize error handling. Relinker will still expose this through
 `policy.warnings()`.
 
 ## Custom exception types

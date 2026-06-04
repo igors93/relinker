@@ -1,6 +1,6 @@
 from typing import Any
 
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 
 def test_decorated_function_collects_success_statistics() -> None:

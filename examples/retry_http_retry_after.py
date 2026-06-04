@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from examples.fake_services import FakeResponse, StatusSequence
-from retryflow import RetryPolicy, retry_after_delay, retry_if_status
+from relinker import RetryPolicy, retry_after_delay, retry_if_status
 
 api = StatusSequence(
     [

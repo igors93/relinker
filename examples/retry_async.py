@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 attempts = 0
 

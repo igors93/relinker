@@ -1,5 +1,5 @@
-from retryflow import background_job, database, fast, network, patient
-from retryflow.presets import network as network_from_module
+from relinker import background_job, database, fast, network, patient
+from relinker.presets import network as network_from_module
 
 
 def test_fast_preset_returns_policy() -> None:

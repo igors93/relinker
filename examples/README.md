@@ -1,11 +1,11 @@
-# RetryFlow Examples
+# Relinker Examples
 
-This directory contains standalone examples that show how to use RetryFlow in real situations.
+This directory contains standalone examples that show how to use Relinker in real situations.
 
 Run examples from the project root directory using `python -m`:
 
 ```bash
-cd retryflow
+cd relinker
 python -m examples.basic_retry
 ```
 
@@ -37,4 +37,4 @@ python -m examples.basic_retry
 
 ## No external dependencies
 
-Examples use only Python's standard library and RetryFlow.
+Examples use only Python's standard library and Relinker.

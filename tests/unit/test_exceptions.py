@@ -1,6 +1,6 @@
 import pytest
 
-from retryflow import InvalidRetryConfigError, RetryPolicy
+from relinker import InvalidRetryConfigError, RetryPolicy
 
 
 def test_invalid_attempts_raise_library_error() -> None:

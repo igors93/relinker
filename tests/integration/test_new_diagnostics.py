@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 
 def test_warning_many_attempts() -> None:
@@ -151,7 +151,7 @@ def test_warnings_never_raises_for_forever_policy() -> None:
 
 
 def test_warnings_returns_tuple_of_policy_warnings() -> None:
-    from retryflow import PolicyWarning
+    from relinker import PolicyWarning
 
     policy = RetryPolicy().forever().on(Exception)
     for w in policy.warnings():
@@ -164,7 +164,7 @@ def test_warnings_returns_tuple_of_policy_warnings() -> None:
 
 
 def test_simulate_raises_for_zero_attempts() -> None:
-    from retryflow import InvalidRetryConfigError
+    from relinker import InvalidRetryConfigError
 
     policy = RetryPolicy().attempts(3)
     with pytest.raises(InvalidRetryConfigError):
@@ -172,7 +172,7 @@ def test_simulate_raises_for_zero_attempts() -> None:
 
 
 def test_simulate_raises_for_negative_attempts() -> None:
-    from retryflow import InvalidRetryConfigError
+    from relinker import InvalidRetryConfigError
 
     policy = RetryPolicy().attempts(3)
     with pytest.raises(InvalidRetryConfigError):
@@ -231,7 +231,7 @@ def test_timeline_returns_string() -> None:
     policy = RetryPolicy().attempts(3).fixed_delay(1)
     text = policy.timeline(attempts=3)
     assert isinstance(text, str)
-    assert "RetryFlow simulation" in text
+    assert "Relinker simulation" in text
 
 
 def test_timeline_matches_simulate_describe() -> None:

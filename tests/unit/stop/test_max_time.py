@@ -1,4 +1,4 @@
-from retryflow.stop.max_time import StopAfterDelay
+from relinker.stop.max_time import StopAfterDelay
 
 
 def test_stop_after_delay() -> None:

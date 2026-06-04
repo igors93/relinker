@@ -1,5 +1,5 @@
-from retryflow.delays.fixed import FixedDelay
-from retryflow.delays.random_delay import RandomDelay
+from relinker.delays.fixed import FixedDelay
+from relinker.delays.random_delay import RandomDelay
 
 
 def test_additive_delay_sums_child_delays() -> None:

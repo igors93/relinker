@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from retryflow import RetryPolicy, RetrySimulation, RetrySimulationAttempt
+from relinker import RetryPolicy, RetrySimulation, RetrySimulationAttempt
 
 
 def test_simulation_attempt_count() -> None:

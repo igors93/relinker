@@ -1,6 +1,6 @@
 # Release process
 
-This document describes how to verify and build RetryFlow locally.
+This document describes how to verify and build Relinker locally.
 
 ## Local checks
 
@@ -35,7 +35,7 @@ All steps must pass with no errors before a release.
 
 Update the version in two places:
 
-- `src/retryflow/__init__.py` — `__version__`
+- `src/relinker/__init__.py` — `__version__`
 - `pyproject.toml` — `[project] version`
 
 ## CHANGELOG
@@ -49,14 +49,14 @@ python -m build
 ```
 
 This produces:
-- `dist/retryflow-X.Y.Z.tar.gz` — source distribution
-- `dist/retryflow-X.Y.Z-py3-none-any.whl` — wheel
+- `dist/relinker-X.Y.Z.tar.gz` — source distribution
+- `dist/relinker-X.Y.Z-py3-none-any.whl` — wheel
 
 ## Verify the build
 
 ```bash
-pip install dist/retryflow-X.Y.Z-py3-none-any.whl
-python -c "import retryflow; print(retryflow.__version__)"
+pip install dist/relinker-X.Y.Z-py3-none-any.whl
+python -c "import relinker; print(relinker.__version__)"
 ```
 
 ## Publish to PyPI
@@ -64,11 +64,11 @@ python -c "import retryflow; print(retryflow.__version__)"
 Once the package is published on PyPI, the install command will be:
 
 ```bash
-pip install retryflow
+pip install relinker
 ```
 
 Until then, install from GitHub:
 
 ```bash
-pip install git+https://github.com/igors93/retryflow.git
+pip install git+https://github.com/igors93/relinker.git
 ```

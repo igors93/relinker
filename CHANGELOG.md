@@ -1,8 +1,8 @@
 # Changelog
 
-All notable changes to RetryFlow will be documented in this file.
+All notable changes to Relinker will be documented in this file.
 
-RetryFlow follows practical semantic versioning while the project is still pre-1.0. Breaking changes may happen before 1.0, but they should be documented clearly.
+Relinker follows practical semantic versioning while the project is still pre-1.0. Breaking changes may happen before 1.0, but they should be documented clearly.
 
 ## 0.5.0
 

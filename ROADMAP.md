@@ -1,6 +1,6 @@
 # Roadmap
 
-RetryFlow is currently pre-1.0. The API is stabilizing but not yet frozen.
+Relinker is currently pre-1.0. The API is stabilizing but not yet frozen.
 
 ## Current state (0.4.x)
 
@@ -16,7 +16,7 @@ The core library is complete:
 - Per-function statistics via `RetryStats`.
 - Policy diagnostics: `warnings()`, `simulate()`, `timeline()`, `explain()`.
 - Standard library logging integration via `with_logging()`.
-- Dependency-free HTTP helpers in `retryflow.http`.
+- Dependency-free HTTP helpers in `relinker.http`.
 - Context manager retry blocks (`for attempt in policy:`).
 - Presets: `fast`, `network`, `database`, `patient`, `background_job`.
 - Testing helpers: `no_sleep`, `fail_times`.

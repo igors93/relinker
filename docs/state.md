@@ -22,7 +22,7 @@ RetryState appears in two places:
 | `last_error` | `BaseException \| None` | Last raised exception, when available |
 | `next_delay` | `float \| None` | Computed delay before the next attempt (set on `before_sleep` events) |
 | `retry_cause` | `"exception" \| "result" \| None` | What triggered this retry |
-| `will_retry` | `bool` | True when RetryFlow will make another attempt |
+| `will_retry` | `bool` | True when Relinker will make another attempt |
 | `will_stop` | `bool` | True when the stop strategy fired |
 
 ## Properties
@@ -39,7 +39,7 @@ RetryState appears in two places:
 ## Using state in event handlers
 
 ```python
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 def on_failure(event):
     state = event.state
@@ -55,7 +55,7 @@ policy = RetryPolicy().attempts(5).on(TimeoutError).on_event("after_failure", on
 ## Using state in stateful delays
 
 ```python
-from retryflow import RetryPolicy, RetryState
+from relinker import RetryPolicy, RetryState
 
 def adaptive_delay(state: RetryState) -> float:
     # Back off more aggressively after many failures
@@ -69,8 +69,8 @@ policy = RetryPolicy().attempts(8).on(TimeoutError).stateful_delay(adaptive_dela
 ## State-aware HTTP Retry-After delay
 
 ```python
-from retryflow import RetryPolicy
-from retryflow.http import retry_if_status, retry_after_delay
+from relinker import RetryPolicy
+from relinker.http import retry_if_status, retry_after_delay
 
 RETRYABLE = {429, 500, 502, 503, 504}
 

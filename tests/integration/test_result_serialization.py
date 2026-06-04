@@ -1,6 +1,6 @@
 import json
 
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 
 def test_retry_result_to_dict_excludes_value_by_default() -> None:

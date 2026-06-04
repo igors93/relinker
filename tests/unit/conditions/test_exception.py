@@ -1,4 +1,4 @@
-from retryflow.conditions.exception import ExceptionCondition
+from relinker.conditions.exception import ExceptionCondition
 
 
 def test_exception_condition() -> None:

@@ -1,5 +1,5 @@
-from retryflow.conditions.exception import ExceptionCondition
-from retryflow.conditions.result import ResultCondition
+from relinker.conditions.exception import ExceptionCondition
+from relinker.conditions.result import ResultCondition
 
 
 def test_any_condition_retries_when_either_condition_matches() -> None:

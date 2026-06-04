@@ -1,4 +1,4 @@
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 policy = RetryPolicy().forever().on(Exception).no_delay()
 

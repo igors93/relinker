@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from retryflow import RetryPolicy, RetryWrappedFunction
+from relinker import RetryPolicy, RetryWrappedFunction
 
 
 def test_decorated_function_satisfies_protocol() -> None:

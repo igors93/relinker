@@ -1,5 +1,5 @@
-from retryflow import RetryPolicy
-from retryflow.event import RetryEvent
+from relinker import RetryPolicy
+from relinker.event import RetryEvent
 
 
 def test_events_include_state() -> None:

@@ -1,4 +1,4 @@
-from retryflow.event import RetryEvent
+from relinker.event import RetryEvent
 
 
 def test_event_creation() -> None:

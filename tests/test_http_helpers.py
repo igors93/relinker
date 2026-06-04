@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import pytest
 
-from retryflow.exceptions import InvalidRetryConfigError
-from retryflow.http import (
+from relinker.exceptions import InvalidRetryConfigError
+from relinker.http import (
     http_retry_policy,
     parse_retry_after,
     retry_after_delay,
     retry_if_status,
 )
-from retryflow.state import RetryState
+from relinker.state import RetryState
 
 
 class Response:

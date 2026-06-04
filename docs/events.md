@@ -1,10 +1,10 @@
 # Events
 
-Events let you connect RetryFlow to logs, metrics, tracing, or debugging tools.
+Events let you connect Relinker to logs, metrics, tracing, or debugging tools.
 
 ```python
-from retryflow import RetryPolicy
-from retryflow.event import RetryEvent
+from relinker import RetryPolicy
+from relinker.event import RetryEvent
 
 def log_event(event: RetryEvent) -> None:
     print(event.name, event.attempt_number)

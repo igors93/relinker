@@ -1,4 +1,4 @@
-from retryflow.conditions.custom import CustomCondition
+from relinker.conditions.custom import CustomCondition
 
 
 def test_custom_condition() -> None:

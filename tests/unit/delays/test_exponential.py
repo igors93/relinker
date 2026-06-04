@@ -1,4 +1,4 @@
-from retryflow.delays.exponential import ExponentialDelay
+from relinker.delays.exponential import ExponentialDelay
 
 
 def test_exponential_delay() -> None:

@@ -5,7 +5,7 @@
 Retry a flaky external API with exponential backoff and jitter:
 
 ```python
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 policy = (
     RetryPolicy()
@@ -25,7 +25,7 @@ def fetch_data(url: str) -> dict:
 Short retry with bounded delay for transient database errors:
 
 ```python
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 policy = (
     RetryPolicy()
@@ -45,7 +45,7 @@ def load_user(user_id: int) -> dict:
 Poll until a resource reaches the desired state:
 
 ```python
-from retryflow import RetryPolicy, TryAgain
+from relinker import RetryPolicy, TryAgain
 
 policy = RetryPolicy().attempts(20).fixed_delay(1)
 
@@ -77,7 +77,7 @@ result = policy.run(lambda: job_service.get_status("job-123"))
 Return a safe default value when all retries are exhausted:
 
 ```python
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 policy = (
     RetryPolicy()
@@ -111,7 +111,7 @@ print(policy.simulate(attempts=5).describe())
 Track per-function retry counts for monitoring:
 
 ```python
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 @RetryPolicy().attempts(5).on(TimeoutError)
 def call_api():
@@ -130,7 +130,7 @@ Async functions work the same as sync functions:
 
 ```python
 import asyncio
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 policy = RetryPolicy().attempts(3).on(ConnectionError).exponential_delay(base=0.5)
 
@@ -147,7 +147,7 @@ Add standard library logging to any policy:
 
 ```python
 import logging
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 policy = (
     RetryPolicy()
@@ -177,7 +177,7 @@ print(result.to_json(indent=2))
 Adapt delay based on execution state:
 
 ```python
-from retryflow import RetryPolicy, RetryState
+from relinker import RetryPolicy, RetryState
 
 def backoff_by_error_type(state: RetryState) -> float:
     if isinstance(state.last_error, TimeoutError):
@@ -197,8 +197,8 @@ policy = (
 Honour the server's requested delay using state-aware retry:
 
 ```python
-from retryflow import RetryPolicy
-from retryflow.http import retry_if_status, retry_after_delay
+from relinker import RetryPolicy
+from relinker.http import retry_if_status, retry_after_delay
 
 RETRYABLE = {429, 500, 502, 503, 504}
 

@@ -1,6 +1,6 @@
 # Development
 
-This document explains how to work on RetryFlow locally and run the same checks
+This document explains how to work on Relinker locally and run the same checks
 used by GitHub Actions.
 
 ## Create a virtual environment

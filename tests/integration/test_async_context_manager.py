@@ -1,6 +1,6 @@
 import pytest
 
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 
 @pytest.mark.asyncio

@@ -1,11 +1,11 @@
 # Error Handling
 
-RetryFlow gives you multiple ways to control what happens when retry attempts are
+Relinker gives you multiple ways to control what happens when retry attempts are
 exhausted.
 
 ## Default behavior
 
-For exception-based retry, RetryFlow raises the last original exception.
+For exception-based retry, Relinker raises the last original exception.
 
 ```python
 policy = RetryPolicy().attempts(3).on(TimeoutError)
@@ -63,7 +63,7 @@ policy = (
 
 ## Behavior precedence
 
-RetryFlow keeps behavior explicit. The last behavior method you call usually
+Relinker keeps behavior explicit. The last behavior method you call usually
 expresses your intention.
 
 Examples:

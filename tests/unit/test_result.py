@@ -1,5 +1,5 @@
-from retryflow.attempt import AttemptRecord
-from retryflow.result import RetryResult
+from relinker.attempt import AttemptRecord
+from relinker.result import RetryResult
 
 
 def test_result_story_for_success() -> None:

@@ -1,4 +1,4 @@
-from retryflow.conditions.result import ResultCondition
+from relinker.conditions.result import ResultCondition
 
 
 def test_result_condition() -> None:

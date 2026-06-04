@@ -2,17 +2,17 @@
 
 ## From GitHub
 
-RetryFlow is not yet published on PyPI. Install directly from GitHub:
+Relinker is not yet published on PyPI. Install directly from GitHub:
 
 ```bash
-pip install git+https://github.com/igors93/retryflow.git
+pip install git+https://github.com/igors93/relinker.git
 ```
 
 To install a specific tag or branch:
 
 ```bash
-pip install git+https://github.com/igors93/retryflow.git@main
-pip install git+https://github.com/igors93/retryflow.git@v0.4.0
+pip install git+https://github.com/igors93/relinker.git@main
+pip install git+https://github.com/igors93/relinker.git@v0.4.0
 ```
 
 ## From source
@@ -20,8 +20,8 @@ pip install git+https://github.com/igors93/retryflow.git@v0.4.0
 Clone the repository and install in editable mode:
 
 ```bash
-git clone https://github.com/igors93/retryflow.git
-cd retryflow
+git clone https://github.com/igors93/relinker.git
+cd relinker
 pip install -e .
 ```
 
@@ -30,7 +30,7 @@ pip install -e .
 Once published to PyPI, the install command will be:
 
 ```bash
-pip install retryflow
+pip install relinker
 ```
 
 ## Requirements
@@ -41,8 +41,8 @@ pip install retryflow
 ## Verify installation
 
 ```python
-import retryflow
-print(retryflow.__version__)
+import relinker
+print(relinker.__version__)
 ```
 
 ## Optional: development dependencies

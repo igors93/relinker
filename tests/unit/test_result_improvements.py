@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import json
 
-from retryflow.attempt import AttemptRecord
-from retryflow.result import RetryResult
+from relinker.attempt import AttemptRecord
+from relinker.result import RetryResult
 
 
 def _make_result_with_failures(n_failures: int, then_succeed: bool = True) -> RetryResult[str]:
@@ -215,7 +215,7 @@ def test_story_result_exhaustion() -> None:
 
 
 def test_story_with_try_again_exhaustion() -> None:
-    from retryflow.exceptions import TryAgain
+    from relinker.exceptions import TryAgain
 
     ta = TryAgain("still polling")
     attempt = AttemptRecord(number=1, started_at=0.0, ended_at=0.1, error=ta)

@@ -1,12 +1,12 @@
 # Observability
 
-RetryFlow exposes lightweight observability without requiring external logging, metrics, or tracing libraries.
+Relinker exposes lightweight observability without requiring external logging, metrics, or tracing libraries.
 
 ## Standard logging
 
 ```python
 import logging
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 logging.basicConfig(level=logging.INFO)
 
@@ -32,7 +32,7 @@ policy = (
 
 Structured logging emits compact JSON strings.
 
-By default, RetryFlow does not include exception messages in structured logs because exception messages can contain sensitive information.
+By default, Relinker does not include exception messages in structured logs because exception messages can contain sensitive information.
 
 Enable only when safe:
 
@@ -45,7 +45,7 @@ policy = RetryPolicy().with_structured_logging(include_error_message=True)
 Use event hooks when you want custom behavior.
 
 ```python
-from retryflow import RetryEvent, RetryPolicy
+from relinker import RetryEvent, RetryPolicy
 
 def capture_retry(event: RetryEvent) -> None:
     print(event.name, event.attempt_number, event.delay)
@@ -61,7 +61,7 @@ policy = RetryPolicy().attempts(3).on_retry(capture_retry)
 | `on_success()` | `after_success` | After an accepted success |
 | `on_failure()` | `after_failure` | After a failed attempt |
 | `on_retry()` | `before_sleep` | Before sleeping for another attempt |
-| `on_giveup()` | `after_giveup` | When RetryFlow gives up |
+| `on_giveup()` | `after_giveup` | When Relinker gives up |
 
 ## RetryState
 

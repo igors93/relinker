@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from retryflow.attempt import AttemptRecord
-from retryflow.state import RetryState
+from relinker.attempt import AttemptRecord
+from relinker.state import RetryState
 
 
 def _attempt(

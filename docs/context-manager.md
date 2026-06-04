@@ -5,7 +5,7 @@ The decorator API is the easiest way to retry a function. The context manager AP
 ## Basic block retry
 
 ```python
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 policy = RetryPolicy().attempts(3).on(TimeoutError).fixed_delay(1)
 
@@ -19,7 +19,7 @@ for attempt in policy:
 Use `set_result()` when retry depends on a returned value.
 
 ```python
-from retryflow import RetryPolicy, retry_if_status
+from relinker import RetryPolicy, retry_if_status
 
 policy = RetryPolicy().attempts(3).retry_if_result(retry_if_status({503}))
 
@@ -31,7 +31,7 @@ for attempt in policy:
 ## Async block retry
 
 ```python
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 policy = RetryPolicy().attempts(3).on(TimeoutError)
 

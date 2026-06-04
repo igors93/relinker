@@ -1,4 +1,4 @@
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 
 def test_policy_jitter_adds_to_existing_delay() -> None:

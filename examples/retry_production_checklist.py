@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 policies = {
     "api": RetryPolicy().attempts(5).on(TimeoutError).exponential_delay(base=1, maximum=30),

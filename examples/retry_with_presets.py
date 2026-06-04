@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from retryflow import background_job, database, fast, network, patient
+from relinker import background_job, database, fast, network, patient
 
 
 def show(name: str, policy: object) -> None:

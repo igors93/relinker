@@ -3,14 +3,14 @@ requires = ["hatchling>=1.30.1"]
 build-backend = "hatchling.build"
 
 [project]
-name = "retryflow"
+name = "relinker"
 version = "0.5.0"
-description = "A clear, modular, and debuggable retry library for Python."
+description = "Relinker — a clear, modular, and debuggable retry/resilience library for Python."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [
-  { name = "RetryFlow Contributors" }
+  { name = "Relinker Contributors" }
 ]
 keywords = ["retry", "backoff", "resilience", "async", "decorator"]
 classifiers = [
@@ -35,7 +35,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/retryflow"]
+packages = ["src/relinker"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

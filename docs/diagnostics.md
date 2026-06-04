@@ -1,11 +1,11 @@
 # Diagnostics and Guidance
 
-RetryFlow is built around guidance. It does not block application-level decisions, but it helps users detect surprising or risky policies.
+Relinker is built around guidance. It does not block application-level decisions, but it helps users detect surprising or risky policies.
 
 ## Warnings
 
 ```python
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 policy = RetryPolicy().forever().on(Exception).no_delay()
 

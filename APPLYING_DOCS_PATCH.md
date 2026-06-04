@@ -9,14 +9,14 @@ It replaces or adds:
 - `docs/`
 - `examples/`
 
-It does not change RetryFlow runtime source code under `src/retryflow/`.
+It does not change Relinker runtime source code under `src/relinker/`.
 
 ## Apply
 
 From the repository root:
 
 ```bash
-unzip -o retryflow_docs_examples_patch.zip -d .
+unzip -o relinker_docs_examples_patch.zip -d .
 ```
 
 Then run:

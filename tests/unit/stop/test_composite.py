@@ -1,5 +1,5 @@
-from retryflow.stop.attempts import StopAfterAttempt
-from retryflow.stop.max_time import StopAfterDelay
+from relinker.stop.attempts import StopAfterAttempt
+from relinker.stop.max_time import StopAfterDelay
 
 
 def test_any_stop_strategy() -> None:

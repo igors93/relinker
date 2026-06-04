@@ -2,7 +2,7 @@
 
 Retry is powerful, but it can make incidents worse when used without care.
 
-RetryFlow does not force application-level rules. Instead, it gives tools that
+Relinker does not force application-level rules. Instead, it gives tools that
 help users reason about behavior.
 
 ## Use specific exceptions when possible
@@ -17,7 +17,7 @@ Avoid retrying every exception unless that is intentional:
 RetryPolicy().on(Exception)
 ```
 
-RetryFlow will emit a `broad_exception` warning when `.on(Exception)` is used. When combined with many attempts or `forever()`, the additional `background_broad_exception` warning fires.
+Relinker will emit a `broad_exception` warning when `.on(Exception)` is used. When combined with many attempts or `forever()`, the additional `background_broad_exception` warning fires.
 
 ## Prefer backoff and jitter for external services
 
@@ -74,7 +74,7 @@ policy.fallback(lambda r: ...)   # provide a fallback value
 policy.raise_on_result_exhausted()  # raise RetryExhaustedError
 ```
 
-Without any of these, exhaustion is silent — the function returns the last value as if it succeeded. RetryFlow emits a `result_retry_without_observation` warning for this case.
+Without any of these, exhaustion is silent — the function returns the last value as if it succeeded. Relinker emits a `result_retry_without_observation` warning for this case.
 
 ## Use diagnostics
 

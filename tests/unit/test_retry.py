@@ -1,4 +1,4 @@
-from retryflow import retry
+from relinker import retry
 
 
 def test_retry_eventually_succeeds() -> None:

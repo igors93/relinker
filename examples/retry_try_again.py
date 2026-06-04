@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from retryflow import RetryPolicy, TryAgain
+from relinker import RetryPolicy, TryAgain
 
 attempts = 0
 

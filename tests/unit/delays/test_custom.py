@@ -1,4 +1,4 @@
-from retryflow.delays.custom import CustomDelay
+from relinker.delays.custom import CustomDelay
 
 
 def test_custom_delay() -> None:

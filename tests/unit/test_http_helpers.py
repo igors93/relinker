@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from retryflow.http import (
+from relinker.http import (
     _extract_retry_after_header,
     parse_retry_after,
     retry_after_delay,
     retry_if_status,
     should_retry_http_status,
 )
-from retryflow.state import RetryState
+from relinker.state import RetryState
 
 # -------------------------------------------------------- should_retry_http_status
 
@@ -263,7 +263,7 @@ def test_parse_retry_after_http_date() -> None:
 
 def test_retry_after_delay_integration_with_policy() -> None:
     """End-to-end: a result-based retry with a stateful Retry-After delay."""
-    from retryflow import RetryPolicy
+    from relinker import RetryPolicy
 
     responses = [
         {"status_code": 429, "headers": {"Retry-After": "0"}},

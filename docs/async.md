@@ -1,11 +1,11 @@
 # Async
 
-RetryFlow supports async functions and async retry blocks.
+Relinker supports async functions and async retry blocks.
 
 ## Async decorator
 
 ```python
-from retryflow import retry
+from relinker import retry
 
 @retry(attempts=3)
 async def fetch_user() -> dict:
@@ -15,7 +15,7 @@ async def fetch_user() -> dict:
 ## Async policy
 
 ```python
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 policy = RetryPolicy().attempts(3).on(TimeoutError)
 
@@ -47,7 +47,7 @@ async for attempt in policy.async_iter(name="external_service"):
 
 ## Custom async sleep
 
-RetryFlow uses `asyncio.sleep` by default. You can provide your own async sleep
+Relinker uses `asyncio.sleep` by default. You can provide your own async sleep
 function for advanced runtimes or tests.
 
 ```python
@@ -60,5 +60,5 @@ policy = RetryPolicy().with_sleep(
 )
 ```
 
-The core package does not depend on Trio, AnyIO, or Tornado. This keeps RetryFlow
+The core package does not depend on Trio, AnyIO, or Tornado. This keeps Relinker
 small and lets users integrate the async runtime they prefer.

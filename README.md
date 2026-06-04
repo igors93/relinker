@@ -1,6 +1,6 @@
-# RetryFlow
+# Relinker
 
-[![CI](https://github.com/igors93/retryflow/actions/workflows/ci.yml/badge.svg)](https://github.com/igors93/retryflow/actions/workflows/ci.yml)
+[![CI](https://github.com/igors93/relinker/actions/workflows/ci.yml/badge.svg)](https://github.com/igors93/relinker/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![Status](https://img.shields.io/badge/status-alpha-orange)
 ![Typing](https://img.shields.io/badge/typing-typed-blue)
@@ -9,7 +9,7 @@
 
 **Simple by default, powerful by composition, safe by guidance.**
 
-RetryFlow is a clear, modular, and debuggable retry library for Python. It helps you retry temporary failures without hiding what your code is doing.
+Relinker is a clear, modular, and debuggable retry library for Python. It helps you retry temporary failures without hiding what your code is doing.
 
 [Overview](#overview) | [Features](#features) | [Quick Start](#quick-start) | [Guidance](#guidance) | [HTTP](#http-retry) | [Observability](#observability) | [Examples](#examples) | [Documentation](#documentation) | [Roadmap](#roadmap)
 
@@ -25,10 +25,10 @@ Applications fail for reasons that are often temporary:
 - a rate limit response
 - a background job that should be tried again
 
-RetryFlow gives you a clean way to describe what should happen:
+Relinker gives you a clean way to describe what should happen:
 
 ```python
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 policy = (
     RetryPolicy()
@@ -47,7 +47,7 @@ This reads like a sentence:
 
 ## Features
 
-RetryFlow currently provides:
+Relinker currently provides:
 
 - simple `@retry` decorator
 - fluent `RetryPolicy` builder
@@ -73,19 +73,19 @@ RetryFlow currently provides:
 
 ## Current status
 
-RetryFlow is in early development. The current package version is **0.5.0**.
+Relinker is in early development. The current package version is **0.5.0**.
 
 Install from GitHub until the package is published on PyPI:
 
 ```bash
-pip install git+https://github.com/igors93/retryflow.git
+pip install git+https://github.com/igors93/relinker.git
 ```
 
 For local development:
 
 ```bash
-git clone https://github.com/igors93/retryflow.git
-cd retryflow
+git clone https://github.com/igors93/relinker.git
+cd relinker
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
@@ -99,19 +99,19 @@ python -m pip install -e ".[dev]"
 ### The smallest useful retry
 
 ```python
-from retryflow import retry
+from relinker import retry
 
 @retry(attempts=3, delay=1, on=(TimeoutError,))
 def fetch_data() -> str:
     return call_external_service()
 ```
 
-If `fetch_data()` raises `TimeoutError`, RetryFlow tries again up to 3 times and waits 1 second between attempts.
+If `fetch_data()` raises `TimeoutError`, Relinker tries again up to 3 times and waits 1 second between attempts.
 
 ### Use a preset
 
 ```python
-from retryflow import network
+from relinker import network
 
 @network()
 def call_api() -> dict:
@@ -127,7 +127,7 @@ policy = network().attempts(8).fallback_value({"status": "offline"})
 ### Use the full builder
 
 ```python
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 policy = (
     RetryPolicy()
@@ -145,10 +145,10 @@ result = policy.run(fetch_data)
 
 ## Guidance
 
-RetryFlow does not try to control your application. It lets you make your own choices, but it helps you notice risky retry policies.
+Relinker does not try to control your application. It lets you make your own choices, but it helps you notice risky retry policies.
 
 ```python
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 policy = RetryPolicy().forever().on(Exception).no_delay()
 
@@ -158,7 +158,7 @@ print(policy.doctor().describe())
 Example output:
 
 ```text
-RetryFlow policy health
+Relinker policy health
 
 Risk level: risky
 
@@ -185,10 +185,10 @@ print(policy.preview(attempts=5))
 
 ## HTTP retry
 
-RetryFlow includes dependency-free HTTP helpers. They work with any response object that exposes `.status_code` or a dictionary with a `"status_code"` key.
+Relinker includes dependency-free HTTP helpers. They work with any response object that exposes `.status_code` or a dictionary with a `"status_code"` key.
 
 ```python
-from retryflow import http_retry_policy
+from relinker import http_retry_policy
 
 policy = http_retry_policy(
     attempts=5,
@@ -200,7 +200,7 @@ policy = http_retry_policy(
 For lower-level control:
 
 ```python
-from retryflow import RetryPolicy, retry_after_delay, retry_if_status
+from relinker import RetryPolicy, retry_after_delay, retry_if_status
 
 policy = (
     RetryPolicy()
@@ -220,7 +220,7 @@ This is useful for APIs that return `429 Too Many Requests` with a `Retry-After`
 
 ```python
 import logging
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 logging.basicConfig(level=logging.INFO)
 
@@ -238,7 +238,7 @@ Structured logs exclude error messages by default because exception messages can
 ### Events
 
 ```python
-from retryflow import RetryEvent, RetryPolicy
+from relinker import RetryEvent, RetryPolicy
 
 def on_retry(event: RetryEvent) -> None:
     print(f"retrying after attempt {event.attempt_number}, delay={event.delay}")
@@ -262,7 +262,7 @@ print(result.story())
 Decorated functions also receive retry statistics:
 
 ```python
-from retryflow import network
+from relinker import network
 
 @network()
 def fetch_user() -> dict:
@@ -332,7 +332,7 @@ python -m build
 
 ## Design principles
 
-RetryFlow is guided by these principles:
+Relinker is guided by these principles:
 
 1. Simple things should be simple.
 2. Advanced things should be possible.
@@ -349,7 +349,7 @@ RetryFlow is guided by these principles:
 
 ## Roadmap
 
-RetryFlow is still evolving. Planned areas include:
+Relinker is still evolving. Planned areas include:
 
 - richer documentation and examples
 - more production recipes

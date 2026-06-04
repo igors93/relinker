@@ -1,11 +1,11 @@
 # Results and Statistics
 
-RetryFlow can return the raw function value or a rich `RetryResult`.
+Relinker can return the raw function value or a rich `RetryResult`.
 
 ## Return RetryResult
 
 ```python
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 result = RetryPolicy().attempts(3).return_result().run(fetch_data)
 
@@ -51,7 +51,7 @@ This gives a readable execution report for debugging, terminal output, or test f
 Decorated functions receive `retry_stats`.
 
 ```python
-from retryflow import network
+from relinker import network
 
 @network()
 def fetch_user() -> dict:

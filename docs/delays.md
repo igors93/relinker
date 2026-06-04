@@ -1,8 +1,8 @@
 # Delays
 
-Delays control how long RetryFlow waits before the next attempt.
+Delays control how long Relinker waits before the next attempt.
 
-RetryFlow keeps delay names simple and predictable.
+Relinker keeps delay names simple and predictable.
 
 ## Choosing the right delay
 

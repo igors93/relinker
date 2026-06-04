@@ -1,11 +1,11 @@
 # Policy
 
-`RetryPolicy` is the main configuration object in RetryFlow.
+`RetryPolicy` is the main configuration object in Relinker.
 
 A policy is immutable. Every configuration method returns a new policy.
 
 ```python
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 base = RetryPolicy()
 api = base.attempts(5).on(TimeoutError)
@@ -49,8 +49,8 @@ RetryPolicy().retry_if_result(lambda value: value is None)
 Combine conditions:
 
 ```python
-from retryflow.conditions.exception import ExceptionCondition
-from retryflow.conditions.result import ResultCondition
+from relinker.conditions.exception import ExceptionCondition
+from relinker.conditions.result import ResultCondition
 
 condition = ExceptionCondition((TimeoutError,)) | ResultCondition(lambda value: value is None)
 policy = RetryPolicy(condition=condition)

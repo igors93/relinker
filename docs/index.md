@@ -1,6 +1,6 @@
-# RetryFlow Documentation
+# Relinker Documentation
 
-RetryFlow is a Python retry library focused on clarity, control, and
+Relinker is a Python retry library focused on clarity, control, and
 debuggability.
 
 ## Getting started
@@ -54,7 +54,7 @@ debuggability.
 
 ## Project values
 
-RetryFlow aims to help users build retry behavior that is:
+Relinker aims to help users build retry behavior that is:
 
 - clear to read
 - easy to debug

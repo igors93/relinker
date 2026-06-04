@@ -1,4 +1,4 @@
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 
 def test_policy_warnings_for_risky_configuration() -> None:
@@ -23,5 +23,5 @@ def test_policy_simulate_returns_delay_timeline() -> None:
 def test_timeline_uses_simulation_description() -> None:
     text = RetryPolicy().attempts(2).fixed_delay(1).timeline(attempts=3)
 
-    assert "RetryFlow simulation" in text
+    assert "Relinker simulation" in text
     assert "Total simulated sleep" in text

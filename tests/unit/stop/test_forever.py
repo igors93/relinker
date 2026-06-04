@@ -1,4 +1,4 @@
-from retryflow.stop.forever import StopForever
+from relinker.stop.forever import StopForever
 
 
 def test_stop_forever_never_stops() -> None:

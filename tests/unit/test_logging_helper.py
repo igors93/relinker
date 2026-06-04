@@ -6,7 +6,7 @@ import logging
 
 import pytest
 
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 
 def test_with_logging_logs_before_sleep(caplog: pytest.LogCaptureFixture) -> None:
@@ -26,7 +26,7 @@ def test_with_logging_logs_before_sleep(caplog: pytest.LogCaptureFixture) -> Non
         .with_logging(level=logging.WARNING)
     )
 
-    with caplog.at_level(logging.WARNING, logger="retryflow"):
+    with caplog.at_level(logging.WARNING, logger="relinker"):
         policy.run(task)
 
     assert any("Attempt" in r.message and "retrying" in r.message for r in caplog.records)
@@ -38,7 +38,7 @@ def test_with_logging_logs_after_giveup(caplog: pytest.LogCaptureFixture) -> Non
 
     policy = RetryPolicy().attempts(3).on(TimeoutError).fixed_delay(0).with_logging()
 
-    with caplog.at_level(logging.WARNING, logger="retryflow"), pytest.raises(TimeoutError):
+    with caplog.at_level(logging.WARNING, logger="relinker"), pytest.raises(TimeoutError):
         policy.run(task)
 
     assert any("Giving up" in r.message for r in caplog.records)
@@ -68,7 +68,7 @@ def test_with_logging_uses_custom_level(caplog: pytest.LogCaptureFixture) -> Non
         RetryPolicy().attempts(2).on(ValueError).fixed_delay(0).with_logging(level=logging.INFO)
     )
 
-    with caplog.at_level(logging.INFO, logger="retryflow"), pytest.raises(ValueError):
+    with caplog.at_level(logging.INFO, logger="relinker"), pytest.raises(ValueError):
         policy.run(task)
 
     info_records = [r for r in caplog.records if r.levelno == logging.INFO]
@@ -81,7 +81,7 @@ def test_with_logging_does_not_log_success(caplog: pytest.LogCaptureFixture) -> 
 
     policy = RetryPolicy().attempts(3).with_logging()
 
-    with caplog.at_level(logging.WARNING, logger="retryflow"):
+    with caplog.at_level(logging.WARNING, logger="relinker"):
         policy.run(task)
 
     assert len(caplog.records) == 0
@@ -120,9 +120,9 @@ def test_with_logging_result_rejection_giveup(caplog: pytest.LogCaptureFixture) 
         .with_logging()
     )
 
-    from retryflow import RetryExhaustedError
+    from relinker import RetryExhaustedError
 
-    with caplog.at_level(logging.WARNING, logger="retryflow"), pytest.raises(RetryExhaustedError):
+    with caplog.at_level(logging.WARNING, logger="relinker"), pytest.raises(RetryExhaustedError):
         policy.run(lambda: "bad")
 
     giveup_records = [r for r in caplog.records if "Giving up" in r.message]
@@ -137,7 +137,7 @@ def test_with_logging_sleep_log_contains_error_class(caplog: pytest.LogCaptureFi
 
     policy = RetryPolicy().attempts(3).on(TimeoutError).fixed_delay(0).with_logging()
 
-    with caplog.at_level(logging.WARNING, logger="retryflow"), pytest.raises(TimeoutError):
+    with caplog.at_level(logging.WARNING, logger="relinker"), pytest.raises(TimeoutError):
         policy.run(task)
 
     sleep_records = [r for r in caplog.records if "retrying" in r.message]
@@ -158,7 +158,7 @@ def test_with_logging_sleep_log_contains_delay(caplog: pytest.LogCaptureFixture)
 
     policy = RetryPolicy().attempts(5).on(TimeoutError).fixed_delay(0).with_logging()
 
-    with caplog.at_level(logging.WARNING, logger="retryflow"):
+    with caplog.at_level(logging.WARNING, logger="relinker"):
         policy.run(task)
 
     sleep_records = [r for r in caplog.records if "retrying" in r.message]
@@ -177,7 +177,7 @@ def test_with_logging_giveup_message_contains_error_message(
 
     policy = RetryPolicy().attempts(2).on(ValueError).fixed_delay(0).with_logging()
 
-    with caplog.at_level(logging.WARNING, logger="retryflow"), pytest.raises(ValueError):
+    with caplog.at_level(logging.WARNING, logger="relinker"), pytest.raises(ValueError):
         policy.run(task)
 
     giveup_records = [r for r in caplog.records if "Giving up" in r.message]

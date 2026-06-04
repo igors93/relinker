@@ -5,7 +5,7 @@
 ## Basic usage
 
 ```python
-from retryflow import RetryPolicy, TryAgain
+from relinker import RetryPolicy, TryAgain
 
 def task():
     result = call_service()
@@ -47,7 +47,7 @@ assert result.exhausted
 result = policy.fallback(lambda r: "default").run(task)
 
 # Raise a custom exception
-from retryflow import RetryExhaustedError
+from relinker import RetryExhaustedError
 policy.on_exhausted_raise(RetryExhaustedError).run(task)
 ```
 
@@ -82,11 +82,11 @@ When `TryAgain` exhausts in a context manager, the exception propagates (consist
 ## Import
 
 ```python
-from retryflow import TryAgain
+from relinker import TryAgain
 ```
 
 Or explicitly from the exceptions module:
 
 ```python
-from retryflow.exceptions import TryAgain
+from relinker.exceptions import TryAgain
 ```

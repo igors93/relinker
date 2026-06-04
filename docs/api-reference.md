@@ -46,7 +46,7 @@ This is a high-level public API reference. Internal modules may change.
 
 | Name | Purpose |
 |---|---|
-| `RetryFlowError` | Base RetryFlow exception |
+| `RelinkerError` | Base Relinker exception |
 | `InvalidRetryConfigError` | Invalid configuration |
 | `RetryExhaustedError` | Result retry exhausted explicitly |
 | `TryAgain` | Explicit retry signal |

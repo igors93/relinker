@@ -1,6 +1,6 @@
-from retryflow.delays.chain import ChainDelay
-from retryflow.delays.linear import LinearDelay
-from retryflow.delays.random_exponential import RandomExponentialDelay
+from relinker.delays.chain import ChainDelay
+from relinker.delays.linear import LinearDelay
+from relinker.delays.random_exponential import RandomExponentialDelay
 
 
 def test_linear_delay() -> None:

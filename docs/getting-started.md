@@ -1,20 +1,20 @@
 # Getting Started
 
-RetryFlow helps Python applications retry temporary failures in a way that is easy to read and easy to reason about.
+Relinker helps Python applications retry temporary failures in a way that is easy to read and easy to reason about.
 
 ## Install
 
 From GitHub:
 
 ```bash
-pip install git+https://github.com/igors93/retryflow.git
+pip install git+https://github.com/igors93/relinker.git
 ```
 
 For local development:
 
 ```bash
-git clone https://github.com/igors93/retryflow.git
-cd retryflow
+git clone https://github.com/igors93/relinker.git
+cd relinker
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
@@ -24,7 +24,7 @@ python -m pip install -e ".[dev]"
 ## Basic decorator
 
 ```python
-from retryflow import retry
+from relinker import retry
 
 @retry(attempts=3, delay=1, on=(TimeoutError,))
 def fetch_data() -> str:
@@ -36,7 +36,7 @@ This retries `fetch_data()` up to 3 times when it raises `TimeoutError`.
 ## Preset policy
 
 ```python
-from retryflow import network
+from relinker import network
 
 @network()
 def call_api() -> str:
@@ -48,7 +48,7 @@ Presets are shortcuts for common production scenarios. They return normal `Retry
 ## Fluent policy
 
 ```python
-from retryflow import RetryPolicy
+from relinker import RetryPolicy
 
 policy = (
     RetryPolicy()
@@ -71,4 +71,4 @@ print(policy.preview(attempts=5))
 print(policy.doctor().describe())
 ```
 
-This is the main difference between RetryFlow and a hidden retry loop: RetryFlow helps you understand what will happen.
+This is the main difference between Relinker and a hidden retry loop: Relinker helps you understand what will happen.

@@ -67,4 +67,4 @@ __all__ = [
     "should_retry_http_status",
 ]
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"

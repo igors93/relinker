@@ -4,7 +4,7 @@ All notable changes to Relinker will be documented in this file.
 
 Relinker follows practical semantic versioning while the project is still pre-1.0. Breaking changes may happen before 1.0, but they should be documented clearly.
 
-## 0.5.0
+## 0.6.0
 
 ### Added
 

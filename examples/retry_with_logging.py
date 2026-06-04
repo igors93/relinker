@@ -10,7 +10,6 @@ from __future__ import annotations
 import logging
 
 from retryflow import RetryPolicy
-from retryflow.testing import no_sleep
 
 logging.basicConfig(
     level=logging.INFO,
@@ -32,9 +31,7 @@ def example_default_logging() -> None:
         return "ok"
 
     policy = RetryPolicy().attempts(5).on(TimeoutError).fixed_delay(0).with_logging()
-
-    with no_sleep():
-        result = policy.run(task)
+    result = policy.run(task)
 
     print(f"Result: {result}")
 
@@ -60,8 +57,7 @@ def example_info_logging() -> None:
         .with_logging(level=logging.INFO)
     )
 
-    with no_sleep():
-        result = policy.run(task)
+    result = policy.run(task)
 
     print(f"Result: {result}")
 
@@ -85,8 +81,7 @@ def example_custom_logger() -> None:
     )
 
     try:
-        with no_sleep():
-            policy.run(task)
+        policy.run(task)
     except OSError as e:
         print(f"Caught: {e}")
 
@@ -113,8 +108,7 @@ def example_logging_with_debug() -> None:
         .debug()  # also prints to stdout
     )
 
-    with no_sleep():
-        result = policy.run(task)
+    result = policy.run(task)
 
     print(f"Result: {result}")
 

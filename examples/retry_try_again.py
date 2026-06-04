@@ -24,6 +24,10 @@ class FakeJobService:
             return "pending"
         return "done"
 
+    @property
+    def calls(self) -> int:
+        return self._calls
+
 
 # --- Example 1: poll until ready ---
 
@@ -37,12 +41,12 @@ def example_poll_until_ready() -> None:
     def check_job() -> str:
         status = service.poll_status()
         if status == "pending":
-            raise TryAgain(f"job still pending (call {service._calls})")
+            raise TryAgain(f"job still pending (call {service.calls})")
         return status
 
     result = policy.run(check_job)
     print(f"Final status: {result}")  # done
-    print(f"Attempts: {service._calls}")
+    print(f"Attempts: {service.calls}")
 
 
 # --- Example 2: TryAgain works even with narrowed exception filter ---

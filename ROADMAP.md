@@ -1,31 +1,39 @@
 # Roadmap
 
-RetryFlow is currently pre-1.0.
+RetryFlow is currently pre-1.0. The API is stabilizing but not yet frozen.
 
-## 0.3.x Stabilization
+## Current state (0.4.x)
 
-- Keep CI green.
-- Improve diagnostics.
-- Document behavior precedence.
-- Strengthen tests for edge cases.
-- Keep the public API small and clear.
+The core library is complete:
 
-## 0.4.x User Experience
+- Immutable `RetryPolicy` builder with full fluent API.
+- Sync and async execution engines.
+- All delay strategies (fixed, linear, exponential, random, chain, additive, custom).
+- All retry conditions (exception, result, custom, composite).
+- All stop strategies (attempts, elapsed time, forever, composite).
+- `TryAgain` explicit retry signal.
+- `RetryResult` with full inspection API.
+- Per-function statistics via `RetryStats`.
+- Policy diagnostics: `warnings()`, `simulate()`, `timeline()`, `explain()`.
+- Standard library logging integration via `with_logging()`.
+- Dependency-free HTTP helpers in `retryflow.http`.
+- Context manager retry blocks (`for attempt in policy:`).
+- Presets: `fast`, `network`, `database`, `patient`, `background_job`.
+- Testing helpers: `no_sleep`, `fail_times`.
+- `RetryWrappedFunction` Protocol for type-safe decorated functions.
+- Zero runtime dependencies.
+- Python 3.10+ support.
+- Full mypy strict compliance.
 
-- Add presets for common use cases.
-- Improve examples.
-- Add more safety documentation.
-- Add richer result exports if needed.
+## Next steps (0.5.x)
 
-## 0.5.x Production Integrations
-
-- Optional HTTP helpers.
+- PyPI release (package is not yet published).
+- Stable `1.0` API commitment.
 - Optional OpenTelemetry integration.
-- Optional CLI diagnostics.
+- Optional CLI diagnostics tool.
 
 ## 1.0
 
-- Stable public API.
-- PyPI release process.
-- SemVer policy.
+- Stable public API with SemVer policy.
+- PyPI release.
 - Complete documentation site.

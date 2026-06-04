@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from examples.fake_services import PollableJob
 from retryflow import RetryPolicy, TryAgain
-from retryflow.testing import no_sleep
 
 # --- Example 1: poll with TryAgain ---
 
@@ -26,9 +25,7 @@ def example_poll_with_try_again() -> None:
         return status
 
     policy = RetryPolicy().attempts(10).fixed_delay(0)
-
-    with no_sleep():
-        result = policy.run(check_status)
+    result = policy.run(check_status)
 
     print(f"Final status: {result}")
     print(f"Polls made: {job.polls}")
@@ -49,19 +46,18 @@ def example_poll_with_result_condition() -> None:
         .return_result()
     )
 
-    with no_sleep():
-        result = policy.run(job.status)
+    result = policy.run(job.status)
 
     print(f"Succeeded: {result.succeeded}")
     print(f"Final value: {result.value}")
     print(f"Polls: {result.attempt_count}")
 
 
-# --- Example 3: poll with timeout ---
+# --- Example 3: poll with attempt limit ---
 
 
-def example_poll_with_timeout() -> None:
-    print("\n=== Poll with time limit ===")
+def example_poll_with_attempt_limit() -> None:
+    print("\n=== Poll with attempt limit ===")
     job = PollableJob(polls_needed=5)
 
     policy = (
@@ -72,8 +68,7 @@ def example_poll_with_timeout() -> None:
         .fallback(lambda r: f"timed out after {r.attempt_count} polls")
     )
 
-    with no_sleep():
-        result = policy.run(job.status)
+    result = policy.run(job.status)
 
     print(f"Result: {result}")
 
@@ -81,4 +76,4 @@ def example_poll_with_timeout() -> None:
 if __name__ == "__main__":
     example_poll_with_try_again()
     example_poll_with_result_condition()
-    example_poll_with_timeout()
+    example_poll_with_attempt_limit()

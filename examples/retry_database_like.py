@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from examples.fake_services import UnstableDatabase
 from retryflow import RetryPolicy
-from retryflow.testing import no_sleep
 
 # --- Example 1: basic database retry ---
 
@@ -18,10 +17,10 @@ def example_basic_database_retry() -> None:
     print("=== Basic database retry ===")
     db = UnstableDatabase(timeout_times=2)
 
-    policy = RetryPolicy().attempts(5).on(TimeoutError).exponential_delay(base=0.01, factor=2)
+    # Use fixed_delay(0) so the example runs instantly.
+    policy = RetryPolicy().attempts(5).on(TimeoutError).fixed_delay(0)
 
-    with no_sleep():
-        rows = policy.run(lambda: db.query("SELECT * FROM users"))
+    rows = policy.run(lambda: db.query("SELECT * FROM users"))
 
     print(f"Rows: {rows}")
     print(f"DB calls: {db.calls}")
@@ -59,10 +58,9 @@ def example_statistics_tracking() -> None:
     def load_users() -> list[dict[str, object]]:
         return db.query("SELECT * FROM users")
 
-    with no_sleep():
-        load_users()
-        load_users()
-        load_users()
+    load_users()
+    load_users()
+    load_users()
 
     snap = load_users.retry_stats.snapshot()  # type: ignore[attr-defined]
     print(f"Calls: {snap.calls}")

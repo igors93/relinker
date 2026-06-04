@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from retryflow import RetryPolicy
 
 
@@ -115,3 +117,123 @@ def test_return_result_precedence_warning_still_works() -> None:
     policy = RetryPolicy().attempts(3).on_exhausted_raise(RuntimeError).return_result()
     codes = {w.code for w in policy.warnings()}
     assert "return_result_precedence" in codes
+
+
+# --- warnings() robustness tests ---
+
+
+def test_warnings_never_raises_for_default_policy() -> None:
+    """warnings() must not raise for any valid policy."""
+    policy = RetryPolicy()
+    warnings = policy.warnings()
+    assert isinstance(warnings, tuple)
+
+
+def test_warnings_never_raises_for_complex_policy() -> None:
+    policy = (
+        RetryPolicy()
+        .attempts(5)
+        .on(TimeoutError, ConnectionError)
+        .exponential_delay(base=0.5, maximum=30)
+        .jitter(maximum=0.5)
+        .return_result()
+        .with_logging()
+    )
+    warnings = policy.warnings()
+    assert isinstance(warnings, tuple)
+
+
+def test_warnings_never_raises_for_forever_policy() -> None:
+    policy = RetryPolicy().forever().on(Exception).no_delay()
+    warnings = policy.warnings()
+    assert isinstance(warnings, tuple)
+    assert len(warnings) > 0
+
+
+def test_warnings_returns_tuple_of_policy_warnings() -> None:
+    from retryflow import PolicyWarning
+
+    policy = RetryPolicy().forever().on(Exception)
+    for w in policy.warnings():
+        assert isinstance(w, PolicyWarning)
+        assert isinstance(w.code, str)
+        assert isinstance(w.message, str)
+
+
+# --- simulate() validation tests ---
+
+
+def test_simulate_raises_for_zero_attempts() -> None:
+    from retryflow import InvalidRetryConfigError
+
+    policy = RetryPolicy().attempts(3)
+    with pytest.raises(InvalidRetryConfigError):
+        policy.simulate(attempts=0)
+
+
+def test_simulate_raises_for_negative_attempts() -> None:
+    from retryflow import InvalidRetryConfigError
+
+    policy = RetryPolicy().attempts(3)
+    with pytest.raises(InvalidRetryConfigError):
+        policy.simulate(attempts=-1)
+
+
+def test_simulate_does_not_sleep() -> None:
+    """simulate() must never sleep — it is pure computation."""
+    import time
+
+    policy = RetryPolicy().attempts(10).fixed_delay(100)  # 100s delays
+    start = time.monotonic()
+    sim = policy.simulate(attempts=10)
+    elapsed = time.monotonic() - start
+
+    # Should complete essentially instantly
+    assert elapsed < 1.0
+    assert sim.total_sleep == 900.0  # 9 delays of 100s (last attempt has no delay)
+
+
+def test_simulate_is_deterministic_for_fixed_delay() -> None:
+    policy = RetryPolicy().attempts(5).fixed_delay(2)
+    sim1 = policy.simulate(attempts=5)
+    sim2 = policy.simulate(attempts=5)
+    assert sim1.total_sleep == sim2.total_sleep
+    assert sim1.attempt_count == sim2.attempt_count
+
+
+# --- explain() tests ---
+
+
+def test_explain_returns_non_empty_string() -> None:
+    policy = RetryPolicy().attempts(3)
+    text = policy.explain()
+    assert isinstance(text, str)
+    assert len(text) > 0
+
+
+def test_explain_includes_warnings() -> None:
+    policy = RetryPolicy().forever().on(Exception).no_delay()
+    text = policy.explain()
+    assert "Warnings" in text
+    assert "forever" in text
+
+
+def test_explain_no_warnings_section_for_clean_policy() -> None:
+    policy = RetryPolicy().attempts(3).on(TimeoutError).fixed_delay(1)
+    text = policy.explain()
+    assert "Warnings" not in text
+
+
+# --- timeline() tests ---
+
+
+def test_timeline_returns_string() -> None:
+    policy = RetryPolicy().attempts(3).fixed_delay(1)
+    text = policy.timeline(attempts=3)
+    assert isinstance(text, str)
+    assert "RetryFlow simulation" in text
+
+
+def test_timeline_matches_simulate_describe() -> None:
+    policy = RetryPolicy().attempts(3).fixed_delay(1)
+    assert policy.timeline(attempts=3) == policy.simulate(attempts=3).describe()

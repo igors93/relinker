@@ -188,3 +188,83 @@ def test_try_again_on_exhausted_raise() -> None:
     policy = RetryPolicy().attempts(3).on_exhausted_raise(RetryExhaustedError)
     with pytest.raises(RetryExhaustedError):
         policy.run(task)
+
+
+def test_try_again_story_shows_error_class() -> None:
+    """story() should mention TryAgain when the result was exhausted by TryAgain."""
+
+    def task() -> str:
+        raise TryAgain("polling")
+
+    result = RetryPolicy().attempts(2).return_result().run(task)
+    text = result.story()
+
+    assert "TryAgain" in text
+    assert "exhausted" in text
+
+
+def test_try_again_last_error_in_result() -> None:
+    """result.last_error should be the TryAgain instance when exhausted."""
+
+    def task() -> str:
+        raise TryAgain("not ready")
+
+    result = RetryPolicy().attempts(3).return_result().run(task)
+
+    assert isinstance(result.last_error, TryAgain)
+    assert str(result.last_error) == "not ready"
+
+
+def test_try_again_failed_attempts_count() -> None:
+    """All attempts should be counted as failed when TryAgain is always raised."""
+    calls = [0]
+
+    def task() -> str:
+        calls[0] += 1
+        raise TryAgain("retry")
+
+    result = RetryPolicy().attempts(4).return_result().run(task)
+
+    assert result.failed_attempts == 4
+    assert result.successful_attempts == 0
+    assert result.attempt_count == 4
+
+
+def test_try_again_with_custom_exhausted_exception_factory() -> None:
+    """TryAgain exhaustion should respect on_exhausted_raise with a factory."""
+
+    class JobNotReadyError(RuntimeError):
+        pass
+
+    def task() -> str:
+        raise TryAgain("not ready")
+
+    policy = (
+        RetryPolicy()
+        .attempts(3)
+        .on_exhausted_raise(
+            lambda r: JobNotReadyError(f"exhausted after {r.attempt_count} attempts")
+        )
+    )
+    with pytest.raises(JobNotReadyError, match="exhausted after 3 attempts"):
+        policy.run(task)
+
+
+def test_try_again_error_in_logs_via_with_logging(caplog: pytest.LogCaptureFixture) -> None:
+    """with_logging should log TryAgain class name when it causes a retry."""
+    import logging
+
+    calls = [0]
+
+    def task() -> str:
+        calls[0] += 1
+        if calls[0] < 2:
+            raise TryAgain("not ready")
+        return "ok"
+
+    policy = RetryPolicy().attempts(5).fixed_delay(0).with_logging(level=logging.WARNING)
+
+    with caplog.at_level(logging.WARNING, logger="retryflow"):
+        policy.run(task)
+
+    assert any("TryAgain" in r.message for r in caplog.records)

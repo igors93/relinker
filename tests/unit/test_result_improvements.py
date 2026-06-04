@@ -171,3 +171,125 @@ def test_summary_is_json_serializable() -> None:
     result = _make_result_with_failures(1, then_succeed=True)
     text = json.dumps(result.summary())
     assert isinstance(text, str)
+
+
+# --- story() tests ---
+
+
+def test_story_succeeded() -> None:
+    result = _make_result_with_failures(0, then_succeed=True)
+    text = result.story()
+    assert "succeeded" in text
+    assert "Status" in text
+    assert "Attempts" in text
+
+
+def test_story_exception_exhaustion() -> None:
+    attempt = AttemptRecord(number=1, started_at=0.0, ended_at=0.1, error=TimeoutError("timeout"))
+    result: RetryResult[str] = RetryResult(
+        attempts=(attempt,),
+        error=TimeoutError("timeout"),
+        started_at=0.0,
+        ended_at=0.1,
+        exhausted=True,
+        retry_cause="exception",
+    )
+    text = result.story()
+    assert "exhausted by exception" in text
+    assert "TimeoutError" in text
+
+
+def test_story_result_exhaustion() -> None:
+    attempt = AttemptRecord(number=1, started_at=0.0, ended_at=0.1, value=None)
+    result: RetryResult[str] = RetryResult(
+        attempts=(attempt,),
+        value=None,
+        started_at=0.0,
+        ended_at=0.1,
+        exhausted=True,
+        retry_cause="result",
+    )
+    text = result.story()
+    assert "exhausted by result" in text
+    assert "rejected" in text
+
+
+def test_story_with_try_again_exhaustion() -> None:
+    from retryflow.exceptions import TryAgain
+
+    ta = TryAgain("still polling")
+    attempt = AttemptRecord(number=1, started_at=0.0, ended_at=0.1, error=ta)
+    result: RetryResult[str] = RetryResult(
+        attempts=(attempt,),
+        error=ta,
+        started_at=0.0,
+        ended_at=0.1,
+        exhausted=True,
+        retry_cause="exception",
+    )
+    text = result.story()
+    assert "TryAgain" in text
+    assert "exhausted" in text
+
+
+# --- to_dict() tests ---
+
+
+def test_to_dict_excludes_value_by_default() -> None:
+    attempt = AttemptRecord(number=1, started_at=0.0, ended_at=0.1, value="sensitive")
+    result: RetryResult[str] = RetryResult(
+        attempts=(attempt,), value="sensitive", started_at=0.0, ended_at=0.1
+    )
+    d = result.to_dict()
+    assert "value" not in d
+
+
+def test_to_dict_includes_value_when_requested() -> None:
+    attempt = AttemptRecord(number=1, started_at=0.0, ended_at=0.1, value="my_value")
+    result: RetryResult[str] = RetryResult(
+        attempts=(attempt,), value="my_value", started_at=0.0, ended_at=0.1
+    )
+    d = result.to_dict(include_value=True)
+    assert "value" in d
+    assert d["value"] == "my_value"
+
+
+def test_to_dict_contains_expected_keys() -> None:
+    result = _make_result_with_failures(1, then_succeed=True)
+    d = result.to_dict()
+    for key in ("succeeded", "failed", "exhausted", "retry_cause", "attempt_count", "total_time"):
+        assert key in d
+
+
+def test_to_dict_attempts_list() -> None:
+    result = _make_result_with_failures(2, then_succeed=True)
+    d = result.to_dict()
+    assert isinstance(d["attempts"], list)
+    assert len(d["attempts"]) == 3  # 2 failures + 1 success
+
+
+# --- to_json() tests ---
+
+
+def test_to_json_excludes_value_by_default() -> None:
+    attempt = AttemptRecord(number=1, started_at=0.0, ended_at=0.1, value="secret")
+    result: RetryResult[str] = RetryResult(
+        attempts=(attempt,), value="secret", started_at=0.0, ended_at=0.1
+    )
+    text = result.to_json()
+    parsed = json.loads(text)
+    assert "value" not in parsed
+
+
+def test_to_json_is_valid_json() -> None:
+    result = _make_result_with_failures(2, then_succeed=True)
+    text = result.to_json()
+    parsed = json.loads(text)
+    assert isinstance(parsed, dict)
+
+
+def test_to_json_with_indent() -> None:
+    result = _make_result_with_failures(1, then_succeed=True)
+    text = result.to_json(indent=2)
+    assert "\n" in text
+    assert '"succeeded"' in text

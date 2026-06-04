@@ -58,3 +58,48 @@ def test_retry_wrapped_function_runtime_checkable() -> None:
         return "ok"
 
     assert isinstance(wrapped, RetryWrappedFunction)
+
+
+def test_async_decorated_function_satisfies_protocol() -> None:
+    @RetryPolicy().attempts(3)
+    async def async_task() -> str:
+        return "ok"
+
+    assert isinstance(async_task, RetryWrappedFunction)
+
+
+def test_async_decorated_function_has_retry_stats() -> None:
+    @RetryPolicy().attempts(3)
+    async def async_task() -> str:
+        return "ok"
+
+    assert hasattr(async_task, "retry_stats")
+    assert hasattr(async_task, "retry_policy")
+
+
+def test_with_policy_result_satisfies_protocol() -> None:
+    @RetryPolicy().attempts(3)
+    def task() -> str:
+        return "ok"
+
+    new_task = task.with_policy(RetryPolicy().attempts(5))  # type: ignore[attr-defined]
+    assert isinstance(new_task, RetryWrappedFunction)
+
+
+def test_decorated_function_preserves_name_and_doc() -> None:
+    @RetryPolicy().attempts(3)
+    def my_function() -> str:
+        """My function docstring."""
+        return "ok"
+
+    assert my_function.__name__ == "my_function"
+    assert my_function.__doc__ == "My function docstring."
+
+
+def test_async_decorated_function_preserves_name() -> None:
+    @RetryPolicy().attempts(3)
+    async def my_async_function() -> str:
+        """Async function docstring."""
+        return "ok"
+
+    assert my_async_function.__name__ == "my_async_function"

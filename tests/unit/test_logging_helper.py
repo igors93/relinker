@@ -127,3 +127,60 @@ def test_with_logging_result_rejection_giveup(caplog: pytest.LogCaptureFixture) 
 
     giveup_records = [r for r in caplog.records if "Giving up" in r.message]
     assert len(giveup_records) > 0
+
+
+def test_with_logging_sleep_log_contains_error_class(caplog: pytest.LogCaptureFixture) -> None:
+    """The before_sleep log message should include the error class name."""
+
+    def task() -> str:
+        raise TimeoutError("timed out")
+
+    policy = RetryPolicy().attempts(3).on(TimeoutError).fixed_delay(0).with_logging()
+
+    with caplog.at_level(logging.WARNING, logger="retryflow"), pytest.raises(TimeoutError):
+        policy.run(task)
+
+    sleep_records = [r for r in caplog.records if "retrying" in r.message]
+    assert len(sleep_records) > 0
+    assert any("TimeoutError" in r.message for r in sleep_records)
+
+
+def test_with_logging_sleep_log_contains_delay(caplog: pytest.LogCaptureFixture) -> None:
+    """The before_sleep log message should include the delay value."""
+
+    calls = [0]
+
+    def task() -> str:
+        calls[0] += 1
+        if calls[0] < 2:
+            raise TimeoutError("timed out")
+        return "ok"
+
+    policy = RetryPolicy().attempts(5).on(TimeoutError).fixed_delay(0).with_logging()
+
+    with caplog.at_level(logging.WARNING, logger="retryflow"):
+        policy.run(task)
+
+    sleep_records = [r for r in caplog.records if "retrying" in r.message]
+    assert len(sleep_records) > 0
+    # Delay is 0.00 seconds
+    assert any("0.00" in r.message for r in sleep_records)
+
+
+def test_with_logging_giveup_message_contains_error_message(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """The after_giveup log message should include error class and message."""
+
+    def task() -> str:
+        raise ValueError("bad argument")
+
+    policy = RetryPolicy().attempts(2).on(ValueError).fixed_delay(0).with_logging()
+
+    with caplog.at_level(logging.WARNING, logger="retryflow"), pytest.raises(ValueError):
+        policy.run(task)
+
+    giveup_records = [r for r in caplog.records if "Giving up" in r.message]
+    assert len(giveup_records) > 0
+    assert any("ValueError" in r.message for r in giveup_records)
+    assert any("bad argument" in r.message for r in giveup_records)

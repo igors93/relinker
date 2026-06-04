@@ -1,8 +1,8 @@
 """
 Policy diagnostics implementation.
 
-Contains the warnings() logic extracted from RetryPolicy. This is internal;
-the public API remains RetryPolicy.warnings().
+Contains the warnings() and doctor() logic extracted from RetryPolicy. This is
+internal; the public API remains RetryPolicy.warnings() and RetryPolicy.doctor().
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from typing import Any
 
 from retryflow.conditions.composite import AllCondition, AnyCondition
 from retryflow.conditions.result import ResultCondition
-from retryflow.diagnostics import PolicyWarning
+from retryflow.diagnostics import PolicyHealthReport, PolicyWarning
 from retryflow.stop.attempts import StopAfterAttempt
 
 
@@ -24,6 +24,13 @@ def _has_result_condition(condition: Any) -> bool:
     return False
 
 
+def _is_no_delay(policy: Any) -> bool:
+    return (
+        policy.delay_strategy.__class__.__name__ == "FixedDelay"
+        and getattr(policy.delay_strategy, "seconds", None) == 0
+    )
+
+
 def compute_warnings(policy: Any) -> tuple[PolicyWarning, ...]:
     """
     Compute advisory warnings for the given policy.
@@ -33,10 +40,10 @@ def compute_warnings(policy: Any) -> tuple[PolicyWarning, ...]:
     warnings: list[PolicyWarning] = []
 
     stop_name = policy.stop_strategy.__class__.__name__
-    delay_name = policy.delay_strategy.__class__.__name__
     condition_name = policy.condition.__class__.__name__
 
     is_forever = stop_name == "StopForever"
+    is_no_delay = _is_no_delay(policy)
 
     if is_forever:
         warnings.append(
@@ -47,12 +54,24 @@ def compute_warnings(policy: Any) -> tuple[PolicyWarning, ...]:
             )
         )
 
-    if delay_name == "FixedDelay" and getattr(policy.delay_strategy, "seconds", None) == 0:
+    if is_no_delay:
         warnings.append(
             PolicyWarning(
                 code="no_delay",
                 message="This policy has no delay between attempts.",
                 hint="Consider jitter or backoff for external services.",
+            )
+        )
+
+    if is_forever and is_no_delay:
+        warnings.append(
+            PolicyWarning(
+                code="tight_loop_risk",
+                message="This policy can retry forever without sleeping.",
+                hint=(
+                    "A tight retry loop can consume CPU and overload downstream services. "
+                    "Add a delay, max_time(), or a cancellation-aware caller."
+                ),
             )
         )
 
@@ -74,7 +93,7 @@ def compute_warnings(policy: Any) -> tuple[PolicyWarning, ...]:
             PolicyWarning(
                 code="many_attempts",
                 message=f"This policy uses {policy.stop_strategy.maximum} attempts.",
-                hint=("High attempt counts increase load on downstream services during incidents."),
+                hint="High attempt counts increase load on downstream services during incidents.",
             )
         )
 
@@ -146,9 +165,7 @@ def compute_warnings(policy: Any) -> tuple[PolicyWarning, ...]:
         warnings.append(
             PolicyWarning(
                 code="background_broad_exception",
-                message=(
-                    "Broad exception handling is combined with many attempts or forever retry."
-                ),
+                message="Broad exception handling is combined with many attempts or forever retry.",
                 hint=(
                     "Background jobs catching all exceptions can mask bugs and amplify load. "
                     "Consider narrowing the exception types or adding a circuit breaker."
@@ -157,3 +174,8 @@ def compute_warnings(policy: Any) -> tuple[PolicyWarning, ...]:
         )
 
     return tuple(warnings)
+
+
+def doctor_policy(policy: Any) -> PolicyHealthReport:
+    """Return a human-friendly policy health report."""
+    return PolicyHealthReport(compute_warnings(policy))

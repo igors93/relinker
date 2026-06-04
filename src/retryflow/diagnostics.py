@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from typing import Literal
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,6 +24,73 @@ class PolicyWarning:
     code: str
     message: str
     hint: str | None = None
+
+    def to_dict(self) -> dict[str, str | None]:
+        """Return this warning as a JSON-friendly dictionary."""
+        return {"code": self.code, "message": self.message, "hint": self.hint}
+
+
+@dataclass(frozen=True, slots=True)
+class PolicyHealthReport:
+    """
+    Human-friendly health report for a retry policy.
+
+    The report does not block execution. It groups the advisory warnings into a
+    small risk level so users can decide whether a policy is ready for production.
+    """
+
+    warnings: tuple[PolicyWarning, ...]
+
+    @property
+    def ok(self) -> bool:
+        """Return True when the policy has no warnings."""
+        return not self.warnings
+
+    @property
+    def has_warnings(self) -> bool:
+        """Return True when the policy has at least one warning."""
+        return bool(self.warnings)
+
+    @property
+    def risk_level(self) -> Literal["ok", "warning", "risky"]:
+        """Return a compact risk level derived from warning codes."""
+        risky_codes = {
+            "forever",
+            "tight_loop_risk",
+            "background_broad_exception",
+        }
+        if any(warning.code in risky_codes for warning in self.warnings):
+            return "risky"
+        if self.warnings:
+            return "warning"
+        return "ok"
+
+    def to_dict(self) -> dict[str, object]:
+        """Return this report as a JSON-friendly dictionary."""
+        return {
+            "ok": self.ok,
+            "risk_level": self.risk_level,
+            "warning_count": len(self.warnings),
+            "warnings": [warning.to_dict() for warning in self.warnings],
+        }
+
+    def to_json(self, indent: int | None = None) -> str:
+        """Return this report as JSON."""
+        return json.dumps(self.to_dict(), indent=indent)
+
+    def describe(self) -> str:
+        """Return a readable policy health report."""
+        lines = ["RetryFlow policy health", "", f"Risk level: {self.risk_level}"]
+        if not self.warnings:
+            lines.extend(["", "No warnings found."])
+            return "\n".join(lines)
+
+        lines.extend(["", "Warnings:"])
+        for warning in self.warnings:
+            lines.append(f"- {warning.code}: {warning.message}")
+            if warning.hint:
+                lines.append(f"  Hint: {warning.hint}")
+        return "\n".join(lines)
 
 
 @dataclass(frozen=True, slots=True)

@@ -5,8 +5,8 @@ RetryPolicy is the main public object in RetryFlow. It is an immutable builder:
 every configuration method returns a new policy so it can be shared and reused
 safely without side effects.
 
-Implementation details are kept in the internal/ modules so this file remains
-a readable public facade.
+Implementation details are kept in the internal/ modules so this file remains a
+readable public facade.
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ from retryflow.delays.linear import LinearDelay
 from retryflow.delays.random_delay import RandomDelay
 from retryflow.delays.random_exponential import RandomExponentialDelay
 from retryflow.delays.stateful import StatefulCustomDelay
-from retryflow.diagnostics import PolicyWarning, RetrySimulation
+from retryflow.diagnostics import PolicyHealthReport, PolicyWarning, RetrySimulation
 from retryflow.event import EventHandler, EventName, RetryEvent
 from retryflow.exceptions import InvalidRetryConfigError
 from retryflow.executors.async_ import execute_async
@@ -275,17 +275,6 @@ class RetryPolicy(Generic[T]):
         The callback receives a RetryState snapshot before each sleep and must
         return a non-negative float (seconds). This enables delays that adapt
         based on the last error, last value, elapsed time, or response headers.
-
-        Example:
-            policy = RetryPolicy().stateful_delay(lambda state: state.attempt_number * 0.5)
-
-        For HTTP Retry-After support:
-            from retryflow.http import retry_after_delay
-            policy = (
-                RetryPolicy()
-                .retry_if_result(retry_if_status({429, 503}))
-                .stateful_delay(retry_after_delay(default=1.0, maximum=60.0))
-            )
         """
         return replace(self, delay_strategy=StatefulCustomDelay(callback))
 
@@ -404,6 +393,26 @@ class RetryPolicy(Generic[T]):
         """Return a new policy with an additional event handler."""
         return replace(self, event_handlers=(*self.event_handlers, (name, handler)))
 
+    def on_before_attempt(self, handler: EventHandler) -> RetryPolicy[T]:
+        """Return a new policy that calls handler before each attempt."""
+        return self.on_event("before_attempt", handler)
+
+    def on_success(self, handler: EventHandler) -> RetryPolicy[T]:
+        """Return a new policy that calls handler after an accepted successful result."""
+        return self.on_event("after_success", handler)
+
+    def on_failure(self, handler: EventHandler) -> RetryPolicy[T]:
+        """Return a new policy that calls handler after a failed attempt."""
+        return self.on_event("after_failure", handler)
+
+    def on_retry(self, handler: EventHandler) -> RetryPolicy[T]:
+        """Return a new policy that calls handler before sleeping for a retry."""
+        return self.on_event("before_sleep", handler)
+
+    def on_giveup(self, handler: EventHandler) -> RetryPolicy[T]:
+        """Return a new policy that calls handler when RetryFlow gives up."""
+        return self.on_event("after_giveup", handler)
+
     def debug(self) -> RetryPolicy[T]:
         """Return a new policy with simple console debug events enabled."""
 
@@ -443,20 +452,39 @@ class RetryPolicy(Generic[T]):
         """
         Return a new policy that logs retry activity using the standard library.
 
-        Logs before each sleep and after giving up. Successful first attempts
-        are not logged to avoid noise.
-
-        Args:
-            level: Python logging level. Defaults to WARNING.
-            logger: Logger instance to use. Defaults to the 'retryflow' logger.
-
-        Example:
-            policy = RetryPolicy().attempts(3).with_logging(level=logging.INFO)
+        Logs before each sleep and after giving up. Successful first attempts are
+        not logged to avoid noise.
         """
         from retryflow.internal.policy_logging import make_logging_handler
 
         _logger = logger if logger is not None else logging.getLogger("retryflow")
         handler = make_logging_handler(level, _logger)
+        policy: RetryPolicy[T] = self
+        for event_name in ("before_sleep", "after_giveup"):
+            policy = policy.on_event(event_name, handler)
+        return policy
+
+    def with_structured_logging(
+        self,
+        *,
+        level: int = logging.INFO,
+        logger: logging.Logger | None = None,
+        include_error_message: bool = False,
+    ) -> RetryPolicy[T]:
+        """
+        Return a new policy that logs retry events as compact JSON strings.
+
+        Error messages are excluded by default because they may contain sensitive
+        user data, tokens, URLs, or payload fragments.
+        """
+        from retryflow.internal.policy_logging import make_structured_logging_handler
+
+        _logger = logger if logger is not None else logging.getLogger("retryflow")
+        handler = make_structured_logging_handler(
+            level,
+            _logger,
+            include_error_message=include_error_message,
+        )
         policy: RetryPolicy[T] = self
         for event_name in ("before_sleep", "after_giveup"):
             policy = policy.on_event(event_name, handler)
@@ -480,6 +508,12 @@ class RetryPolicy(Generic[T]):
         from retryflow.internal.policy_diagnostics import compute_warnings
 
         return compute_warnings(self)
+
+    def doctor(self) -> PolicyHealthReport:
+        """Return a human-friendly health report for this policy."""
+        from retryflow.internal.policy_diagnostics import doctor_policy
+
+        return doctor_policy(self)
 
     def simulate(self, attempts: int = 5) -> RetrySimulation:
         """
@@ -505,6 +539,12 @@ class RetryPolicy(Generic[T]):
         This is a shortcut for simulate(attempts).describe().
         """
         return self.simulate(attempts=attempts).describe()
+
+    def preview(self, attempts: int = 5) -> str:
+        """Return a concise preview of retry timing and policy warnings."""
+        from retryflow.internal.policy_simulation import preview_policy
+
+        return preview_policy(self, attempts)
 
     # -------------------------------------------------- iteration / blocks
 

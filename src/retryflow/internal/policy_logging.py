@@ -1,13 +1,16 @@
 """
 Logging integration for retry policies.
 
-Implements the handler factory for RetryPolicy.with_logging(). This is internal;
-the public API is RetryPolicy.with_logging().
+Implements handler factories for RetryPolicy.with_logging() and
+RetryPolicy.with_structured_logging(). This is internal; the public API remains
+on RetryPolicy.
 """
 
 from __future__ import annotations
 
+import json
 import logging
+from typing import Any
 
 from retryflow.event import EventHandler, RetryEvent
 
@@ -49,3 +52,57 @@ def make_logging_handler(
                 )
 
     return handler
+
+
+def make_structured_logging_handler(
+    level: int,
+    logger: logging.Logger,
+    *,
+    include_error_message: bool = False,
+) -> EventHandler:
+    """
+    Create a JSON logging handler with safe default fields.
+
+    Error messages can contain secrets or user data, so they are excluded unless
+    include_error_message=True is explicitly requested by the caller.
+    """
+
+    def handler(event: RetryEvent) -> None:
+        payload = _structured_payload(event, include_error_message=include_error_message)
+        logger.log(level, "%s", json.dumps(payload, sort_keys=True, separators=(",", ":")))
+
+    return handler
+
+
+def _structured_payload(
+    event: RetryEvent,
+    *,
+    include_error_message: bool,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "library": "retryflow",
+        "event": event.name,
+        "function": event.function_name,
+        "attempt": event.attempt_number,
+    }
+
+    if event.delay is not None:
+        payload["delay"] = event.delay
+
+    if event.error is not None:
+        payload["error_type"] = event.error.__class__.__name__
+        if include_error_message:
+            payload["error_message"] = str(event.error)
+
+    if event.state is not None:
+        payload.update(
+            {
+                "elapsed": round(event.state.elapsed, 6),
+                "attempt_count": event.state.attempt_count,
+                "retry_cause": event.state.retry_cause,
+                "will_retry": event.state.will_retry,
+                "will_stop": event.state.will_stop,
+            }
+        )
+
+    return payload

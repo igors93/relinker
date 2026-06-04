@@ -32,3 +32,22 @@ class RetryExhaustedError(RetryFlowError):
     def __init__(self, message: str, *, result: Any | None = None) -> None:
         super().__init__(message)
         self.result = result
+
+
+class TryAgain(Exception):
+    """
+    Explicit signal to request another retry attempt from inside a wrapped function.
+
+    Raise TryAgain to unconditionally request another attempt, regardless of which
+    exception types the policy is configured to retry. TryAgain still respects the
+    stop strategy (attempt limit or elapsed time).
+
+    Example:
+        from retryflow import TryAgain
+
+        def task():
+            result = call_service()
+            if result == "pending":
+                raise TryAgain("not ready yet")
+            return result
+    """

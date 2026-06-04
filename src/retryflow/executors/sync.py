@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from retryflow.attempt import AttemptRecord
 from retryflow.event import RetryEvent
-from retryflow.exceptions import RetryExhaustedError
+from retryflow.exceptions import RetryExhaustedError, TryAgain
 from retryflow.internal.clock import now
 from retryflow.result import RetryResult
 from retryflow.state import RetryCause, RetryState
@@ -121,6 +121,86 @@ def execute_sync(
 
         try:
             value = function(*args, **kwargs)
+        except TryAgain as error:
+            # TryAgain is an explicit user retry signal — bypass the condition check.
+            attempt_ended_at = now()
+            attempts.append(
+                AttemptRecord(
+                    number=attempt_number,
+                    started_at=attempt_started_at,
+                    ended_at=attempt_ended_at,
+                    error=error,
+                )
+            )
+            elapsed = attempt_ended_at - execution_started_at
+            should_stop = policy.stop_strategy.should_stop(attempt_number, elapsed)
+            policy.emit(
+                RetryEvent(
+                    name="after_failure",
+                    attempt_number=attempt_number,
+                    function_name=function_name,
+                    error=error,
+                    state=_state(
+                        function_name=function_name,
+                        attempt_number=attempt_number,
+                        execution_started_at=execution_started_at,
+                        attempts=attempts,
+                        last_error=error,
+                        retry_cause="exception",
+                        will_retry=not should_stop,
+                        will_stop=should_stop,
+                    ),
+                )
+            )
+            if should_stop:
+                result: RetryResult[Any] = RetryResult(
+                    attempts=tuple(attempts),
+                    error=error,
+                    started_at=execution_started_at,
+                    ended_at=now(),
+                    exhausted=True,
+                    retry_cause="exception",
+                )
+                policy.emit(
+                    RetryEvent(
+                        name="after_giveup",
+                        attempt_number=attempt_number,
+                        function_name=function_name,
+                        error=error,
+                        state=_state(
+                            function_name=function_name,
+                            attempt_number=attempt_number,
+                            execution_started_at=execution_started_at,
+                            attempts=attempts,
+                            last_error=error,
+                            retry_cause="exception",
+                            will_stop=True,
+                        ),
+                    )
+                )
+                return _finish_exhausted(policy, result)
+            delay = policy.delay_strategy.next_delay(attempt_number)
+            policy.emit(
+                RetryEvent(
+                    name="before_sleep",
+                    attempt_number=attempt_number,
+                    function_name=function_name,
+                    delay=delay,
+                    error=error,
+                    state=_state(
+                        function_name=function_name,
+                        attempt_number=attempt_number,
+                        execution_started_at=execution_started_at,
+                        attempts=attempts,
+                        last_error=error,
+                        next_delay=delay,
+                        retry_cause="exception",
+                        will_retry=True,
+                    ),
+                )
+            )
+            policy.sleep(delay)
+            continue
         except Exception as error:
             attempt_ended_at = now()
             attempts.append(
@@ -156,7 +236,7 @@ def execute_sync(
             )
 
             if not should_retry:
-                result: RetryResult[Any] = RetryResult(
+                result = RetryResult(
                     attempts=tuple(attempts),
                     error=error,
                     started_at=execution_started_at,

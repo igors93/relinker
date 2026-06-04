@@ -8,6 +8,7 @@ policy, which avoids surprising side effects when policies are reused.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
 from functools import wraps
@@ -46,6 +47,15 @@ from retryflow.typing import P, T
 ResultExhaustedBehavior = Literal["return_last", "raise"]
 ExhaustedCallback = Callable[[RetryResult[Any]], Any]
 ExceptionFactory = Callable[[RetryResult[Any]], BaseException]
+
+
+def _has_result_condition(condition: RetryCondition) -> bool:
+    """Return True when the condition tree includes at least one ResultCondition."""
+    if isinstance(condition, ResultCondition):
+        return True
+    if isinstance(condition, (AnyCondition, AllCondition)):
+        return any(_has_result_condition(c) for c in condition.conditions)
+    return False
 
 
 @dataclass(frozen=True, slots=True)
@@ -396,6 +406,60 @@ class RetryPolicy(Generic[T]):
             policy = policy.on_event(event_name, print_event)
         return policy
 
+    def with_logging(
+        self,
+        *,
+        level: int = logging.WARNING,
+        logger: logging.Logger | None = None,
+    ) -> RetryPolicy[T]:
+        """
+        Return a new policy that logs retry activity using the standard library.
+
+        By default logs before each sleep (attempt failed, retry coming) and
+        after giving up. Successful attempts are not logged to avoid noise.
+
+        Args:
+            level: Python logging level. Defaults to WARNING.
+            logger: Logger to use. Defaults to the 'retryflow' logger.
+
+        Example:
+            import logging
+            policy = RetryPolicy().attempts(3).with_logging(level=logging.INFO)
+        """
+        _logger = logger if logger is not None else logging.getLogger("retryflow")
+
+        def handler(event: RetryEvent) -> None:
+            if event.name == "before_sleep":
+                _logger.log(
+                    level,
+                    "Attempt %d failed (%s), retrying in %.2fs",
+                    event.attempt_number,
+                    event.error.__class__.__name__
+                    if event.error is not None
+                    else "result rejected",
+                    event.delay if event.delay is not None else 0.0,
+                )
+            elif event.name == "after_giveup":
+                if event.error is not None:
+                    _logger.log(
+                        level,
+                        "Giving up after attempt %d: %s: %s",
+                        event.attempt_number,
+                        event.error.__class__.__name__,
+                        event.error,
+                    )
+                else:
+                    _logger.log(
+                        level,
+                        "Giving up after attempt %d: result retry exhausted",
+                        event.attempt_number,
+                    )
+
+        policy: RetryPolicy[T] = self
+        for event_name in ("before_sleep", "after_giveup"):
+            policy = policy.on_event(event_name, handler)
+        return policy
+
     def emit(self, event: RetryEvent) -> None:
         """Emit an event to all matching handlers."""
         for name, handler in self.event_handlers:
@@ -415,7 +479,9 @@ class RetryPolicy(Generic[T]):
         delay_name = self.delay_strategy.__class__.__name__
         condition_name = self.condition.__class__.__name__
 
-        if stop_name == "StopForever":
+        is_forever = stop_name == "StopForever"
+
+        if is_forever:
             warnings.append(
                 PolicyWarning(
                     code="forever",
@@ -433,9 +499,11 @@ class RetryPolicy(Generic[T]):
                 )
             )
 
+        is_broad_exception = False
         if condition_name == "ExceptionCondition":
             exception_types = getattr(self.condition, "exception_types", ())
             if exception_types == (Exception,):
+                is_broad_exception = True
                 warnings.append(
                     PolicyWarning(
                         code="broad_exception",
@@ -443,6 +511,44 @@ class RetryPolicy(Generic[T]):
                         hint="Prefer specific exception types when possible.",
                     )
                 )
+
+        # many_attempts: more than 10 configured attempts
+        if isinstance(self.stop_strategy, StopAfterAttempt) and self.stop_strategy.maximum > 10:
+            warnings.append(
+                PolicyWarning(
+                    code="many_attempts",
+                    message=f"This policy uses {self.stop_strategy.maximum} attempts.",
+                    hint=(
+                        "High attempt counts increase load on downstream services during incidents."
+                    ),
+                )
+            )
+
+        # high_total_sleep: simulated total sleep is very large
+        if not is_forever:
+            try:
+                sim_count = (
+                    self.stop_strategy.maximum
+                    if isinstance(self.stop_strategy, StopAfterAttempt)
+                    else 10
+                )
+                simulation = self.simulate(attempts=sim_count)
+                if simulation.total_sleep > 300:
+                    warnings.append(
+                        PolicyWarning(
+                            code="high_total_sleep",
+                            message=(
+                                f"Simulated total sleep is {simulation.total_sleep:.1f}s "
+                                f"across {sim_count} attempts."
+                            ),
+                            hint=(
+                                "Verify that upstream services and callers can wait this long "
+                                "before adding a stricter time limit."
+                            ),
+                        )
+                    )
+            except Exception:  # noqa: BLE001
+                pass
 
         if self.should_return_result and (
             self.exhausted_callback is not None or self.exhausted_exception_factory is not None
@@ -454,6 +560,47 @@ class RetryPolicy(Generic[T]):
                     hint=(
                         "Configure fallback/on_exhausted_raise after deciding "
                         "whether to return RetryResult."
+                    ),
+                )
+            )
+
+        # result_retry_without_observation: result-based retry with no way to observe exhaustion
+        if (
+            _has_result_condition(self.condition)
+            and not self.should_return_result
+            and self.exhausted_callback is None
+            and self.exhausted_exception_factory is None
+            and self.result_exhausted_behavior != "raise"
+        ):
+            warnings.append(
+                PolicyWarning(
+                    code="result_retry_without_observation",
+                    message=(
+                        "Result-based retry is configured without return_result(), "
+                        "fallback, or raise-on-exhausted behavior."
+                    ),
+                    hint=(
+                        "Add .return_result(), .fallback(...), or "
+                        ".raise_on_result_exhausted() to observe when "
+                        "result retry is exhausted."
+                    ),
+                )
+            )
+
+        # background_broad_exception: broad exception in a high-attempt or forever policy
+        is_high_attempt = (
+            isinstance(self.stop_strategy, StopAfterAttempt) and self.stop_strategy.maximum >= 10
+        )
+        if is_broad_exception and (is_forever or is_high_attempt):
+            warnings.append(
+                PolicyWarning(
+                    code="background_broad_exception",
+                    message=(
+                        "Broad exception handling is combined with many attempts or forever retry."
+                    ),
+                    hint=(
+                        "Background jobs catching all exceptions can mask bugs and amplify load. "
+                        "Consider narrowing the exception types or adding a circuit breaker."
                     ),
                 )
             )
@@ -472,15 +619,18 @@ class RetryPolicy(Generic[T]):
 
         simulated_attempts: list[RetrySimulationAttempt] = []
         elapsed = 0.0
+        cumulative = 0.0
 
         for attempt_number in range(1, attempts + 1):
             should_stop = self.stop_strategy.should_stop(attempt_number, elapsed)
             delay = 0.0 if should_stop else self.delay_strategy.next_delay(attempt_number)
+            cumulative += delay
             simulated_attempts.append(
                 RetrySimulationAttempt(
                     attempt_number=attempt_number,
                     delay_before_next_attempt=delay,
                     stops_after_attempt=should_stop,
+                    cumulative_sleep=cumulative,
                 )
             )
             elapsed += delay

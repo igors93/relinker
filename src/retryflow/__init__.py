@@ -13,6 +13,7 @@ from retryflow.exceptions import (
     InvalidRetryConfigError,
     RetryExhaustedError,
     RetryFlowError,
+    TryAgain,
 )
 from retryflow.policy import RetryPolicy
 from retryflow.presets import background_job, database, fast, network, patient
@@ -20,6 +21,7 @@ from retryflow.result import RetryResult
 from retryflow.retry import retry
 from retryflow.state import RetryState
 from retryflow.stats import RetryStats, RetryStatsSnapshot
+from retryflow.typing import RetryWrappedFunction
 
 __all__ = [
     "AsyncRetryAttemptContext",
@@ -35,6 +37,8 @@ __all__ = [
     "RetryState",
     "RetryStats",
     "RetryStatsSnapshot",
+    "RetryWrappedFunction",
+    "TryAgain",
     "background_job",
     "database",
     "fast",

@@ -3,22 +3,49 @@
 RetryFlow is a Python retry library focused on clarity, control, and
 debuggability.
 
-## Main guides
+## Getting started
 
+- [Installation](installation.md)
 - [Quickstart](quickstart.md)
 - [Presets](presets.md)
-- [Examples](examples.md)
+
+## Core concepts
+
 - [Policy](policy.md)
 - [Delays](delays.md)
-- [Diagnostics](diagnostics.md)
+- [Conditions](conditions.md)
+- [Stop strategies](stop.md)
 - [Error handling](error-handling.md)
-- [Statistics](statistics.md)
+- [Results](results.md)
 - [Async](async.md)
 - [Events](events.md)
-- [Safety](safety.md)
-- [When not to retry](when-not-to-retry.md)
-- [API reference](api-reference.md)
+- [Statistics](statistics.md)
 - [Testing](testing.md)
+
+## Retry signals
+
+- [TryAgain](try-again.md) — explicit retry signal from inside a function
+
+## Observability and diagnostics
+
+- [Diagnostics](diagnostics.md) — warnings, simulation, policy explanation
+- [Safety](safety.md) — built-in safety mechanisms
+
+## Integrations
+
+- [HTTP helpers](http.md) — dependency-free HTTP status and header helpers
+
+## Practical guidance
+
+- [Common patterns](common-patterns.md)
+- [Production checklist](production-checklist.md)
+- [When not to retry](when-not-to-retry.md)
+- [Examples](examples.md)
+
+## Reference
+
+- [API reference](api-reference.md)
+- [Release](release.md)
 - [Development](development.md)
 
 ## Project values

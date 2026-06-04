@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any
 
 from retryflow.attempt import AttemptRecord
 from retryflow.event import RetryEvent
-from retryflow.exceptions import RetryExhaustedError
+from retryflow.exceptions import RetryExhaustedError, TryAgain
 from retryflow.internal.clock import now
 from retryflow.result import RetryResult
 from retryflow.state import RetryCause, RetryState
@@ -163,7 +163,11 @@ class RetryAttemptContext:
         )
 
         elapsed = attempt_ended_at - self.iterator.started_at
-        should_retry = self.policy.condition.should_retry_exception(error)
+        # TryAgain bypasses the condition check — it is always a retry signal.
+        if isinstance(error, TryAgain):
+            should_retry = True
+        else:
+            should_retry = self.policy.condition.should_retry_exception(error)
         should_stop = self.policy.stop_strategy.should_stop(self.number, elapsed)
 
         self.policy.emit(
@@ -434,7 +438,11 @@ class AsyncRetryAttemptContext:
         )
 
         elapsed = attempt_ended_at - self.iterator.started_at
-        should_retry = self.policy.condition.should_retry_exception(error)
+        # TryAgain bypasses the condition check — it is always a retry signal.
+        if isinstance(error, TryAgain):
+            should_retry = True
+        else:
+            should_retry = self.policy.condition.should_retry_exception(error)
         should_stop = self.policy.stop_strategy.should_stop(self.number, elapsed)
 
         self.policy.emit(

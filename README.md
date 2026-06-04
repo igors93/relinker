@@ -1,3 +1,5 @@
+<div align="center">
+
 # Relinker
 
 [![CI](https://github.com/igors93/relinker/actions/workflows/ci.yml/badge.svg)](https://github.com/igors93/relinker/actions/workflows/ci.yml)
@@ -9,9 +11,12 @@
 
 **Simple by default, powerful by composition, safe by guidance.**
 
-Relinker is a clear, modular, and debuggable retry library for Python. It helps you retry temporary failures without hiding what your code is doing.
+Relinker is a clear, modular, and debuggable retry library for Python.  
+It helps you retry temporary failures without hiding what your code is doing.
 
-[Overview](#overview) | [Features](#features) | [Quick Start](#quick-start) | [Guidance](#guidance) | [HTTP](#http-retry) | [Observability](#observability) | [Examples](#examples) | [Documentation](#documentation) | [Roadmap](#roadmap)
+[Overview](#overview) · [Features](#features) · [Quick Start](#quick-start) · [Guidance](#guidance) · [HTTP](#http-retry) · [Observability](#observability) · [Examples](#examples) · [Documentation](#documentation) · [Roadmap](#roadmap)
+
+</div>
 
 ---
 

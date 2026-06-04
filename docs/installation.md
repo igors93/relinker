@@ -1,8 +1,14 @@
 # Installation
 
+## From PyPI
+
+```bash
+pip install relinker
+```
+
 ## From GitHub
 
-Relinker is not yet published on PyPI. Install directly from GitHub:
+To track the latest development version or a specific branch:
 
 ```bash
 pip install git+https://github.com/igors93/relinker.git
@@ -12,7 +18,7 @@ To install a specific tag or branch:
 
 ```bash
 pip install git+https://github.com/igors93/relinker.git@main
-pip install git+https://github.com/igors93/relinker.git@v0.4.0
+pip install git+https://github.com/igors93/relinker.git@v0.6.0
 ```
 
 ## From source
@@ -23,14 +29,6 @@ Clone the repository and install in editable mode:
 git clone https://github.com/igors93/relinker.git
 cd relinker
 pip install -e .
-```
-
-## Future PyPI installation
-
-Once published to PyPI, the install command will be:
-
-```bash
-pip install relinker
 ```
 
 ## Requirements

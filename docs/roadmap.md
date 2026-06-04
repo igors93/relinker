@@ -5,9 +5,9 @@ Relinker is still evolving. This roadmap describes direction, not guaranteed dea
 ## Documentation
 
 - Expand examples for common production scenarios.
-- Add a full PyPI-ready README.
 - Add guides for migration from manual retry loops.
 - Add comparison notes explaining Relinker's philosophy.
+- Improve installation and PyPI setup documentation.
 
 ## API and usability
 
@@ -28,10 +28,12 @@ Relinker is still evolving. This roadmap describes direction, not guaranteed dea
 - Improve structured logging documentation.
 - Add examples for metrics/tracing integration without required dependencies.
 
-## Packaging
+## Packaging and release
 
-- Publish on PyPI when documentation and release process are ready.
-- Add release automation when appropriate.
+- Improve release automation (version bump, changelog, tag, publish).
+- Add a structured changelog workflow.
+- Verify and document Python 3.13+ compatibility when stable.
+- Explore Trusted Publishing via GitHub Actions for streamlined PyPI releases.
 
 ## Guiding principle
 

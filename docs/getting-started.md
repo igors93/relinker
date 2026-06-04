@@ -4,10 +4,10 @@ Relinker helps Python applications retry temporary failures in a way that is eas
 
 ## Install
 
-From GitHub:
+From PyPI:
 
 ```bash
-pip install git+https://github.com/igors93/relinker.git
+pip install relinker
 ```
 
 For local development:

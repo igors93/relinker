@@ -61,14 +61,16 @@ python -c "import relinker; print(relinker.__version__)"
 
 ## Publish to PyPI
 
-Once the package is published on PyPI, the install command will be:
+Push the tag and the GitHub Actions workflow handles publishing via Trusted Publishing:
 
 ```bash
-pip install relinker
+git tag v0.X.Y
+git push origin v0.X.Y
 ```
 
-Until then, install from GitHub:
+After publishing, verify the release:
 
 ```bash
-pip install git+https://github.com/igors93/relinker.git
+pip install relinker==0.X.Y
+python -c "import relinker; print(relinker.__version__)"
 ```

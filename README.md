@@ -78,9 +78,15 @@ Relinker currently provides:
 
 ## Current status
 
-Relinker is in early development. The current package version is **0.6.0**.
+Relinker is in alpha. The current package version is **0.6.1**.
 
-Install from GitHub until the package is published on PyPI:
+Install from PyPI:
+
+```bash
+pip install relinker
+```
+
+For development or to track the latest changes on the main branch:
 
 ```bash
 pip install git+https://github.com/igors93/relinker.git
@@ -361,7 +367,6 @@ Relinker is still evolving. Planned areas include:
 - improved context manager consistency
 - expanded HTTP guidance
 - optional integrations without required runtime dependencies
-- PyPI publication
 
 See [docs/roadmap.md](docs/roadmap.md).
 

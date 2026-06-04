@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "relinker"
-version = "0.6.0"
+version = "0.6.1"
 description = "Relinker — a clear, modular, and debuggable retry/resilience library for Python."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -33,6 +33,13 @@ dev = [
   "ruff>=0.15.15",
   "mypy>=2.1.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/igors93/relinker"
+Repository = "https://github.com/igors93/relinker"
+Documentation = "https://github.com/igors93/relinker/tree/main/docs"
+Issues = "https://github.com/igors93/relinker/issues"
+Changelog = "https://github.com/igors93/relinker/blob/main/CHANGELOG.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/relinker"]

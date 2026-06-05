@@ -2,25 +2,39 @@
 
 from __future__ import annotations
 
+import math
+
 from relinker.exceptions import InvalidRetryConfigError
 
 
-def ensure_non_negative(name: str, value: float) -> None:
-    """Raise when value is negative."""
-    if value < 0:
+def ensure_finite_float(name: str, value: object) -> float:
+    """Raise when value is not a finite, non-bool number. Returns float."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise InvalidRetryConfigError(f"{name} must be a number, got {type(value).__name__}")
+    resolved = float(value)
+    if not math.isfinite(resolved):
+        raise InvalidRetryConfigError(f"{name} must be finite, got {value!r}")
+    return resolved
+
+
+def ensure_non_negative(name: str, value: object) -> None:
+    """Raise when value is not a finite non-negative number."""
+    resolved = ensure_finite_float(name, value)
+    if resolved < 0:
         raise InvalidRetryConfigError(f"{name} must be greater than or equal to 0")
 
 
-def ensure_positive(name: str, value: float) -> None:
-    """Raise when value is not positive."""
-    if value <= 0:
+def ensure_positive(name: str, value: object) -> None:
+    """Raise when value is not a finite positive number."""
+    resolved = ensure_finite_float(name, value)
+    if resolved <= 0:
         raise InvalidRetryConfigError(f"{name} must be greater than 0")
 
 
-def ensure_positive_int(name: str, value: int) -> None:
-    """Raise when value is not a positive integer."""
-    if not isinstance(value, int) or value <= 0:
-        raise InvalidRetryConfigError(f"{name} must be a positive integer")
+def ensure_positive_int(name: str, value: object) -> None:
+    """Raise when value is not a positive integer (booleans rejected)."""
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise InvalidRetryConfigError(f"{name} must be a positive integer, got {value!r}")
 
 
 def ensure_exception_types(exception_types: tuple[type[BaseException], ...]) -> None:

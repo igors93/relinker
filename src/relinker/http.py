@@ -29,6 +29,7 @@ if TYPE_CHECKING:
 
 DEFAULT_RETRYABLE_STATUSES = frozenset({429, 500, 502, 503, 504})
 _MAX_RETRY_AFTER_HEADER_LENGTH = 256
+MAX_RETRY_AFTER_SECONDS = 86400.0
 
 
 def _normalize_statuses(statuses: Iterable[int]) -> frozenset[int]:
@@ -160,13 +161,19 @@ def _extract_retry_after_header(response: Any) -> str | None:
     return None
 
 
-def parse_retry_after(header_value: str, default: float = 0.0) -> float:
+def parse_retry_after(
+    header_value: str,
+    default: float = 0.0,
+    maximum: float = MAX_RETRY_AFTER_SECONDS,
+) -> float:
     """
     Parse a Retry-After header value into a delay in seconds.
 
-    Accepts non-negative integer seconds and HTTP-date strings. Any unparseable
-    or unusually large header value falls back to default. Negative defaults are
-    normalized to zero so this helper never returns a negative delay.
+    Accepts non-negative integer seconds and HTTP-date strings. Any unparseable,
+    negative, or excessively large header value falls back to default. Numeric
+    values are capped at maximum (default: MAX_RETRY_AFTER_SECONDS = 86400.0)
+    so a malformed header cannot cause an arbitrarily long delay. Negative
+    defaults are normalized to zero so this helper never returns a negative delay.
     """
     safe_default = max(0.0, default)
 
@@ -174,15 +181,18 @@ def parse_retry_after(header_value: str, default: float = 0.0) -> float:
     if not stripped or len(stripped) > _MAX_RETRY_AFTER_HEADER_LENGTH:
         return safe_default
 
-    if stripped.isdigit():
-        return float(int(stripped))
+    if stripped.lstrip("-").isdigit():
+        raw = int(stripped)
+        if raw < 0:
+            return safe_default
+        return min(float(raw), maximum)
 
     try:
         parsed = parsedate_tz(stripped)
         if parsed is not None:
             target = float(mktime_tz(parsed))
             delay = target - time.time()
-            return max(0.0, delay)
+            return max(0.0, min(delay, maximum))
     except Exception:  # noqa: BLE001
         pass
 

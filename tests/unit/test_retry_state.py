@@ -110,8 +110,20 @@ def test_has_value_true() -> None:
         started_at=0.0,
         elapsed=0.0,
         last_value="something",
+        has_value=True,
     )
     assert state.has_value is True
+
+
+def test_has_value_false_by_default() -> None:
+    state = RetryState(
+        function_name="t",
+        attempt_number=1,
+        started_at=0.0,
+        elapsed=0.0,
+        last_value="something",
+    )
+    assert state.has_value is False
 
 
 def test_has_value_false_when_last_error_set() -> None:

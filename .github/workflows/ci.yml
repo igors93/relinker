@@ -44,14 +44,15 @@ jobs:
         run: python -m mypy src
 
   tests:
-    name: Tests on Python ${{ matrix.python-version }}
-    runs-on: ubuntu-latest
+    name: Tests (${{ matrix.python-version }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     needs: quality
 
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        os: ["ubuntu-latest", "macos-latest"]
 
     steps:
       - name: Checkout repository
@@ -66,13 +67,13 @@ jobs:
       - name: Install package with development dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ".[dev]"
+          python -m pip install -e ".[dev]" pytest-cov
 
-      - name: Run tests
-        run: python -m pytest
+      - name: Run tests with coverage
+        run: python -m pytest --cov=relinker --cov-report=term-missing
 
-  build:
-    name: Build package
+  validate-package:
+    name: Validate package
     runs-on: ubuntu-latest
     needs: tests
 
@@ -86,10 +87,27 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: Install build dependencies
+      - name: Install build and validation tools
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ".[dev]"
+          python -m pip install build twine
 
       - name: Build distribution
         run: python -m build
+
+      - name: Validate distribution metadata
+        run: python -m twine check --strict dist/*
+
+      - name: Smoke test wheel import
+        run: |
+          python -m pip install dist/*.whl
+          python -c "import relinker; print('Import OK:', relinker.__version__)"
+
+      - name: Verify py.typed marker
+        run: |
+          python -c "
+          import importlib.resources as ir
+          files = {f.name for f in ir.files('relinker').iterdir()}
+          assert 'py.typed' in files, f'py.typed missing; found: {files}'
+          print('py.typed OK')
+          "

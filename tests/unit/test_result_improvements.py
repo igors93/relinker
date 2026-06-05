@@ -64,8 +64,8 @@ def test_last_error_no_errors_returns_none() -> None:
 
 
 def test_last_value_from_latest_successful_attempt() -> None:
-    attempt1 = AttemptRecord(number=1, started_at=0.0, ended_at=0.1, value="first")
-    attempt2 = AttemptRecord(number=2, started_at=0.1, ended_at=0.2, value="second")
+    attempt1 = AttemptRecord(number=1, started_at=0.0, ended_at=0.1, value="first", has_value=True)
+    attempt2 = AttemptRecord(number=2, started_at=0.1, ended_at=0.2, value="second", has_value=True)
     result: RetryResult[str] = RetryResult(
         attempts=(attempt1, attempt2), value="second", started_at=0.0, ended_at=0.2
     )

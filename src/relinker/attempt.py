@@ -20,8 +20,11 @@ class AttemptRecord:
         number: One-based attempt number.
         started_at: Monotonic timestamp when the attempt started.
         ended_at: Monotonic timestamp when the attempt ended.
-        value: Returned value, when the attempt succeeded.
+        value: Returned value, when the attempt produced one. May be None.
         error: Raised exception, when the attempt failed.
+        has_value: True when the attempt produced a return value.
+            Use this rather than checking ``value is not None`` because
+            None is a valid function result.
     """
 
     number: int
@@ -29,6 +32,7 @@ class AttemptRecord:
     ended_at: float
     value: Any = None
     error: BaseException | None = None
+    has_value: bool = False
 
     @property
     def duration(self) -> float:

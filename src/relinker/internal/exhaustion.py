@@ -5,7 +5,7 @@ When the stop strategy fires while the condition would still retry, the
 execution is exhausted. This module applies whatever final behavior the
 policy configures (fallback, raise, return result, etc.).
 
-Used by both executors and the decorator wrapper.
+Used by executors, context managers, and the decorator wrapper.
 """
 
 from __future__ import annotations
@@ -17,6 +17,22 @@ from relinker.exceptions import RetryExhaustedError
 if TYPE_CHECKING:
     from relinker.policy import RetryPolicy
     from relinker.result import RetryResult
+    from relinker.stop.base import StopStrategy
+
+
+def should_stop_before_sleep(
+    stop_strategy: StopStrategy,
+    attempt_number: int,
+    elapsed: float,
+    delay: float,
+) -> bool:
+    """Return True when sleeping for delay would exceed the stop strategy budget.
+
+    This prevents a sleep that is longer than the remaining time budget. It is
+    only meaningful for time-based stop strategies; attempt-only strategies will
+    not trigger early because they do not depend on elapsed time.
+    """
+    return stop_strategy.should_stop(attempt_number, elapsed + delay)
 
 
 def finish_exhausted(policy: RetryPolicy[Any], result: RetryResult[Any]) -> Any:

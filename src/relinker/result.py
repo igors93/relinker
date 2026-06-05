@@ -35,6 +35,7 @@ class RetryResult(Generic[T]):
     ended_at: float = 0.0
     exhausted: bool = False
     retry_cause: RetryCause | None = None
+    total_attempts: int = 0
 
     @property
     def succeeded(self) -> bool:
@@ -48,8 +49,13 @@ class RetryResult(Generic[T]):
 
     @property
     def attempt_count(self) -> int:
-        """Return how many attempts were made."""
-        return len(self.attempts)
+        """Return how many attempts were made in total.
+
+        When a history_limit is configured, RetryResult.attempts may contain
+        fewer records than this count. Use this property (not len(attempts))
+        to get the true total.
+        """
+        return self.total_attempts if self.total_attempts else len(self.attempts)
 
     @property
     def total_time(self) -> float:
@@ -75,10 +81,19 @@ class RetryResult(Generic[T]):
         return None
 
     @property
+    def has_last_value(self) -> bool:
+        """Return True when any attempt produced a return value (which may be None)."""
+        return any(a.has_value for a in self.attempts)
+
+    @property
     def last_value(self) -> T | None:
-        """Return the value from the most recent attempt that returned a value."""
+        """Return the value from the most recent attempt that returned a value.
+
+        Returns None when no attempt produced a value. Use has_last_value to
+        distinguish a successful None return from a fully failed execution.
+        """
         for attempt in reversed(self.attempts):
-            if attempt.error is None:
+            if attempt.has_value:
                 return cast(T, attempt.value)
         return None
 

@@ -27,8 +27,12 @@ class RetryState:
         started_at: Monotonic timestamp when the whole retry execution started.
         elapsed: Seconds elapsed since the whole retry execution started.
         attempts: Attempts recorded before this snapshot.
-        last_value: Last returned value, when available.
+        last_value: Last returned value, when available. May be None even when
+            has_value is True, because None is a valid function result.
         last_error: Last raised exception, when available.
+        has_value: True when last_value was explicitly produced by the function.
+            Check this instead of ``last_value is not None`` to distinguish a
+            successful None return from an attempt that raised an exception.
         next_delay: Delay before the next attempt, when known.
         retry_cause: Whether retry was caused by an exception or a returned value.
         will_retry: True when Relinker decided another attempt should happen.
@@ -42,6 +46,7 @@ class RetryState:
     attempts: tuple[AttemptRecord, ...] = ()
     last_value: Any = None
     last_error: BaseException | None = None
+    has_value: bool = False
     next_delay: float | None = None
     retry_cause: RetryCause | None = None
     will_retry: bool = False
@@ -70,8 +75,3 @@ class RetryState:
     def has_error(self) -> bool:
         """Return True when this state contains an exception."""
         return self.last_error is not None
-
-    @property
-    def has_value(self) -> bool:
-        """Return True when this state contains a returned value."""
-        return self.last_error is None and self.last_value is not None

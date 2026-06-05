@@ -73,6 +73,13 @@ class RetryPolicy(Generic[T]):
     event_handlers: tuple[tuple[EventName, EventHandler], ...] = ()
     sleep: Callable[[float], None] = default_sleep
     async_sleep: Callable[[float], Awaitable[None]] = default_async_sleep
+    history_limit: int | None = 1000
+
+    def __post_init__(self) -> None:
+        if self.history_limit is not None:
+            from relinker.internal.validation import ensure_positive_int
+
+            ensure_positive_int("history_limit", self.history_limit)
 
     # ------------------------------------------------------------------ stop
 
@@ -368,6 +375,24 @@ class RetryPolicy(Generic[T]):
             exhausted_callback=None,
             should_return_result=False,
         )
+
+    # --------------------------------------------------- history
+
+    def keep_history(self, maximum: int | None) -> RetryPolicy[T]:
+        """
+        Return a new policy that retains at most maximum attempt records.
+
+        - Positive integer: keep only the last N AttemptRecord objects in
+          RetryResult.attempts and RetryState.attempts. Attempt numbers always
+          count all attempts, even those not retained.
+        - None: keep unlimited history (use with care for long-running policies).
+        - Zero, negative values, and booleans are rejected.
+        """
+        if maximum is not None:
+            from relinker.internal.validation import ensure_positive_int
+
+            ensure_positive_int("maximum", maximum)
+        return replace(self, history_limit=maximum)
 
     # -------------------------------------------------- sleep / test hooks
 

@@ -95,15 +95,20 @@ def test_releasing_expired_or_unknown_reservation_is_harmless() -> None:
     budget._release(reservation)
 
 
-def test_reservations_remain_ordered() -> None:
+def test_reservations_satisfy_capacity_and_respect_not_before() -> None:
     budget = RetryBudget(max_retries=2, per=10)
+    not_befores = (3, 1, 20, 4, 21)
     reservations = [
-        budget._reserve("api", current_time=0, not_before=not_before)
-        for not_before in (3, 1, 20, 4, 21)
+        budget._reserve("api", current_time=0, not_before=nb) for nb in not_befores
     ]
+    times = [r.scheduled_at for r in reservations]
 
-    times = [reservation.scheduled_at for reservation in reservations]
-    assert times == sorted(times)
+    for r, nb in zip(reservations, not_befores, strict=True):
+        assert r.scheduled_at >= nb
+
+    for t in times:
+        window_count = sum(1 for s in times if s > t - budget.per and s <= t)
+        assert window_count <= budget.max_retries
 
 
 def test_thread_race_does_not_oversubscribe() -> None:

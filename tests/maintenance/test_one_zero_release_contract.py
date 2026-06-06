@@ -88,7 +88,7 @@ def test_compatibility_doc_is_post_one_zero() -> None:
 
 
 def test_public_api_size_is_unchanged() -> None:
-    assert len(relinker.__all__) == 30
+    assert len(relinker.__all__) == 31
 
 
 def test_readiness_record_is_honest() -> None:

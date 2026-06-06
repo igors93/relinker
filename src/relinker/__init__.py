@@ -7,7 +7,7 @@ change, but these names should remain stable whenever possible.
 
 from __future__ import annotations
 
-from relinker.budget import RetryBudget
+from relinker.budget import RetryBudget, RetryBudgetSnapshot
 from relinker.context import AsyncRetryAttemptContext, RetryAttemptContext
 from relinker.diagnostics import (
     PolicyHealthReport,
@@ -47,6 +47,7 @@ __all__ = [
     "PolicyWarning",
     "RetryAttemptContext",
     "RetryBudget",
+    "RetryBudgetSnapshot",
     "RetryExhaustedError",
     "RelinkerError",
     "RetryPolicy",

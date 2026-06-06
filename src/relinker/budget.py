@@ -10,9 +10,21 @@ from __future__ import annotations
 from collections import deque
 from dataclasses import dataclass
 from threading import Lock
+from time import monotonic as _monotonic
 
 from relinker.exceptions import InvalidRetryConfigError
 from relinker.internal.validation import ensure_positive, ensure_positive_int
+
+
+@dataclass(frozen=True, slots=True)
+class RetryBudgetSnapshot:
+    """Read-only point-in-time view of one budget key's state."""
+
+    key: str
+    capacity: int
+    per: float
+    active: int
+    available: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,6 +62,25 @@ class RetryBudget:
         """Return the rolling period in seconds."""
         return self._per
 
+    def snapshot(self, key: str) -> RetryBudgetSnapshot:
+        """Return a read-only point-in-time view of the budget state for *key*."""
+        current = _monotonic()
+        with self._lock:
+            reservations = self._reservations.get(key)
+            if reservations is None:
+                active = 0
+            else:
+                boundary = current - self._per
+                active = sum(1 for r in reservations if r.scheduled_at > boundary)
+        available = max(0, self._max_retries - active)
+        return RetryBudgetSnapshot(
+            key=key,
+            capacity=self._max_retries,
+            per=self._per,
+            active=active,
+            available=available,
+        )
+
     def _reserve(
         self,
         key: str,
@@ -66,15 +97,13 @@ class RetryBudget:
             current = float(current_time)
             candidate = max(current, float(not_before))
             self._prune(reservations, current)
-            if reservations:
-                candidate = max(candidate, reservations[-1].scheduled_at)
 
             while True:
                 boundary = candidate - self._per
                 active = [item for item in reservations if item.scheduled_at > boundary]
                 if len(active) < self._max_retries:
                     break
-                candidate = max(candidate, active[0].scheduled_at + self._per)
+                candidate = max(candidate, min(r.scheduled_at for r in active) + self._per)
 
             reservation = _RetryReservation(
                 token=self._next_token,
@@ -107,5 +136,6 @@ class RetryBudget:
     ) -> None:
         """Remove slots that are outside the rolling period at ``candidate``."""
         boundary = candidate - self._per
-        while reservations and reservations[0].scheduled_at <= boundary:
-            reservations.popleft()
+        keep = [r for r in reservations if r.scheduled_at > boundary]
+        reservations.clear()
+        reservations.extend(keep)

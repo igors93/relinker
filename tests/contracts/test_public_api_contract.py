@@ -14,6 +14,7 @@ EXPECTED_ROOT_PUBLIC_API = (
     "PolicyWarning",
     "RetryAttemptContext",
     "RetryBudget",
+    "RetryBudgetSnapshot",
     "RetryExhaustedError",
     "RelinkerError",
     "RetryPolicy",

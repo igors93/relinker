@@ -54,6 +54,14 @@ ExceptionFactory = Callable[[RetryResult[Any]], BaseException]
 StatefulDelayCallback = Callable[[RetryState], float]
 
 
+def _no_sleep(_: float) -> None:
+    """No-op sync sleep used by for_testing()."""
+
+
+async def _no_sleep_async(_: float) -> None:
+    """No-op async sleep used by for_testing()."""
+
+
 @dataclass(frozen=True, slots=True)
 class RetryPolicy(Generic[T]):
     """
@@ -475,6 +483,18 @@ class RetryPolicy(Generic[T]):
             sleep=sleep,
             async_sleep=async_sleep if async_sleep is not None else self.async_sleep,
         )
+
+    def for_testing(self) -> RetryPolicy[T]:
+        """Return a copy of this policy with sync and async sleep replaced by no-ops.
+
+        All other settings (attempts, conditions, delays, event handlers, etc.) are
+        preserved. This makes tests run without real delays.
+
+        Note: ``max_time`` and retry-budget windows are not virtually advanced.
+        They use real wall-clock time and will behave as if no time passes between
+        retries.
+        """
+        return self.with_sleep(_no_sleep, _no_sleep_async)
 
     # ------------------------------------------------------------ events
 

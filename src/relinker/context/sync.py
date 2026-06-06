@@ -147,6 +147,29 @@ class RetryAttemptContext(_BaseRetryAttemptContext):
                     ),
                 )
             )
+        except BaseException:
+            release_retry_wait(plan)
+            raise
+
+        if should_stop_before_sleep(
+            self.policy.stop_strategy,
+            self.number,
+            _context_now() - self.iterator.started_at,
+            plan.total_delay,
+        ):
+            release_retry_wait(plan)
+            self.iterator.finished = True
+            result = self.iterator._runtime.result(
+                ended_at=_context_now(),
+                error=error,
+                exhausted=True,
+                retry_cause="exception",
+            )
+            self.iterator.result = result
+            self._giveup(error=error, retry_cause="exception")
+            return self._apply_exhausted(result, error)
+
+        try:
             self.policy.sleep(plan.total_delay)
         except BaseException:
             release_retry_wait(plan)
@@ -205,7 +228,10 @@ class RetryAttemptContext(_BaseRetryAttemptContext):
         )
         plan = plan_retry_wait(self.policy, self.number, pre_sleep_state)
         if should_stop_before_sleep(
-            self.policy.stop_strategy, self.number, elapsed, plan.total_delay
+            self.policy.stop_strategy,
+            self.number,
+            _context_now() - self.iterator.started_at,
+            plan.total_delay,
         ):
             release_retry_wait(plan)
             self.iterator.finished = True
@@ -235,6 +261,29 @@ class RetryAttemptContext(_BaseRetryAttemptContext):
                     ),
                 )
             )
+        except BaseException:
+            release_retry_wait(plan)
+            raise
+
+        if should_stop_before_sleep(
+            self.policy.stop_strategy,
+            self.number,
+            _context_now() - self.iterator.started_at,
+            plan.total_delay,
+        ):
+            release_retry_wait(plan)
+            self.iterator.finished = True
+            result = self.iterator._runtime.result(
+                ended_at=_context_now(),
+                value=value,
+                exhausted=True,
+                retry_cause="result",
+            )
+            self.iterator.result = result
+            self._giveup(value=value, retry_cause="result")
+            return self._apply_exhausted(result, None)
+
+        try:
             self.policy.sleep(plan.total_delay)
         except BaseException:
             release_retry_wait(plan)

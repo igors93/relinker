@@ -4,9 +4,29 @@ Retry code can make tests slow if it sleeps for real. Relinker lets you inject c
 
 ## Disable sleep in tests
 
+The simplest way to disable sleep is the built-in `for_testing()` method:
+
 ```python
 from relinker import RetryPolicy
 
+policy = (
+    RetryPolicy()
+    .attempts(3)
+    .fixed_delay(10)
+    .for_testing()  # replaces sync and async sleep with no-ops
+)
+```
+
+`for_testing()` returns a new policy and preserves all other settings (attempts, conditions,
+delays, event handlers). It is chainable and can be called at any point in the builder chain.
+
+> **Note:** `max_time` and retry-budget windows still use real wall-clock time. They will
+> behave as if no time passes between retries, which may cause `max_time`-based exhaustion
+> to behave differently than in production.
+
+For lower-level control, you can inject custom sleep functions directly:
+
+```python
 policy = (
     RetryPolicy()
     .attempts(3)

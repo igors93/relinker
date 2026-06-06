@@ -117,7 +117,7 @@ async def execute_async(
             if should_stop_before_sleep(
                 policy.stop_strategy,
                 attempt_number,
-                elapsed,
+                now() - runtime.started_at,
                 plan.total_delay,
             ):
                 release_retry_wait(plan)
@@ -159,6 +159,40 @@ async def execute_async(
                         ),
                     )
                 )
+            except BaseException:
+                release_retry_wait(plan)
+                raise
+
+            if should_stop_before_sleep(
+                policy.stop_strategy,
+                attempt_number,
+                now() - runtime.started_at,
+                plan.total_delay,
+            ):
+                release_retry_wait(plan)
+                result = runtime.result(
+                    ended_at=now(),
+                    value=value,
+                    exhausted=True,
+                    retry_cause="result",
+                )
+                policy.emit(
+                    RetryEvent(
+                        name="after_giveup",
+                        attempt_number=attempt_number,
+                        function_name=runtime.function_name,
+                        value=value,
+                        state=runtime.state(
+                            last_value=value,
+                            has_value=True,
+                            retry_cause="result",
+                            will_stop=True,
+                        ),
+                    )
+                )
+                return finish_exhausted(policy, result)
+
+            try:
                 await policy.async_sleep(plan.total_delay)
             except BaseException:
                 release_retry_wait(plan)
@@ -280,6 +314,39 @@ async def execute_async(
                     ),
                 )
             )
+        except BaseException:
+            release_retry_wait(plan)
+            raise
+
+        if should_stop_before_sleep(
+            policy.stop_strategy,
+            attempt_number,
+            now() - runtime.started_at,
+            plan.total_delay,
+        ):
+            release_retry_wait(plan)
+            result = runtime.result(
+                ended_at=now(),
+                error=error,
+                exhausted=True,
+                retry_cause="exception",
+            )
+            policy.emit(
+                RetryEvent(
+                    name="after_giveup",
+                    attempt_number=attempt_number,
+                    function_name=runtime.function_name,
+                    error=error,
+                    state=runtime.state(
+                        last_error=error,
+                        retry_cause="exception",
+                        will_stop=True,
+                    ),
+                )
+            )
+            return finish_exhausted(policy, result)
+
+        try:
             await policy.async_sleep(plan.total_delay)
         except BaseException:
             release_retry_wait(plan)

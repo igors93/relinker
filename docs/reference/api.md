@@ -18,6 +18,7 @@ For behavioral details, see [Retry lifecycle](../concepts/retry-lifecycle.md) an
 | `retry` | Simple decorator entry point. |
 | `RetryPolicy` | Fluent policy builder. |
 | `RetryBudget` | Shared process-local retry capacity. |
+| `RetryBudgetSnapshot` | Read-only point-in-time view of one budget key's state. |
 | `RetryResult` | Rich execution result. |
 | `RetryState` | Immutable runtime state snapshot. |
 | `RetryWrappedFunction` | Type alias for a wrapped retry callable. |

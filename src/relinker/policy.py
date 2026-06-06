@@ -313,7 +313,13 @@ class RetryPolicy(Generic[T]):
 
     def raise_last(self) -> RetryPolicy[T]:
         """Return a new policy that re-raises the last original exception."""
-        return replace(self, should_raise_last=True, should_return_result=False)
+        return replace(
+            self,
+            should_raise_last=True,
+            should_return_result=False,
+            exhausted_callback=None,
+            exhausted_exception_factory=None,
+        )
 
     def return_result(self) -> RetryPolicy[T]:
         """Return a new policy that returns RetryResult instead of raising."""

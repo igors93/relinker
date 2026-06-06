@@ -61,6 +61,10 @@ events, and final behavior. Sync and async loops remain separate where awaiting
 changes control flow. Shared deterministic operations may be extracted, but a
 single highly-parameterized universal executor should be avoided.
 
+`internal/runtime.py` centralizes mutable attempt history, aggregate counters,
+`RetryState` construction, and `RetryResult` construction shared by executors
+and context managers.
+
 ### Results and state
 
 `AttemptRecord`, `RetryState`, and `RetryResult` are immutable observable data.

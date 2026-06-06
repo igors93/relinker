@@ -53,9 +53,7 @@ def read_pyproject_version(project_root: Path) -> str:
     try:
         version = data["project"]["version"]
     except KeyError as error:
-        raise VersionValidationError(
-            f"project version is missing from {pyproject_path}"
-        ) from error
+        raise VersionValidationError(f"project version is missing from {pyproject_path}") from error
 
     if not isinstance(version, str) or not version:
         raise VersionValidationError(

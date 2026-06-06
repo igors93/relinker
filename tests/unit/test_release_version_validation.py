@@ -34,11 +34,7 @@ def _write_project(root: Path, version: str) -> None:
     package.mkdir(parents=True)
 
     (root / "pyproject.toml").write_text(
-        (
-            "[project]\n"
-            'name = "relinker"\n'
-            f'version = "{version}"\n'
-        ),
+        (f'[project]\nname = "relinker"\nversion = "{version}"\n'),
         encoding="utf-8",
     )
     (package / "__init__.py").write_text(

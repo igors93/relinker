@@ -8,7 +8,7 @@ RetryPolicy.preview(), and RetryPolicy.explain().
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from relinker.diagnostics import RetrySimulation, RetrySimulationAttempt
 from relinker.exceptions import InvalidRetryConfigError
@@ -37,7 +37,7 @@ def _safe_next_delay(policy: Any, attempt_number: int) -> float:
         raise InvalidRetryConfigError(
             "Simulation is not supported for policies with custom delay callbacks"
         )
-    return policy.delay_strategy.next_delay(attempt_number)
+    return cast(float, policy.delay_strategy.next_delay(attempt_number))
 
 
 def simulate_policy(policy: Any, attempts: int) -> RetrySimulation:

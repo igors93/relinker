@@ -61,9 +61,15 @@ events, and final behavior. Sync and async loops remain separate where awaiting
 changes control flow. Shared deterministic operations may be extracted, but a
 single highly-parameterized universal executor should be avoided.
 
+`relinker.context` is a package that preserves the public import surface while
+separating synchronous and asynchronous control flow into `sync.py` and
+`async_.py`. `_shared.py` contains only common state and identical helper
+behavior.
+
 `internal/runtime.py` centralizes mutable attempt history, aggregate counters,
 `RetryState` construction, and `RetryResult` construction shared by executors
-and context managers.
+and context managers. RetryRuntime remains responsible for attempt history,
+counters, `RetryState`, and `RetryResult` construction.
 
 ### Results and state
 

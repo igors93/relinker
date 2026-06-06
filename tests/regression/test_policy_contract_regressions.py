@@ -30,12 +30,7 @@ def test_raise_last_configured_after_fallback_takes_precedence() -> None:
 
 def test_raise_last_configured_after_custom_exception_takes_precedence() -> None:
     """raise_last must clear a previously configured custom exhaustion exception."""
-    policy = (
-        RetryPolicy()
-        .attempts(1)
-        .on_exhausted_raise(ValueError("custom"))
-        .raise_last()
-    )
+    policy = RetryPolicy().attempts(1).on_exhausted_raise(ValueError("custom")).raise_last()
 
     with pytest.raises(RuntimeError, match="boom"):
         policy.run(_raise_runtime_error)
@@ -51,10 +46,7 @@ def test_fallback_configured_after_raise_last_takes_precedence() -> None:
 def test_custom_exception_configured_after_fallback_takes_precedence() -> None:
     """A custom exception configured last must replace a previous fallback."""
     policy = (
-        RetryPolicy()
-        .attempts(1)
-        .fallback_value("safe")
-        .on_exhausted_raise(ValueError("custom"))
+        RetryPolicy().attempts(1).fallback_value("safe").on_exhausted_raise(ValueError("custom"))
     )
 
     with pytest.raises(ValueError, match="custom"):

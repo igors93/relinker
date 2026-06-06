@@ -9,6 +9,9 @@ from __future__ import annotations
 
 import time
 
+import pytest
+
+from relinker.exceptions import InvalidRetryConfigError
 from relinker.http import MAX_RETRY_AFTER_SECONDS, parse_retry_after
 
 
@@ -28,8 +31,9 @@ class TestParseRetryAfterBasic:
     def test_default_when_invalid(self) -> None:
         assert parse_retry_after("not-a-number", default=3.0) == 3.0
 
-    def test_negative_default_clamped_to_zero(self) -> None:
-        assert parse_retry_after("bad", default=-5.0) == 0.0
+    def test_negative_default_raises(self) -> None:
+        with pytest.raises(InvalidRetryConfigError):
+            parse_retry_after("bad", default=-5.0)
 
 
 class TestParseRetryAfterNegative:

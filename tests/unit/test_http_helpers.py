@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from relinker.http import (
     _extract_retry_after_header,
     parse_retry_after,
@@ -167,10 +169,11 @@ def test_retry_after_delay_invalid_header_falls_back_to_default() -> None:
     assert delay_fn(state) == 2.0
 
 
-def test_retry_after_delay_never_negative() -> None:
-    delay_fn = retry_after_delay(default=-5.0)
-    state = _minimal_state(last_value=None)
-    assert delay_fn(state) == 0.0
+def test_retry_after_delay_negative_default_raises() -> None:
+    from relinker.exceptions import InvalidRetryConfigError
+
+    with pytest.raises(InvalidRetryConfigError):
+        retry_after_delay(default=-5.0)
 
 
 def test_retry_after_delay_case_insensitive_header() -> None:

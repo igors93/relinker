@@ -115,7 +115,7 @@ def test_stateful_delay_rejects_negative_return() -> None:
 
     policy = RetryPolicy().attempts(5).on(ValueError).stateful_delay(bad_callback)
 
-    with pytest.raises(InvalidRetryConfigError, match="negative"):
+    with pytest.raises(InvalidRetryConfigError, match="stateful delay"):
         policy.run(task)
 
 

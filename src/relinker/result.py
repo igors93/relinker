@@ -36,6 +36,8 @@ class RetryResult(Generic[T]):
     exhausted: bool = False
     retry_cause: RetryCause | None = None
     total_attempts: int = 0
+    total_failed_attempts: int = 0
+    total_successful_attempts: int = 0
 
     @property
     def succeeded(self) -> bool:
@@ -99,12 +101,26 @@ class RetryResult(Generic[T]):
 
     @property
     def failed_attempts(self) -> int:
-        """Return how many individual attempts raised an exception."""
+        """Return how many individual attempts raised an exception.
+
+        When a history_limit is configured, attempts may be bounded. Use this
+        property (backed by total_failed_attempts when available) to get the
+        true total across all attempts.
+        """
+        if self.total_attempts:
+            return self.total_failed_attempts
         return sum(1 for a in self.attempts if a.failed)
 
     @property
     def successful_attempts(self) -> int:
-        """Return how many individual attempts returned a value without an exception."""
+        """Return how many individual attempts returned a value without an exception.
+
+        When a history_limit is configured, attempts may be bounded. Use this
+        property (backed by total_successful_attempts when available) to get the
+        true total across all attempts.
+        """
+        if self.total_attempts:
+            return self.total_successful_attempts
         return sum(1 for a in self.attempts if a.succeeded)
 
     @property

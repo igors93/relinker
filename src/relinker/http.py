@@ -80,10 +80,10 @@ def retry_after_delay(
 
     The callback reads state.last_value to inspect the response object. When the
     header is absent or unparseable, it returns default. The returned delay is
-    never negative and is capped by maximum when provided. Negative defaults are
-    normalized to zero so the helper remains safe even with user-provided config.
+    never negative and is capped by maximum when provided.
     """
-    safe_default = max(0.0, default)
+    ensure_non_negative("default", default)
+    safe_default = float(default)
     if maximum is not None:
         ensure_non_negative("maximum", maximum)
 
@@ -172,10 +172,12 @@ def parse_retry_after(
     Accepts non-negative integer seconds and HTTP-date strings. Any unparseable,
     negative, or excessively large header value falls back to default. Numeric
     values are capped at maximum (default: MAX_RETRY_AFTER_SECONDS = 86400.0)
-    so a malformed header cannot cause an arbitrarily long delay. Negative
-    defaults are normalized to zero so this helper never returns a negative delay.
+    so a malformed header cannot cause an arbitrarily long delay. When default
+    exceeds maximum it is capped to maximum.
     """
-    safe_default = max(0.0, default)
+    ensure_non_negative("default", default)
+    ensure_non_negative("maximum", maximum)
+    safe_default = min(float(default), maximum)
 
     stripped = header_value.strip()
     if not stripped or len(stripped) > _MAX_RETRY_AFTER_HEADER_LENGTH:

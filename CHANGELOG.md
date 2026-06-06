@@ -31,20 +31,11 @@ Relinker follows practical semantic versioning while the project is still pre-1.
 
 ## 0.6.1
 
-### Added
+### Changed
 
-- Added `RetryPolicy.keep_history(n)` to bound the number of `AttemptRecord` entries kept in memory; defaults to 1000. `RetryResult.attempt_count` now reflects the true total even when history is bounded.
-- Added `RetryResult.has_last_value` to distinguish a successful `None` return from a run with no successful attempts.
-- Added `MAX_RETRY_AFTER_SECONDS` constant (86_400 s) as a safety cap for `parse_retry_after()`.
-
-### Fixed
-
-- `max_time()` now acts as a real time budget: the executor no longer sleeps past the deadline. If the computed delay would exceed the remaining budget the run is exhausted immediately instead of oversleeping.
-- `RetryResult.last_value` and `RetryState.has_value` now correctly represent functions that return `None`.
-- `parse_retry_after()` no longer returns arbitrarily large delays; values above `MAX_RETRY_AFTER_SECONDS` are capped and negative values fall back to the default.
-- `ensure_non_negative()` and `ensure_positive()` now reject `NaN`, `inf`, and boolean arguments.
-- Empty `AnyCondition`, `AllCondition`, `AnyStopStrategy`, and `AllStopStrategy` now raise `InvalidRetryConfigError` at construction time.
-- Context manager exhaustion paths now apply the same `finish_exhausted()` behaviors as normal executors (return_result, exhausted_callback, exhausted_exception_factory).
+- Updated README with corrected installation instructions and usage examples.
+- Updated documentation pages (`getting-started.md`, `installation.md`, `release.md`, `roadmap.md`).
+- Added `Programming Language :: Python :: 3.12` and `Typing :: Typed` classifiers to `pyproject.toml`.
 
 ## 0.6.0
 

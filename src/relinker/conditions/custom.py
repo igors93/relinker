@@ -14,8 +14,10 @@ class CustomCondition(ConditionMixin):
     """
     Fully custom retry condition.
 
-    The callback receives either an error or a value. Exactly one of them will
-    be non-None for each decision.
+    The callback receives (error, value). For exception decisions, error is the
+    raised exception and value is None. For result decisions, error is None and
+    value contains the returned value — which may itself be None when the
+    function returned None.
     """
 
     callback: Callable[[BaseException | None, Any], bool]

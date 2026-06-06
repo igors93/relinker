@@ -69,6 +69,8 @@ def execute_sync(
     execution_started_at = now()
     function_name = _function_name(function)
     attempt_number = 0
+    failed_count = 0
+    success_count = 0
 
     while True:
         attempt_number += 1
@@ -101,6 +103,7 @@ def execute_sync(
                     error=error,
                 )
             )
+            failed_count += 1
             elapsed = attempt_ended_at - execution_started_at
             should_stop = policy.stop_strategy.should_stop(attempt_number, elapsed)
             policy.emit(
@@ -130,6 +133,8 @@ def execute_sync(
                     exhausted=True,
                     retry_cause="exception",
                     total_attempts=attempt_number,
+                    total_failed_attempts=failed_count,
+                    total_successful_attempts=success_count,
                 )
                 policy.emit(
                     RetryEvent(
@@ -168,6 +173,8 @@ def execute_sync(
                     exhausted=True,
                     retry_cause="exception",
                     total_attempts=attempt_number,
+                    total_failed_attempts=failed_count,
+                    total_successful_attempts=success_count,
                 )
                 policy.emit(
                     RetryEvent(
@@ -209,6 +216,7 @@ def execute_sync(
                     error=error,
                 )
             )
+            failed_count += 1
 
             elapsed = attempt_ended_at - execution_started_at
             should_retry = policy.condition.should_retry_exception(error)
@@ -240,6 +248,8 @@ def execute_sync(
                     started_at=execution_started_at,
                     ended_at=now(),
                     total_attempts=attempt_number,
+                    total_failed_attempts=failed_count,
+                    total_successful_attempts=success_count,
                 )
                 policy.emit(
                     RetryEvent(
@@ -264,6 +274,8 @@ def execute_sync(
                     exhausted=True,
                     retry_cause="exception",
                     total_attempts=attempt_number,
+                    total_failed_attempts=failed_count,
+                    total_successful_attempts=success_count,
                 )
                 policy.emit(
                     RetryEvent(
@@ -303,6 +315,8 @@ def execute_sync(
                     exhausted=True,
                     retry_cause="exception",
                     total_attempts=attempt_number,
+                    total_failed_attempts=failed_count,
+                    total_successful_attempts=success_count,
                 )
                 policy.emit(
                     RetryEvent(
@@ -345,6 +359,7 @@ def execute_sync(
                 has_value=True,
             )
         )
+        success_count += 1
 
         should_retry = policy.condition.should_retry_result(value)
         elapsed = attempt_ended_at - execution_started_at
@@ -357,6 +372,8 @@ def execute_sync(
                 started_at=execution_started_at,
                 ended_at=now(),
                 total_attempts=attempt_number,
+                total_failed_attempts=failed_count,
+                total_successful_attempts=success_count,
             )
             policy.emit(
                 RetryEvent(
@@ -387,6 +404,8 @@ def execute_sync(
                 exhausted=True,
                 retry_cause="result",
                 total_attempts=attempt_number,
+                total_failed_attempts=failed_count,
+                total_successful_attempts=success_count,
             )
             policy.emit(
                 RetryEvent(
@@ -428,6 +447,8 @@ def execute_sync(
                 exhausted=True,
                 retry_cause="result",
                 total_attempts=attempt_number,
+                total_failed_attempts=failed_count,
+                total_successful_attempts=success_count,
             )
             policy.emit(
                 RetryEvent(

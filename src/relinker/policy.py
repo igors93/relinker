@@ -92,7 +92,13 @@ class RetryPolicy(Generic[T]):
         return replace(self, stop_strategy=StopForever())
 
     def max_time(self, seconds: float) -> RetryPolicy[T]:
-        """Return a new policy that stops after the given elapsed time."""
+        """Return a new policy that stops after the given elapsed time.
+
+        Note: this is a time budget for the retry loop, not a hard timeout. A
+        function call that is already running will not be interrupted — the
+        budget check happens between attempts, before the next sleep or attempt
+        starts.
+        """
         return replace(self, stop_strategy=StopAfterDelay(seconds))
 
     def stop_when(self, strategy: StopStrategy) -> RetryPolicy[T]:

@@ -12,7 +12,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from relinker.exceptions import InvalidRetryConfigError
+from relinker.internal.validation import ensure_non_negative
 
 if TYPE_CHECKING:
     from relinker.delays.base import DelayStrategy
@@ -59,11 +59,8 @@ class StatefulCustomDelay:
 
     def _run(self, state: RetryState) -> float:
         delay = self.callback(state)
-        if delay < 0:
-            raise InvalidRetryConfigError(
-                f"stateful delay callback returned a negative value: {delay}"
-            )
-        return delay
+        ensure_non_negative("stateful delay callback return value", delay)
+        return float(delay)
 
 
 def resolve_delay(

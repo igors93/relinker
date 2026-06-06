@@ -78,7 +78,7 @@ Relinker currently provides:
 
 ## Current status
 
-Relinker is in alpha. The current package version is **0.6.1**.
+Relinker is in alpha. The current package version is **0.7.0**.
 
 Install from PyPI:
 

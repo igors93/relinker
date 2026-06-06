@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
-
-import tomllib
 
 
 def test_pyproject_version_matches_package_version() -> None:
@@ -12,8 +11,10 @@ def test_pyproject_version_matches_package_version() -> None:
     import relinker
 
     root = Path(__file__).parent.parent.parent
-    data = tomllib.loads((root / "pyproject.toml").read_text())
-    pyproject_version = data["project"]["version"]
+    content = (root / "pyproject.toml").read_text()
+    match = re.search(r'^version\s*=\s*"([^"]+)"', content, re.MULTILINE)
+    assert match is not None, "Could not find version field in pyproject.toml"
+    pyproject_version = match.group(1)
     assert pyproject_version == relinker.__version__, (
         f"pyproject.toml version {pyproject_version!r} != "
         f"relinker.__version__ {relinker.__version__!r}"

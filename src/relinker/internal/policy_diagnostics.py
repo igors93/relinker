@@ -122,7 +122,6 @@ def compute_warnings(policy: Any) -> tuple[PolicyWarning, ...]:
         except Exception:  # noqa: BLE001
             pass
 
-
     if (
         _has_result_condition(policy.condition)
         and not policy.should_return_result

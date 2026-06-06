@@ -112,12 +112,7 @@ def test_existing_warning_codes_still_present() -> None:
 
 
 def test_return_result_replaces_custom_exhaustion_behavior() -> None:
-    policy = (
-        RetryPolicy()
-        .attempts(3)
-        .on_exhausted_raise(RuntimeError)
-        .return_result()
-    )
+    policy = RetryPolicy().attempts(3).on_exhausted_raise(RuntimeError).return_result()
 
     codes = {warning.code for warning in policy.warnings()}
 

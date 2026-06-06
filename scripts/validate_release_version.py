@@ -14,7 +14,10 @@ import os
 import sys
 from pathlib import Path
 
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
 
 
 class VersionValidationError(RuntimeError):
@@ -71,7 +74,10 @@ def read_package_version(project_root: Path) -> str:
     avoids importing the package before the wheel has been built.
     """
     init_path = project_root / "src" / "relinker" / "__init__.py"
-    tree = ast.parse(init_path.read_text(encoding="utf-8"), filename=str(init_path))
+    tree = ast.parse(
+        init_path.read_text(encoding="utf-8"),
+        filename=str(init_path),
+    )
 
     for statement in tree.body:
         if not isinstance(statement, (ast.Assign, ast.AnnAssign)):
@@ -90,13 +96,21 @@ def read_package_version(project_root: Path) -> str:
         if value is None:
             continue
 
-        if any(isinstance(target, ast.Name) and target.id == "__version__" for target in targets):
-            resolved = ast.literal_eval(value)
-            if isinstance(resolved, str) and resolved:
-                return resolved
-            raise VersionValidationError(
-                f"__version__ in {init_path} must be a non-empty string literal"
-            )
+        has_version_target = any(
+            isinstance(target, ast.Name) and target.id == "__version__" for target in targets
+        )
+
+        if not has_version_target:
+            continue
+
+        resolved = ast.literal_eval(value)
+
+        if isinstance(resolved, str) and resolved:
+            return resolved
+
+        raise VersionValidationError(
+            f"__version__ in {init_path} must be a non-empty string literal"
+        )
 
     raise VersionValidationError(f"could not find __version__ in {init_path}")
 
@@ -157,7 +171,10 @@ def main() -> int:
             args.project_root.expanduser().resolve(),
         )
     except (OSError, SyntaxError, ValueError, VersionValidationError) as error:
-        print(f"release version validation failed: {error}", file=sys.stderr)
+        print(
+            f"release version validation failed: {error}",
+            file=sys.stderr,
+        )
         return 1
 
     version = versions["pyproject.toml"]

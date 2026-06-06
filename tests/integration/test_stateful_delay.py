@@ -239,17 +239,13 @@ def test_resolve_delay_uses_state_for_stateful_strategy() -> None:
 # ---------------------------------------------- simulation with stateful delay
 
 
-def test_stateful_delay_simulation_uses_attempt_number() -> None:
+def test_stateful_delay_simulation_raises_for_user_callbacks() -> None:
     def callback(state: RetryState) -> float:
         return float(state.attempt_number)
 
     policy = RetryPolicy().attempts(4).stateful_delay(callback)
-    sim = policy.simulate(attempts=4)
-
-    # Last attempt has delay 0 because stop fires there
-    assert sim.attempts[0].delay_before_next_attempt == 1.0
-    assert sim.attempts[1].delay_before_next_attempt == 2.0
-    assert sim.attempts[2].delay_before_next_attempt == 3.0
+    with pytest.raises(InvalidRetryConfigError):
+        policy.simulate(attempts=4)
 
 
 # ---------------------------------------------- state fields in before_sleep event

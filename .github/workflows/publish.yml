@@ -52,15 +52,8 @@ jobs:
       - name: Run tests
         run: python -m pytest --cov=relinker --cov-report=term-missing
 
-      - name: Verify pyproject.toml version matches package version
-        run: |
-          PYPROJECT_VERSION=$(grep -m1 '^version\s*=' pyproject.toml | sed 's/.*= *"\(.*\)"/\1/')
-          PACKAGE_VERSION=$(python -c "import relinker; print(relinker.__version__)")
-          if [ "$PYPROJECT_VERSION" != "$PACKAGE_VERSION" ]; then
-            echo "Version mismatch: pyproject.toml=$PYPROJECT_VERSION, package=$PACKAGE_VERSION"
-            exit 1
-          fi
-          echo "Verified version: $PYPROJECT_VERSION"
+      - name: Validate release version
+        run: python scripts/validate_release_version.py --tag "$RELEASE_TAG"
 
       - name: Verify py.typed marker is present
         run: |

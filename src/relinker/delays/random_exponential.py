@@ -38,7 +38,10 @@ class RandomExponentialDelay(DelayMixin):
 
     def next_delay(self, attempt_number: int) -> float:
         """Return a random exponential delay for the given attempt."""
-        cap = self.base * (self.factor ** max(0, attempt_number - 1))
+        try:
+            cap = self.base * (self.factor ** max(0, attempt_number - 1))
+        except OverflowError:
+            cap = float("inf")
         if self.maximum is not None:
             cap = min(cap, self.maximum)
 

@@ -146,6 +146,11 @@ class RetryPolicy(Generic[T]):
     def on(self, *exception_types: type[BaseException]) -> RetryPolicy[T]:
         """Return a new policy that retries on the given exception types."""
         types = exception_types or (Exception,)
+        for t in types:
+            if not issubclass(t, Exception):
+                raise InvalidRetryConfigError(
+                    f"{t.__name__} is a BaseException subclass that the executor never catches"
+                )
         return replace(self, condition=ExceptionCondition(types))
 
     def retry_if_result(self, predicate: Callable[[Any], bool]) -> RetryPolicy[T]:
@@ -295,7 +300,13 @@ class RetryPolicy(Generic[T]):
 
     def raise_last(self) -> RetryPolicy[T]:
         """Return a new policy that re-raises the last original exception."""
-        return replace(self, should_raise_last=True, should_return_result=False)
+        return replace(
+            self,
+            should_raise_last=True,
+            should_return_result=False,
+            exhausted_callback=None,
+            exhausted_exception_factory=None,
+        )
 
     def return_result(self) -> RetryPolicy[T]:
         """Return a new policy that returns RetryResult instead of raising."""

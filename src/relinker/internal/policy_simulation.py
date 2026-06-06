@@ -26,6 +26,20 @@ def _class_name(value: object) -> str:
     return value.__class__.__name__
 
 
+def _safe_next_delay(policy: Any, attempt_number: int) -> float:
+    """Return next delay without executing user-provided callbacks.
+
+    Raises InvalidRetryConfigError for custom or stateful delay strategies so
+    that simulate() and warnings() never cause application side effects.
+    """
+    name = _class_name(policy.delay_strategy)
+    if name in {"CustomDelay", "StatefulCustomDelay"}:
+        raise InvalidRetryConfigError(
+            "Simulation is not supported for policies with custom delay callbacks"
+        )
+    return policy.delay_strategy.next_delay(attempt_number)
+
+
 def simulate_policy(policy: Any, attempts: int) -> RetrySimulation:
     """
     Compute the delay timeline for a policy without executing user code.
@@ -41,7 +55,13 @@ def simulate_policy(policy: Any, attempts: int) -> RetrySimulation:
 
     for attempt_number in range(1, attempts + 1):
         should_stop = policy.stop_strategy.should_stop(attempt_number, elapsed)
-        delay = 0.0 if should_stop else policy.delay_strategy.next_delay(attempt_number)
+        if not should_stop:
+            delay = _safe_next_delay(policy, attempt_number)
+            if policy.stop_strategy.should_stop(attempt_number, elapsed + delay):
+                should_stop = True
+                delay = 0.0
+        else:
+            delay = 0.0
         cumulative += delay
         simulated_attempts.append(
             RetrySimulationAttempt(
@@ -64,7 +84,7 @@ def _describe_stop(policy: Any) -> str:
     if name == "StopAfterAttempt":
         return f"try up to {strategy.maximum} times"
     if name == "StopAfterDelay":
-        return f"keep trying until {_format_seconds(strategy.max_delay)} has elapsed"
+        return f"keep trying until {_format_seconds(strategy.seconds)} has elapsed"
     if name == "StopForever":
         return "keep trying until the caller stops it"
     if name in {"AnyStopStrategy", "AllStopStrategy"}:

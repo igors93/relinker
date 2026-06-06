@@ -26,6 +26,9 @@ class RetryResult(Generic[T]):
         A run can fail because an exception was raised, or because the retry policy
         kept rejecting returned values until the stop strategy was reached. The
         `exhausted` and `retry_cause` fields make that difference explicit.
+
+        When a policy uses bounded history, `attempts` contains only the retained
+        records. Aggregate counters still describe the complete execution.
     """
 
     attempts: tuple[AttemptRecord, ...]
@@ -36,8 +39,8 @@ class RetryResult(Generic[T]):
     exhausted: bool = False
     retry_cause: RetryCause | None = None
     total_attempts: int = 0
-    total_failed_attempts: int = 0
-    total_successful_attempts: int = 0
+    total_failed_attempts: int | None = None
+    total_successful_attempts: int | None = None
 
     @property
     def succeeded(self) -> bool:
@@ -51,13 +54,24 @@ class RetryResult(Generic[T]):
 
     @property
     def attempt_count(self) -> int:
-        """Return how many attempts were made in total.
+        """
+        Return how many attempts were made in total.
 
-        When a history_limit is configured, RetryResult.attempts may contain
-        fewer records than this count. Use this property (not len(attempts))
-        to get the true total.
+        When a history limit is configured, `attempts` may contain fewer records
+        than this count. Use this property instead of `len(attempts)` to obtain
+        the complete execution total.
         """
         return self.total_attempts if self.total_attempts else len(self.attempts)
+
+    @property
+    def retained_attempt_count(self) -> int:
+        """Return the number of attempt records currently retained in memory."""
+        return len(self.attempts)
+
+    @property
+    def history_truncated(self) -> bool:
+        """Return True when older attempt records were discarded."""
+        return self.retained_attempt_count < self.attempt_count
 
     @property
     def total_time(self) -> float:
@@ -76,7 +90,7 @@ class RetryResult(Generic[T]):
 
     @property
     def last_error(self) -> BaseException | None:
-        """Return the error from the most recent failed attempt, if any."""
+        """Return the most recent error available in the retained attempt history."""
         for attempt in reversed(self.attempts):
             if attempt.error is not None:
                 return attempt.error
@@ -84,15 +98,16 @@ class RetryResult(Generic[T]):
 
     @property
     def has_last_value(self) -> bool:
-        """Return True when any attempt produced a return value (which may be None)."""
-        return any(a.has_value for a in self.attempts)
+        """Return True when the retained history contains a produced value."""
+        return any(attempt.has_value for attempt in self.attempts)
 
     @property
     def last_value(self) -> T | None:
-        """Return the value from the most recent attempt that returned a value.
+        """
+        Return the most recent value available in the retained attempt history.
 
-        Returns None when no attempt produced a value. Use has_last_value to
-        distinguish a successful None return from a fully failed execution.
+        The returned value may be None. Use `has_last_value` to distinguish a
+        produced None value from the absence of a retained value.
         """
         for attempt in reversed(self.attempts):
             if attempt.has_value:
@@ -101,47 +116,50 @@ class RetryResult(Generic[T]):
 
     @property
     def failed_attempts(self) -> int:
-        """Return how many individual attempts raised an exception.
-
-        When a history_limit is configured, attempts may be bounded. Use this
-        property (backed by total_failed_attempts when available) to get the
-        true total across all attempts.
         """
-        if self.total_attempts:
+        Return the total number of attempts that raised an exception.
+
+        Executors populate `total_failed_attempts` independently from retained
+        history. Manually constructed results that omit this aggregate fall back
+        to counting the available records.
+        """
+        if self.total_failed_attempts is not None:
             return self.total_failed_attempts
-        return sum(1 for a in self.attempts if a.failed)
+        return sum(1 for attempt in self.attempts if attempt.failed)
 
     @property
     def successful_attempts(self) -> int:
-        """Return how many individual attempts returned a value without an exception.
-
-        When a history_limit is configured, attempts may be bounded. Use this
-        property (backed by total_successful_attempts when available) to get the
-        true total across all attempts.
         """
-        if self.total_attempts:
+        Return the total number of attempts that returned without an exception.
+
+        Executors populate `total_successful_attempts` independently from retained
+        history. Manually constructed results that omit this aggregate fall back
+        to counting the available records.
+        """
+        if self.total_successful_attempts is not None:
             return self.total_successful_attempts
-        return sum(1 for a in self.attempts if a.succeeded)
+        return sum(1 for attempt in self.attempts if attempt.succeeded)
 
     @property
     def error_types(self) -> tuple[type[BaseException], ...]:
-        """Return the distinct exception types raised across all attempts, in order."""
+        """Return distinct exception types available in the retained history."""
         seen: list[type[BaseException]] = []
         for attempt in self.attempts:
-            if attempt.error is not None and type(attempt.error) not in seen:
-                seen.append(type(attempt.error))
+            error_type = type(attempt.error)
+            if attempt.error is not None and error_type not in seen:
+                seen.append(error_type)
         return tuple(seen)
 
     def last_attempt(self) -> AttemptRecord | None:
-        """Return the last attempt, or None when nothing was executed."""
+        """Return the last retained attempt, or None when no record is available."""
         return self.attempts[-1] if self.attempts else None
 
     def summary(self) -> dict[str, Any]:
         """
-        Return a compact dict suitable for logging.
+        Return a compact dictionary suitable for logging.
 
         Values are intentionally excluded to keep log lines small and safe.
-        Use to_dict(include_value=True) when you need the full result.
+        Use `to_dict(include_value=True)` when you need the full result.
         """
         return {
             "succeeded": self.succeeded,
@@ -149,9 +167,12 @@ class RetryResult(Generic[T]):
             "retry_cause": self.retry_cause,
             "attempt_count": self.attempt_count,
             "failed_attempts": self.failed_attempts,
+            "successful_attempts": self.successful_attempts,
+            "retained_attempt_count": self.retained_attempt_count,
+            "history_truncated": self.history_truncated,
             "total_time": round(self.total_time, 3),
             "error": self.error.__class__.__name__ if self.error is not None else None,
-            "error_types": [t.__name__ for t in self.error_types],
+            "error_types": [error_type.__name__ for error_type in self.error_types],
         }
 
     def to_dict(self, *, include_value: bool = False) -> dict[str, Any]:
@@ -159,8 +180,11 @@ class RetryResult(Generic[T]):
         Return a JSON-friendly dictionary.
 
         By default the returned value is not included because application values
-        may be large, private, or not JSON-serializable. Set include_value=True
+        may be large, private, or not JSON-serializable. Set `include_value=True`
         when you explicitly want it.
+
+        The `attempts` list contains retained history. Aggregate counters describe
+        the complete execution even when older records were discarded.
         """
         data: dict[str, Any] = {
             "succeeded": self.succeeded,
@@ -168,6 +192,10 @@ class RetryResult(Generic[T]):
             "exhausted": self.exhausted,
             "retry_cause": self.retry_cause,
             "attempt_count": self.attempt_count,
+            "failed_attempts": self.failed_attempts,
+            "successful_attempts": self.successful_attempts,
+            "retained_attempt_count": self.retained_attempt_count,
+            "history_truncated": self.history_truncated,
             "total_time": self.total_time,
             "started_at": self.started_at,
             "ended_at": self.ended_at,
@@ -204,9 +232,9 @@ class RetryResult(Generic[T]):
         """
         Return this result as JSON.
 
-        If include_value=True and the value is not JSON-serializable, json.dumps
-        will raise TypeError. That is intentional because Relinker should not
-        silently alter application data.
+        If `include_value=True` and the value is not JSON-serializable,
+        `json.dumps()` raises `TypeError`. That is intentional because Relinker
+        should not silently alter application data.
         """
         return json.dumps(self.to_dict(include_value=include_value), indent=indent)
 
@@ -215,7 +243,8 @@ class RetryResult(Generic[T]):
         Return a readable execution story.
 
         This is intentionally plain text because it is useful in logs, test
-        failures, terminal output, and debugging sessions.
+        failures, terminal output, and debugging sessions. When history is
+        truncated, the story says how many records were retained.
         """
         if self.succeeded:
             status = "succeeded"
@@ -229,9 +258,22 @@ class RetryResult(Generic[T]):
             "",
             f"Status: {status}",
             f"Attempts: {self.attempt_count}",
+            f"Failed attempts: {self.failed_attempts}",
+            f"Successful attempts: {self.successful_attempts}",
             f"Total time: {self.total_time:.4f}s",
             "",
         ]
+
+        if self.history_truncated:
+            lines.extend(
+                [
+                    (
+                        f"Retained history: last {self.retained_attempt_count} "
+                        f"of {self.attempt_count} attempts"
+                    ),
+                    "",
+                ]
+            )
 
         for attempt in self.attempts:
             attempt_status = "succeeded" if attempt.succeeded else "failed"

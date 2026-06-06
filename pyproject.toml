@@ -66,3 +66,8 @@ ignore = []
 python_version = "3.10"
 strict = true
 mypy_path = "src"
+
+[tool.coverage.report]
+fail_under = 85
+show_missing = true
+skip_covered = false

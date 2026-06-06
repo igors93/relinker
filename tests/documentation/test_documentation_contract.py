@@ -85,6 +85,31 @@ def test_documented_core_imports_are_public() -> None:
         assert hasattr(relinker, name)
 
 
+def test_public_api_reference_documents_every_root_export() -> None:
+    reference = (ROOT / "docs/reference/api.md").read_text(encoding="utf-8")
+    missing = [name for name in relinker.__all__ if f"`{name}`" not in reference]
+
+    assert missing == []
+
+
+def test_public_api_reference_identifies_root_surface() -> None:
+    reference = (ROOT / "docs/reference/api.md").read_text(encoding="utf-8")
+
+    assert "relinker.__all__" in reference
+    assert "from relinker.context import" in reference
+    assert "relinker.__version__" in reference
+
+
+def test_compatibility_guide_defines_public_api_tiers() -> None:
+    compatibility = (ROOT / "docs/reference/compatibility.md").read_text(encoding="utf-8")
+
+    assert "relinker.__all__" in compatibility
+    assert "relinker.context.__all__" in compatibility
+    assert "relinker.context._shared" in compatibility
+    assert "relinker.internal" in compatibility
+    assert "__version__" in compatibility
+
+
 def test_compatibility_guide_documents_internal_scope() -> None:
     compatibility = (ROOT / "docs/reference/compatibility.md").read_text(encoding="utf-8")
 

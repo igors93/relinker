@@ -21,19 +21,46 @@ The release version is stored in:
 Tests require these values to match. The README intentionally does not duplicate
 a current version number. Release history belongs in `CHANGELOG.md`.
 
-## Public API
+## API tiers
 
-The stable import surface is defined by `relinker.__all__`. Users should prefer:
+Relinker separates supported API into explicit tiers.
+
+### Root API
+
+The stable root import surface is the exact ordered list in `relinker.__all__`.
+Users should prefer:
 
 ```python
 from relinker import RetryPolicy, RetryBudget, retry
 ```
+
+The snapshot of `relinker.__all__` is deliberate. Incompatible changes to this
+list require documentation, `CHANGELOG.md` notes, migration guidance, and an
+updated public API contract.
+
+`relinker.__version__` is package metadata and remains available directly. It is
+not part of the star-import API because it is not listed in `relinker.__all__`.
+
+### Documented module APIs
+
+Module-level APIs are supported only when they meet all of these requirements:
+
+- the module defines an explicit `__all__`;
+- the module appears in the reference documentation;
+- the module has a contract test for that public surface.
+
+The current documented module API is `relinker.context.__all__`.
+
+### Internal API
 
 Modules under `relinker.internal` are implementation details. Their names,
 functions, and data structures may change without deprecation.
 
 Underscore-prefixed objects, including retry-budget reservation details, are also
 internal even when they live near public code.
+
+Examples of internal implementation details include `relinker.context._shared`
+and `relinker.internal.runtime`.
 
 ## Behavioral compatibility
 
@@ -50,22 +77,28 @@ behavior:
 The contract suite in `tests/contracts/` protects these semantics during internal
 refactoring.
 
-## Pre-1.0 changes
+## Deprecation policy
+
+### Pre-1.0 changes
 
 Before `1.0`, incompatible changes remain possible, but they must be deliberate:
 
 1. explain the reason in `CHANGELOG.md`;
 2. include migration guidance;
-3. add or update contract tests;
-4. avoid combining an incompatible change with unrelated refactoring.
+3. add or update snapshots and contract tests;
+4. update the reference documentation;
+5. avoid combining an incompatible change with unrelated refactoring.
 
 Where practical, deprecation warnings should be preferred over immediate removal.
 
-## After 1.0
+### After 1.0
 
 After `1.0`, public APIs should normally be deprecated in a minor release and
-removed only in a later major release. Security or correctness issues may require
-faster action, but the change must be documented clearly.
+removed only in a later major release. The recommended minimum is at least one
+full minor release between deprecation and removal.
+
+Security or critical correctness issues may require faster action, but the
+exception and migration path must be documented clearly.
 
 ## Scope limitations
 

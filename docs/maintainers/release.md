@@ -23,13 +23,26 @@ python -m ruff check .
 python -m mypy src
 
 # Tests
-python -m pytest
+python -m pytest --cov=relinker --cov-report=term-missing --cov-fail-under=85
 
 # Build
 python -m build
+
+# Distribution metadata
+python -m twine check --strict dist/*
 ```
 
 All steps must pass with no errors before a release.
+
+## Public API review
+
+Before the version bump:
+
+- review the diff of `relinker.__all__`;
+- review the public API snapshot;
+- review `relinker.context.__all__`;
+- confirm that `docs/reference/api.md` corresponds to the exports;
+- confirm compatibility and migration guidance for incompatible changes.
 
 ## Version bump
 
@@ -56,7 +69,20 @@ This produces:
 
 ```bash
 pip install dist/relinker-X.Y.Z-py3-none-any.whl
-python -c "import relinker; print(relinker.__version__)"
+python - <<'PY'
+import relinker
+
+for name in relinker.__all__:
+    getattr(relinker, name)
+
+assert isinstance(relinker.__version__, str)
+assert relinker.__version__
+
+print(
+    f"Import OK: {len(relinker.__all__)} public exports, "
+    f"version {relinker.__version__}"
+)
+PY
 ```
 
 ## Publish to PyPI

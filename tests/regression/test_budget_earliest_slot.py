@@ -64,9 +64,7 @@ def test_out_of_order_not_before_produces_earliest_slots() -> None:
     """
     budget = RetryBudget(max_retries=2, per=10)
     not_befores = (3, 1, 20, 4, 21)
-    reservations = [
-        budget._reserve("api", current_time=0, not_before=nb) for nb in not_befores
-    ]
+    reservations = [budget._reserve("api", current_time=0, not_before=nb) for nb in not_befores]
     times = [r.scheduled_at for r in reservations]
 
     # Each reservation is no earlier than its not_before.

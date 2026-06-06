@@ -98,9 +98,7 @@ def test_releasing_expired_or_unknown_reservation_is_harmless() -> None:
 def test_reservations_satisfy_capacity_and_respect_not_before() -> None:
     budget = RetryBudget(max_retries=2, per=10)
     not_befores = (3, 1, 20, 4, 21)
-    reservations = [
-        budget._reserve("api", current_time=0, not_before=nb) for nb in not_befores
-    ]
+    reservations = [budget._reserve("api", current_time=0, not_before=nb) for nb in not_befores]
     times = [r.scheduled_at for r in reservations]
 
     for r, nb in zip(reservations, not_befores, strict=True):

@@ -121,9 +121,7 @@ async def test_async_executor_result_path_uses_fresh_elapsed(
     result = await policy.run_async(returning_op)
 
     assert result.exhausted
-    assert sleeps == [], (
-        f"No sleep expected after delay callback advanced clock. Got: {sleeps}."
-    )
+    assert sleeps == [], f"No sleep expected after delay callback advanced clock. Got: {sleeps}."
     assert calls == 1
 
 
@@ -156,9 +154,7 @@ def test_sync_context_manager_result_path_uses_fresh_elapsed(
                 calls += 1
                 attempt.set_result(_RETRYABLE)
 
-    assert sleeps == [], (
-        f"No sleep expected after delay callback advanced clock. Got: {sleeps}."
-    )
+    assert sleeps == [], f"No sleep expected after delay callback advanced clock. Got: {sleeps}."
     assert calls == 1, f"Expected exactly one attempt, got {calls}"
 
 
@@ -192,7 +188,5 @@ async def test_async_context_manager_result_path_uses_fresh_elapsed(
                 calls += 1
                 attempt.set_result(_RETRYABLE)
 
-    assert sleeps == [], (
-        f"No sleep expected after delay callback advanced clock. Got: {sleeps}."
-    )
+    assert sleeps == [], f"No sleep expected after delay callback advanced clock. Got: {sleeps}."
     assert calls == 1, f"Expected exactly one attempt, got {calls}"

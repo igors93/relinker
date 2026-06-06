@@ -115,6 +115,12 @@ Changes must preserve these invariants:
 Do not replace whole core files from an older snapshot. Apply minimal changes to
 the current branch so fixes and contracts already present are preserved.
 
+## Recorded decisions
+
+[Architectural decisions](decisions/README.md) record decisions already
+implemented in the codebase. They help prevent refactorings from reversing
+important invariants without the original context.
+
 ## Extension guidance
 
 Add a new strategy when the behavior is independently testable and composes with

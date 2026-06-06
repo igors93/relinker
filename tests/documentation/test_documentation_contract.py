@@ -63,6 +63,9 @@ def test_documentation_index_contains_the_stability_guides() -> None:
         "concepts/exhaustion.md",
         "reference/compatibility.md",
         "maintainers/architecture.md",
+        "maintainers/stability-matrix.md",
+        "maintainers/1.0-readiness.md",
+        "maintainers/decisions/README.md",
     ):
         assert relative_path in index
         assert (ROOT / "docs" / relative_path).is_file()
@@ -116,3 +119,35 @@ def test_compatibility_guide_documents_internal_scope() -> None:
     assert "relinker.__all__" in compatibility
     assert "relinker.internal" in compatibility
     assert "process-local" in compatibility
+
+
+def test_pre_one_zero_documents_do_not_claim_external_validation_is_complete() -> None:
+    readiness = (ROOT / "docs/maintainers/1.0-readiness.md").read_text(encoding="utf-8")
+
+    assert "- [ ] Release `0.9.0`." in readiness
+    assert "- [ ] Complete at least one full feedback cycle on the `0.9.x` series." in readiness
+    assert (
+        "- [ ] Validate the `0.9.x` series in at least one real application or representative "
+        "integration."
+    ) in readiness
+    assert "These items must not be checked by automation alone." in readiness
+
+
+def test_architectural_decision_records_have_required_sections() -> None:
+    decision_files = (
+        "docs/maintainers/decisions/001-public-api.md",
+        "docs/maintainers/decisions/002-mutually-exclusive-exhaustion.md",
+        "docs/maintainers/decisions/003-shared-retry-runtime.md",
+        "docs/maintainers/decisions/004-context-package.md",
+        "docs/maintainers/decisions/005-process-local-retry-budget.md",
+    )
+
+    for relative_path in decision_files:
+        decision = (ROOT / relative_path).read_text(encoding="utf-8")
+        for heading in (
+            "## Context",
+            "## Decision",
+            "## Consequences",
+            "## Alternatives considered",
+        ):
+            assert heading in decision

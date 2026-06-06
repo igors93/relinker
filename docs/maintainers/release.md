@@ -20,7 +20,7 @@ python -m ruff format --check .
 python -m ruff check .
 
 # Type check
-python -m mypy src
+python -m mypy src tests/typing
 
 # Tests
 python -m pytest --cov=relinker --cov-report=term-missing --cov-fail-under=85
@@ -43,6 +43,40 @@ Before the version bump:
 - review `relinker.context.__all__`;
 - confirm that `docs/reference/api.md` corresponds to the exports;
 - confirm compatibility and migration guidance for incompatible changes.
+
+## Prepare a pre-1.0 release
+
+Preparation and publication happen in separate commits.
+
+### Commit de preparação
+
+- update `Unreleased`;
+- validate the public API;
+- validate the installed wheel;
+- run the full suite;
+- do not change the version.
+
+### Commit de release
+
+Only after everything is green:
+
+- update `pyproject.toml`;
+- update `src/relinker/__init__.py`;
+- move `Unreleased` items to `## 0.9.0 - YYYY-MM-DD`;
+- create a new empty `Unreleased`;
+- run the pipeline again;
+- create the tag only after CI is green.
+
+Checklist for `0.9.0`:
+
+- changelog preparado
+- API snapshot revisado
+- typing examples passam
+- wheel validator passa
+- stability matrix revisada
+- 1.0 readiness permanece honesta
+
+Do not mark external-validation items complete based only on CI.
 
 ## Version bump
 
@@ -69,20 +103,7 @@ This produces:
 
 ```bash
 pip install dist/relinker-X.Y.Z-py3-none-any.whl
-python - <<'PY'
-import relinker
-
-for name in relinker.__all__:
-    getattr(relinker, name)
-
-assert isinstance(relinker.__version__, str)
-assert relinker.__version__
-
-print(
-    f"Import OK: {len(relinker.__all__)} public exports, "
-    f"version {relinker.__version__}"
-)
-PY
+python scripts/validate_installed_wheel.py
 ```
 
 ## Publish to PyPI

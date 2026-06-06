@@ -27,7 +27,7 @@ env/
 .DS_Store
 Thumbs.db
 
-.venv/
-venv/
-env/
-.venv/
+# Local task artifacts
+CODEX_FASE*.md
+CODEX_FASES*.md
+*.patch.zip

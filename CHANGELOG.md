@@ -4,6 +4,32 @@ All notable changes to Relinker will be documented in this file.
 
 Relinker follows practical semantic versioning while the project is still pre-1.0. Breaking changes may happen before 1.0, but they should be documented clearly.
 
+## Unreleased
+
+### Added
+
+- Added behavioral contract tests covering sync, async, decorators, context managers, events, history, exhaustion, and retry budgets.
+- Added documentation contracts for links, examples, versions, and documented imports.
+- Added exact public API snapshots for `relinker.__all__` and `relinker.context.__all__`.
+- Added an 85% coverage floor, documentation CI job, package export smoke checks, and a pull request checklist.
+
+### Changed
+
+- Centralized mutually exclusive exhaustion configuration in `RetryPolicy`.
+- Centralized attempt history, aggregate counters, `RetryState`, and `RetryResult` construction in the internal `RetryRuntime`.
+- Split context-manager support into focused sync, async, and shared modules while preserving existing imports.
+- Reorganized documentation into guides, concepts, reference, and maintainer sections.
+
+### Fixed
+
+- Restored last-configuration-wins precedence for fallback, custom exhaustion exceptions, `return_result()`, and `raise_last()`.
+- Removed the obsolete `return_result_precedence` diagnostic after contradictory exhaustion states became invalid.
+- Kept explicit `None` results distinct from context blocks that did not call `set_result()`.
+
+### Documentation
+
+- Documented retry lifecycle, exhaustion behavior, compatibility tiers, architecture, public API, development checks, and release validation.
+
 ## 0.8.0
 
 ### Added

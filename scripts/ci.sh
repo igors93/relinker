@@ -3,7 +3,7 @@ set -euo pipefail
 
 python -m ruff format --check .
 python -m ruff check .
-python -m mypy src
+python -m mypy src tests/typing
 python -m pytest \
   --cov=relinker \
   --cov-report=term-missing \

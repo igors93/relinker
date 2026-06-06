@@ -24,7 +24,7 @@ Or run them separately:
 ```bash
 python -m ruff format --check .
 python -m ruff check .
-python -m mypy src
+python -m mypy src tests/typing
 python -m pytest --cov=relinker --cov-report=term-missing --cov-fail-under=85
 python -m build
 python -m twine check --strict dist/*
@@ -67,3 +67,12 @@ changes whenever possible, and check the relevant items in the pull request
 template.
 
 No pull request should lower the coverage floor to make a change pass.
+
+## Pre-1.0 stabilization
+
+The `0.9.x` series prioritizes bugs, contracts, documentation, and
+compatibility. Large features should wait for a separate decision.
+
+Every bug fix needs a regression test. Public API changes require snapshot,
+documentation, and changelog updates. Do not reduce coverage or mark external
+validation complete without evidence.

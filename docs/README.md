@@ -62,6 +62,9 @@ This directory is organized by intent:
 | [Design principles](maintainers/design-principles.md) | Values that guide implementation decisions |
 | [Development](maintainers/development.md) | Set up the project and run local checks |
 | [Release process](maintainers/release.md) | Validate and publish a release |
+| [Stability matrix](maintainers/stability-matrix.md) | Map core capabilities to automated contracts |
+| [1.0 readiness](maintainers/1.0-readiness.md) | Track pre-1.0 automated, release, and validation requirements |
+| [Architectural decisions](maintainers/decisions/README.md) | Record important decisions and their tradeoffs |
 
 ## Recommended learning path
 

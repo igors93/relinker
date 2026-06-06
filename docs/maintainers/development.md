@@ -28,7 +28,7 @@ Or run each command manually:
 ```bash
 python -m ruff format --check .
 python -m ruff check .
-python -m mypy src
+python -m mypy src tests/typing
 python -m pytest --cov=relinker --cov-report=term-missing --cov-fail-under=85
 python -m build
 python -m twine check --strict dist/*
@@ -61,9 +61,41 @@ The workflow has four jobs:
 
 `quality` runs on Python 3.12. `documentation` runs the documentation tests and
 the public API snapshot. `validate-package` depends on both `tests` and
-`documentation`, builds the package, validates metadata with Twine, checks every
-name in `relinker.__all__` from the installed wheel, and verifies the `py.typed`
-marker.
+`documentation`, builds the package, validates metadata with Twine, runs the
+installed wheel validator, and verifies the `py.typed` marker.
+
+## Public typing examples
+
+Public typing examples are checked with:
+
+```bash
+python -m mypy src tests/typing
+```
+
+The examples represent supported public use. They should import from `relinker`
+and avoid internal modules.
+
+## Installed wheel validation
+
+The package validation job:
+
+1. builds the wheel;
+2. installs it;
+3. runs `scripts/validate_installed_wheel.py`;
+4. verifies `py.typed`.
+
+The validator must import the installed distribution, not `src`.
+
+## Performance smoke script
+
+Maintainers can run a small manual performance smoke check:
+
+```bash
+python scripts/benchmark_smoke.py --iterations 1000
+```
+
+This is not a CI gate and does not replace profiling. It is only a quick way to
+notice coarse regressions.
 
 ## Coverage floor
 

@@ -28,8 +28,8 @@ def _validate_public_api() -> None:
 
     assert isinstance(relinker.__version__, str)
     assert relinker.__version__
-    assert relinker.__version__ == "1.0.0"
-    assert distribution_version("relinker") == "1.0.0"
+    assert relinker.__version__ == "1.0.1"
+    assert distribution_version("relinker") == "1.0.1"
 
 
 def _validate_sync_run() -> None:
@@ -154,7 +154,7 @@ def main() -> None:
     asyncio.run(_validate_async_scenarios())
 
     print(
-        "Installed wheel validation passed for Relinker 1.0.0: public API, sync, async, "
+        "Installed wheel validation passed for Relinker 1.0.1: public API, sync, async, "
         "decorator, context managers, and Retry Budget."
     )
 

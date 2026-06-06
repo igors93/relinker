@@ -8,6 +8,17 @@ the compatibility and deprecation policy documented in
 
 ## Unreleased
 
+## 1.0.1 - 2026-06-06
+
+### Fixed
+
+- Budget reservation is now released when a `before_sleep` event handler raises
+  an exception, across all execution paths (sync executor, async executor, sync
+  context manager, async context manager).
+- `max_time()` now evaluates elapsed time after `after_failure` event handlers
+  run, so time consumed by handlers between the attempt end and the sleep
+  decision is correctly counted against the configured budget.
+
 ## 1.0.0 - 2026-06-06
 
 ### Added

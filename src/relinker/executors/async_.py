@@ -143,22 +143,22 @@ async def execute_async(
                 )
                 return finish_exhausted(policy, result)
 
-            policy.emit(
-                RetryEvent(
-                    name="before_sleep",
-                    attempt_number=attempt_number,
-                    function_name=runtime.function_name,
-                    delay=plan.total_delay,
-                    value=value,
-                    state=_dc_replace(
-                        pre_sleep_state,
-                        next_delay=plan.total_delay,
-                        policy_delay=plan.policy_delay,
-                        budget_delay=plan.budget_delay,
-                    ),
-                )
-            )
             try:
+                policy.emit(
+                    RetryEvent(
+                        name="before_sleep",
+                        attempt_number=attempt_number,
+                        function_name=runtime.function_name,
+                        delay=plan.total_delay,
+                        value=value,
+                        state=_dc_replace(
+                            pre_sleep_state,
+                            next_delay=plan.total_delay,
+                            policy_delay=plan.policy_delay,
+                            budget_delay=plan.budget_delay,
+                        ),
+                    )
+                )
                 await policy.async_sleep(plan.total_delay)
             except BaseException:
                 release_retry_wait(plan)
@@ -239,7 +239,7 @@ async def execute_async(
         if should_stop_before_sleep(
             policy.stop_strategy,
             attempt_number,
-            elapsed,
+            now() - runtime.started_at,
             plan.total_delay,
         ):
             release_retry_wait(plan)
@@ -264,22 +264,22 @@ async def execute_async(
             )
             return finish_exhausted(policy, result)
 
-        policy.emit(
-            RetryEvent(
-                name="before_sleep",
-                attempt_number=attempt_number,
-                function_name=runtime.function_name,
-                delay=plan.total_delay,
-                error=error,
-                state=_dc_replace(
-                    pre_sleep_state,
-                    next_delay=plan.total_delay,
-                    policy_delay=plan.policy_delay,
-                    budget_delay=plan.budget_delay,
-                ),
-            )
-        )
         try:
+            policy.emit(
+                RetryEvent(
+                    name="before_sleep",
+                    attempt_number=attempt_number,
+                    function_name=runtime.function_name,
+                    delay=plan.total_delay,
+                    error=error,
+                    state=_dc_replace(
+                        pre_sleep_state,
+                        next_delay=plan.total_delay,
+                        policy_delay=plan.policy_delay,
+                        budget_delay=plan.budget_delay,
+                    ),
+                )
+            )
             await policy.async_sleep(plan.total_delay)
         except BaseException:
             release_retry_wait(plan)

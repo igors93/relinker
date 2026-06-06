@@ -1,4 +1,4 @@
-"""Release contract for Relinker 1.0.0."""
+"""Release contract for Relinker 1.0.1."""
 
 from __future__ import annotations
 
@@ -15,12 +15,12 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_version_sources_report_one_zero_zero() -> None:
+def test_version_sources_report_one_zero_one() -> None:
     with (ROOT / "pyproject.toml").open("rb") as file:
         project_version = tomllib.load(file)["project"]["version"]
 
-    assert project_version == "1.0.0"
-    assert relinker.__version__ == "1.0.0"
+    assert project_version == "1.0.1"
+    assert relinker.__version__ == "1.0.1"
 
 
 def test_classifier_is_production_stable() -> None:
@@ -32,18 +32,18 @@ def test_classifier_is_production_stable() -> None:
     assert "Development Status :: 3 - Alpha" not in classifier_text
 
 
-def test_changelog_has_dated_one_zero_zero_section() -> None:
+def test_changelog_has_dated_one_zero_one_section() -> None:
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    pattern = re.compile(r"^## 1\.0\.0 - \d{4}-\d{2}-\d{2}$", re.MULTILINE)
+    pattern = re.compile(r"^## 1\.0\.1 - \d{4}-\d{2}-\d{2}$", re.MULTILINE)
     matches = pattern.findall(changelog)
 
     assert len(matches) == 1
 
 
-def test_changelog_unreleased_is_empty_before_one_zero_zero() -> None:
+def test_changelog_unreleased_is_empty_before_one_zero_one() -> None:
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     start = changelog.index("## Unreleased")
-    end = changelog.index("## 1.0.0")
+    end = changelog.index("## 1.0.1")
     block = changelog[start + len("## Unreleased") : end].strip()
 
     assert block == ""
@@ -103,4 +103,4 @@ def test_wheel_validator_checks_version() -> None:
     content = (ROOT / "scripts/validate_installed_wheel.py").read_text(encoding="utf-8")
 
     assert "distribution_version" in content
-    assert "1.0.0" in content
+    assert "1.0.1" in content

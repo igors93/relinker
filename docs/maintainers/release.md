@@ -89,14 +89,12 @@ Install the wheel in an isolated virtual environment and run the validator:
 python scripts/validate_installed_wheel.py
 ```
 
-## Checklist for 1.0.0
+## Checklist for 1.0.1
 
-- [ ] `pyproject.toml` reports `1.0.0`.
-- [ ] `relinker.__version__` reports `1.0.0`.
-- [ ] `CHANGELOG.md` contains a dated `1.0.0` section.
+- [ ] `pyproject.toml` reports `1.0.1`.
+- [ ] `relinker.__version__` reports `1.0.1`.
+- [ ] `CHANGELOG.md` contains a dated `1.0.1` section.
 - [ ] A new empty `Unreleased` section exists.
 - [ ] Public API snapshots are unchanged.
-- [ ] Migration guidance is published.
 - [ ] Ruff, mypy, tests, coverage, build, and Twine pass.
 - [ ] The installed wheel validator passes.
-- [ ] The maintainer reviewed known scope boundaries.

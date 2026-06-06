@@ -114,7 +114,10 @@ class AsyncRetryAttemptContext(_BaseRetryAttemptContext):
         )
         plan = plan_retry_wait(self.policy, self.number, pre_sleep_state)
         if should_stop_before_sleep(
-            self.policy.stop_strategy, self.number, elapsed, plan.total_delay
+            self.policy.stop_strategy,
+            self.number,
+            _context_now() - self.iterator.started_at,
+            plan.total_delay,
         ):
             release_retry_wait(plan)
             self.iterator.finished = True
@@ -128,22 +131,22 @@ class AsyncRetryAttemptContext(_BaseRetryAttemptContext):
             self._giveup(error=error, retry_cause="exception")
             return self._apply_exhausted(result, error)
 
-        self.policy.emit(
-            RetryEvent(
-                name="before_sleep",
-                attempt_number=self.number,
-                function_name=self.iterator.name,
-                delay=plan.total_delay,
-                error=error,
-                state=_dc_replace(
-                    pre_sleep_state,
-                    next_delay=plan.total_delay,
-                    policy_delay=plan.policy_delay,
-                    budget_delay=plan.budget_delay,
-                ),
-            )
-        )
         try:
+            self.policy.emit(
+                RetryEvent(
+                    name="before_sleep",
+                    attempt_number=self.number,
+                    function_name=self.iterator.name,
+                    delay=plan.total_delay,
+                    error=error,
+                    state=_dc_replace(
+                        pre_sleep_state,
+                        next_delay=plan.total_delay,
+                        policy_delay=plan.policy_delay,
+                        budget_delay=plan.budget_delay,
+                    ),
+                )
+            )
             await self.policy.async_sleep(plan.total_delay)
         except BaseException:
             release_retry_wait(plan)
@@ -216,22 +219,22 @@ class AsyncRetryAttemptContext(_BaseRetryAttemptContext):
             self._giveup(value=value, retry_cause="result")
             return self._apply_exhausted(result, None)
 
-        self.policy.emit(
-            RetryEvent(
-                name="before_sleep",
-                attempt_number=self.number,
-                function_name=self.iterator.name,
-                delay=plan.total_delay,
-                value=value,
-                state=_dc_replace(
-                    pre_sleep_state,
-                    next_delay=plan.total_delay,
-                    policy_delay=plan.policy_delay,
-                    budget_delay=plan.budget_delay,
-                ),
-            )
-        )
         try:
+            self.policy.emit(
+                RetryEvent(
+                    name="before_sleep",
+                    attempt_number=self.number,
+                    function_name=self.iterator.name,
+                    delay=plan.total_delay,
+                    value=value,
+                    state=_dc_replace(
+                        pre_sleep_state,
+                        next_delay=plan.total_delay,
+                        policy_delay=plan.policy_delay,
+                        budget_delay=plan.budget_delay,
+                    ),
+                )
+            )
             await self.policy.async_sleep(plan.total_delay)
         except BaseException:
             release_retry_wait(plan)

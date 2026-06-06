@@ -11,7 +11,7 @@ IGNORED_SCAN_PARTS = {".venv", ".git", "dist", "build"}
 def _unreleased_block() -> str:
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     start = changelog.index("## Unreleased")
-    end = changelog.index("## 1.0.0")
+    end = changelog.index("## 1.0.1")
     return changelog[start:end]
 
 

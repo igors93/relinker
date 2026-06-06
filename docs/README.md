@@ -15,6 +15,7 @@ This documentation is organized for two audiences:
 | [Policy builder](policy-builder.md) | Learn the fluent `RetryPolicy` API |
 | [Diagnostics and guidance](diagnostics.md) | Use warnings, doctor, preview, and explain |
 | [HTTP retry](http.md) | Retry HTTP status codes and `Retry-After` |
+| [Retry budgets](retry-budgets.md) | Limit shared retry activity during incidents |
 | [Observability](observability.md) | Logging, structured logging, and events |
 | [Results and statistics](results.md) | Inspect retry outcomes and per-function stats |
 | [Context manager usage](context-manager.md) | Retry blocks without extracting functions |

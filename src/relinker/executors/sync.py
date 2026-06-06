@@ -7,13 +7,13 @@ from dataclasses import replace as _dc_replace
 from typing import TYPE_CHECKING, Any
 
 from relinker.attempt import AttemptRecord
-from relinker.delays.stateful import resolve_delay
 from relinker.event import RetryEvent
 from relinker.exceptions import TryAgain
 from relinker.internal.clock import now
 from relinker.internal.executor_helpers import build_state
 from relinker.internal.executor_helpers import function_name as _function_name
 from relinker.internal.exhaustion import finish_exhausted, should_stop_before_sleep
+from relinker.internal.retry_wait import plan_retry_wait, release_retry_wait
 from relinker.result import RetryResult
 
 if TYPE_CHECKING:
@@ -35,6 +35,8 @@ def _state(
     retry_cause: str | None = None,
     will_retry: bool = False,
     will_stop: bool = False,
+    policy_delay: float | None = None,
+    budget_delay: float | None = None,
 ) -> Any:
     return build_state(
         function_name=function_name,
@@ -48,6 +50,35 @@ def _state(
         retry_cause=retry_cause,
         will_retry=will_retry,
         will_stop=will_stop,
+        policy_delay=policy_delay,
+        budget_delay=budget_delay,
+    )
+
+
+def _make_result(
+    *,
+    attempts: deque[AttemptRecord],
+    started_at: float,
+    attempt_number: int,
+    failed_count: int,
+    success_count: int,
+    value: Any = None,
+    error: BaseException | None = None,
+    exhausted: bool = False,
+    retry_cause: str | None = None,
+) -> RetryResult[Any]:
+    cause = retry_cause if retry_cause in {"exception", "result"} else None
+    return RetryResult(
+        attempts=tuple(attempts),
+        value=value,
+        error=error,
+        started_at=started_at,
+        ended_at=now(),
+        exhausted=exhausted,
+        retry_cause=cause,  # type: ignore[arg-type]
+        total_attempts=attempt_number,
+        total_failed_attempts=failed_count,
+        total_successful_attempts=success_count,
     )
 
 
@@ -57,15 +88,8 @@ def execute_sync(
     *args: Any,
     **kwargs: Any,
 ) -> Any:
-    """
-    Execute a synchronous function using a RetryPolicy.
-
-    The executor never catches BaseException directly. This prevents Relinker
-    from swallowing interpreter-level signals such as KeyboardInterrupt and
-    SystemExit.
-    """
-    limit = policy.history_limit
-    attempts: deque[AttemptRecord] = deque(maxlen=limit)
+    """Execute a synchronous function using a ``RetryPolicy``."""
+    attempts: deque[AttemptRecord] = deque(maxlen=policy.history_limit)
     execution_started_at = now()
     function_name = _function_name(function)
     attempt_number = 0
@@ -87,209 +111,85 @@ def execute_sync(
                 ),
             )
         )
-
         attempt_started_at = now()
+        error: Exception
 
         try:
             value = function(*args, **kwargs)
-        except TryAgain as error:
-            # TryAgain is an explicit user retry signal — bypass the condition check.
-            attempt_ended_at = now()
-            attempts.append(
-                AttemptRecord(
-                    number=attempt_number,
-                    started_at=attempt_started_at,
-                    ended_at=attempt_ended_at,
-                    error=error,
-                )
-            )
-            failed_count += 1
-            elapsed = attempt_ended_at - execution_started_at
-            should_stop = policy.stop_strategy.should_stop(attempt_number, elapsed)
-            policy.emit(
-                RetryEvent(
-                    name="after_failure",
-                    attempt_number=attempt_number,
-                    function_name=function_name,
-                    error=error,
-                    state=_state(
-                        function_name=function_name,
-                        attempt_number=attempt_number,
-                        execution_started_at=execution_started_at,
-                        attempts=attempts,
-                        last_error=error,
-                        retry_cause="exception",
-                        will_retry=not should_stop,
-                        will_stop=should_stop,
-                    ),
-                )
-            )
-            if should_stop:
-                result: RetryResult[Any] = RetryResult(
-                    attempts=tuple(attempts),
-                    error=error,
-                    started_at=execution_started_at,
-                    ended_at=now(),
-                    exhausted=True,
-                    retry_cause="exception",
-                    total_attempts=attempt_number,
-                    total_failed_attempts=failed_count,
-                    total_successful_attempts=success_count,
-                )
-                policy.emit(
-                    RetryEvent(
-                        name="after_giveup",
-                        attempt_number=attempt_number,
-                        function_name=function_name,
-                        error=error,
-                        state=_state(
-                            function_name=function_name,
-                            attempt_number=attempt_number,
-                            execution_started_at=execution_started_at,
-                            attempts=attempts,
-                            last_error=error,
-                            retry_cause="exception",
-                            will_stop=True,
-                        ),
-                    )
-                )
-                return finish_exhausted(policy, result)
-            pre_sleep_state = _state(
-                function_name=function_name,
-                attempt_number=attempt_number,
-                execution_started_at=execution_started_at,
-                attempts=attempts,
-                last_error=error,
-                retry_cause="exception",
-                will_retry=True,
-            )
-            delay = resolve_delay(policy.delay_strategy, attempt_number, pre_sleep_state)
-            if should_stop_before_sleep(policy.stop_strategy, attempt_number, elapsed, delay):
-                result = RetryResult(
-                    attempts=tuple(attempts),
-                    error=error,
-                    started_at=execution_started_at,
-                    ended_at=now(),
-                    exhausted=True,
-                    retry_cause="exception",
-                    total_attempts=attempt_number,
-                    total_failed_attempts=failed_count,
-                    total_successful_attempts=success_count,
-                )
-                policy.emit(
-                    RetryEvent(
-                        name="after_giveup",
-                        attempt_number=attempt_number,
-                        function_name=function_name,
-                        error=error,
-                        state=_state(
-                            function_name=function_name,
-                            attempt_number=attempt_number,
-                            execution_started_at=execution_started_at,
-                            attempts=attempts,
-                            last_error=error,
-                            retry_cause="exception",
-                            will_stop=True,
-                        ),
-                    )
-                )
-                return finish_exhausted(policy, result)
-            policy.emit(
-                RetryEvent(
-                    name="before_sleep",
-                    attempt_number=attempt_number,
-                    function_name=function_name,
-                    delay=delay,
-                    error=error,
-                    state=_dc_replace(pre_sleep_state, next_delay=delay),
-                )
-            )
-            policy.sleep(delay)
-            continue
-        except Exception as error:
-            attempt_ended_at = now()
-            attempts.append(
-                AttemptRecord(
-                    number=attempt_number,
-                    started_at=attempt_started_at,
-                    ended_at=attempt_ended_at,
-                    error=error,
-                )
-            )
-            failed_count += 1
-
-            elapsed = attempt_ended_at - execution_started_at
+        except TryAgain as caught_error:
+            error = caught_error
+            should_retry = True
+        except Exception as caught_error:
+            error = caught_error
             should_retry = policy.condition.should_retry_exception(error)
-            should_stop = policy.stop_strategy.should_stop(attempt_number, elapsed)
-
-            policy.emit(
-                RetryEvent(
-                    name="after_failure",
-                    attempt_number=attempt_number,
-                    function_name=function_name,
-                    error=error,
-                    state=_state(
-                        function_name=function_name,
-                        attempt_number=attempt_number,
-                        execution_started_at=execution_started_at,
-                        attempts=attempts,
-                        last_error=error,
-                        retry_cause="exception",
-                        will_retry=should_retry and not should_stop,
-                        will_stop=should_stop,
-                    ),
+        else:
+            attempt_ended_at = now()
+            attempts.append(
+                AttemptRecord(
+                    number=attempt_number,
+                    started_at=attempt_started_at,
+                    ended_at=attempt_ended_at,
+                    value=value,
+                    has_value=True,
                 )
             )
+            success_count += 1
+            should_retry_result = policy.condition.should_retry_result(value)
+            elapsed = attempt_ended_at - execution_started_at
+            should_stop = policy.stop_strategy.should_stop(attempt_number, elapsed)
 
-            if not should_retry:
-                result = RetryResult(
-                    attempts=tuple(attempts),
-                    error=error,
+            if not should_retry_result:
+                result = _make_result(
+                    attempts=attempts,
                     started_at=execution_started_at,
-                    ended_at=now(),
-                    total_attempts=attempt_number,
-                    total_failed_attempts=failed_count,
-                    total_successful_attempts=success_count,
+                    attempt_number=attempt_number,
+                    failed_count=failed_count,
+                    success_count=success_count,
+                    value=value,
                 )
                 policy.emit(
                     RetryEvent(
-                        name="after_giveup",
+                        name="after_success",
                         attempt_number=attempt_number,
                         function_name=function_name,
-                        error=error,
-                    )
-                )
-                if policy.should_return_result:
-                    return result
-                if policy.should_raise_last:
-                    raise error
-                return None
-
-            if should_stop:
-                result = RetryResult(
-                    attempts=tuple(attempts),
-                    error=error,
-                    started_at=execution_started_at,
-                    ended_at=now(),
-                    exhausted=True,
-                    retry_cause="exception",
-                    total_attempts=attempt_number,
-                    total_failed_attempts=failed_count,
-                    total_successful_attempts=success_count,
-                )
-                policy.emit(
-                    RetryEvent(
-                        name="after_giveup",
-                        attempt_number=attempt_number,
-                        function_name=function_name,
-                        error=error,
+                        value=value,
                         state=_state(
                             function_name=function_name,
                             attempt_number=attempt_number,
                             execution_started_at=execution_started_at,
                             attempts=attempts,
-                            last_error=error,
-                            retry_cause="exception",
+                            last_value=value,
+                            has_value=True,
+                        ),
+                    )
+                )
+                return result if policy.should_return_result else value
+
+            if should_stop:
+                result = _make_result(
+                    attempts=attempts,
+                    started_at=execution_started_at,
+                    attempt_number=attempt_number,
+                    failed_count=failed_count,
+                    success_count=success_count,
+                    value=value,
+                    exhausted=True,
+                    retry_cause="result",
+                )
+                policy.emit(
+                    RetryEvent(
+                        name="after_giveup",
+                        attempt_number=attempt_number,
+                        function_name=function_name,
+                        value=value,
+                        state=_state(
+                            function_name=function_name,
+                            attempt_number=attempt_number,
+                            execution_started_at=execution_started_at,
+                            attempts=attempts,
+                            last_value=value,
+                            has_value=True,
+                            retry_cause="result",
                             will_stop=True,
                         ),
                     )
@@ -301,52 +201,69 @@ def execute_sync(
                 attempt_number=attempt_number,
                 execution_started_at=execution_started_at,
                 attempts=attempts,
-                last_error=error,
-                retry_cause="exception",
+                last_value=value,
+                has_value=True,
+                retry_cause="result",
                 will_retry=True,
             )
-            delay = resolve_delay(policy.delay_strategy, attempt_number, pre_sleep_state)
-            if should_stop_before_sleep(policy.stop_strategy, attempt_number, elapsed, delay):
-                result = RetryResult(
-                    attempts=tuple(attempts),
-                    error=error,
+            plan = plan_retry_wait(policy, attempt_number, pre_sleep_state)
+            if should_stop_before_sleep(
+                policy.stop_strategy,
+                attempt_number,
+                elapsed,
+                plan.total_delay,
+            ):
+                release_retry_wait(plan)
+                result = _make_result(
+                    attempts=attempts,
                     started_at=execution_started_at,
-                    ended_at=now(),
+                    attempt_number=attempt_number,
+                    failed_count=failed_count,
+                    success_count=success_count,
+                    value=value,
                     exhausted=True,
-                    retry_cause="exception",
-                    total_attempts=attempt_number,
-                    total_failed_attempts=failed_count,
-                    total_successful_attempts=success_count,
+                    retry_cause="result",
                 )
                 policy.emit(
                     RetryEvent(
                         name="after_giveup",
                         attempt_number=attempt_number,
                         function_name=function_name,
-                        error=error,
+                        value=value,
                         state=_state(
                             function_name=function_name,
                             attempt_number=attempt_number,
                             execution_started_at=execution_started_at,
                             attempts=attempts,
-                            last_error=error,
-                            retry_cause="exception",
+                            last_value=value,
+                            has_value=True,
+                            retry_cause="result",
                             will_stop=True,
                         ),
                     )
                 )
                 return finish_exhausted(policy, result)
+
             policy.emit(
                 RetryEvent(
                     name="before_sleep",
                     attempt_number=attempt_number,
                     function_name=function_name,
-                    delay=delay,
-                    error=error,
-                    state=_dc_replace(pre_sleep_state, next_delay=delay),
+                    delay=plan.total_delay,
+                    value=value,
+                    state=_dc_replace(
+                        pre_sleep_state,
+                        next_delay=plan.total_delay,
+                        policy_delay=plan.policy_delay,
+                        budget_delay=plan.budget_delay,
+                    ),
                 )
             )
-            policy.sleep(delay)
+            try:
+                policy.sleep(plan.total_delay)
+            except BaseException:
+                release_retry_wait(plan)
+                raise
             continue
 
         attempt_ended_at = now()
@@ -355,72 +272,79 @@ def execute_sync(
                 number=attempt_number,
                 started_at=attempt_started_at,
                 ended_at=attempt_ended_at,
-                value=value,
-                has_value=True,
+                error=error,
             )
         )
-        success_count += 1
-
-        should_retry = policy.condition.should_retry_result(value)
+        failed_count += 1
         elapsed = attempt_ended_at - execution_started_at
         should_stop = policy.stop_strategy.should_stop(attempt_number, elapsed)
 
-        if not should_retry:
-            result = RetryResult(
-                attempts=tuple(attempts),
-                value=value,
-                started_at=execution_started_at,
-                ended_at=now(),
-                total_attempts=attempt_number,
-                total_failed_attempts=failed_count,
-                total_successful_attempts=success_count,
-            )
-            policy.emit(
-                RetryEvent(
-                    name="after_success",
-                    attempt_number=attempt_number,
+        policy.emit(
+            RetryEvent(
+                name="after_failure",
+                attempt_number=attempt_number,
+                function_name=function_name,
+                error=error,
+                state=_state(
                     function_name=function_name,
-                    value=value,
-                    state=_state(
-                        function_name=function_name,
-                        attempt_number=attempt_number,
-                        execution_started_at=execution_started_at,
-                        attempts=attempts,
-                        last_value=value,
-                        has_value=True,
-                    ),
-                )
+                    attempt_number=attempt_number,
+                    execution_started_at=execution_started_at,
+                    attempts=attempts,
+                    last_error=error,
+                    retry_cause="exception",
+                    will_retry=should_retry and not should_stop,
+                    will_stop=should_stop,
+                ),
             )
-            if policy.should_return_result:
-                return result
-            return value
+        )
 
-        if should_stop:
-            result = RetryResult(
-                attempts=tuple(attempts),
-                value=value,
+        if not should_retry:
+            result = _make_result(
+                attempts=attempts,
                 started_at=execution_started_at,
-                ended_at=now(),
-                exhausted=True,
-                retry_cause="result",
-                total_attempts=attempt_number,
-                total_failed_attempts=failed_count,
-                total_successful_attempts=success_count,
+                attempt_number=attempt_number,
+                failed_count=failed_count,
+                success_count=success_count,
+                error=error,
             )
             policy.emit(
                 RetryEvent(
                     name="after_giveup",
                     attempt_number=attempt_number,
                     function_name=function_name,
-                    value=value,
+                    error=error,
+                )
+            )
+            if policy.should_return_result:
+                return result
+            if policy.should_raise_last:
+                raise error
+            return None
+
+        if should_stop:
+            result = _make_result(
+                attempts=attempts,
+                started_at=execution_started_at,
+                attempt_number=attempt_number,
+                failed_count=failed_count,
+                success_count=success_count,
+                error=error,
+                exhausted=True,
+                retry_cause="exception",
+            )
+            policy.emit(
+                RetryEvent(
+                    name="after_giveup",
+                    attempt_number=attempt_number,
+                    function_name=function_name,
+                    error=error,
                     state=_state(
                         function_name=function_name,
                         attempt_number=attempt_number,
                         execution_started_at=execution_started_at,
                         attempts=attempts,
-                        last_value=value,
-                        has_value=True,
-                        retry_cause="result",
+                        last_error=error,
+                        retry_cause="exception",
                         will_stop=True,
                     ),
                 )
@@ -432,51 +356,64 @@ def execute_sync(
             attempt_number=attempt_number,
             execution_started_at=execution_started_at,
             attempts=attempts,
-            last_value=value,
-            has_value=True,
-            retry_cause="result",
+            last_error=error,
+            retry_cause="exception",
             will_retry=True,
         )
-        delay = resolve_delay(policy.delay_strategy, attempt_number, pre_sleep_state)
-        if should_stop_before_sleep(policy.stop_strategy, attempt_number, elapsed, delay):
-            result = RetryResult(
-                attempts=tuple(attempts),
-                value=value,
+        plan = plan_retry_wait(policy, attempt_number, pre_sleep_state)
+        if should_stop_before_sleep(
+            policy.stop_strategy,
+            attempt_number,
+            elapsed,
+            plan.total_delay,
+        ):
+            release_retry_wait(plan)
+            result = _make_result(
+                attempts=attempts,
                 started_at=execution_started_at,
-                ended_at=now(),
+                attempt_number=attempt_number,
+                failed_count=failed_count,
+                success_count=success_count,
+                error=error,
                 exhausted=True,
-                retry_cause="result",
-                total_attempts=attempt_number,
-                total_failed_attempts=failed_count,
-                total_successful_attempts=success_count,
+                retry_cause="exception",
             )
             policy.emit(
                 RetryEvent(
                     name="after_giveup",
                     attempt_number=attempt_number,
                     function_name=function_name,
-                    value=value,
+                    error=error,
                     state=_state(
                         function_name=function_name,
                         attempt_number=attempt_number,
                         execution_started_at=execution_started_at,
                         attempts=attempts,
-                        last_value=value,
-                        has_value=True,
-                        retry_cause="result",
+                        last_error=error,
+                        retry_cause="exception",
                         will_stop=True,
                     ),
                 )
             )
             return finish_exhausted(policy, result)
+
         policy.emit(
             RetryEvent(
                 name="before_sleep",
                 attempt_number=attempt_number,
                 function_name=function_name,
-                delay=delay,
-                value=value,
-                state=_dc_replace(pre_sleep_state, next_delay=delay),
+                delay=plan.total_delay,
+                error=error,
+                state=_dc_replace(
+                    pre_sleep_state,
+                    next_delay=plan.total_delay,
+                    policy_delay=plan.policy_delay,
+                    budget_delay=plan.budget_delay,
+                ),
             )
         )
-        policy.sleep(delay)
+        try:
+            policy.sleep(plan.total_delay)
+        except BaseException:
+            release_retry_wait(plan)
+            raise

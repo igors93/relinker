@@ -1,10 +1,4 @@
-"""
-Context manager support for Relinker.
-
-The decorator API is the easiest way to retry a function. The context manager
-API is useful when users want to retry a block of code without extracting that
-block into a separate function.
-"""
+"""Context-manager support for retrying inline blocks."""
 
 from __future__ import annotations
 
@@ -13,12 +7,12 @@ from dataclasses import replace as _dc_replace
 from typing import TYPE_CHECKING, Any
 
 from relinker.attempt import AttemptRecord
-from relinker.delays.stateful import resolve_delay
 from relinker.event import RetryEvent
 from relinker.exceptions import TryAgain
 from relinker.internal.clock import now
 from relinker.internal.executor_helpers import build_state as _state
 from relinker.internal.exhaustion import finish_exhausted, should_stop_before_sleep
+from relinker.internal.retry_wait import plan_retry_wait, release_retry_wait
 from relinker.result import RetryResult
 
 if TYPE_CHECKING:
@@ -39,29 +33,22 @@ class RetryBlockIterator:
         self.finished = False
         self.result: RetryResult[Any] | None = None
         self.outcome: Any = None
-        self.has_outcome: bool = False
-        self._total_failed: int = 0
-        self._total_successful: int = 0
+        self.has_outcome = False
+        self._total_failed = 0
+        self._total_successful = 0
 
     def __iter__(self) -> RetryBlockIterator:
-        """Return this iterator."""
         return self
 
     def __next__(self) -> RetryAttemptContext:
-        """Return the next attempt context manager."""
         if self.finished:
             raise StopIteration
-
         self.attempt_number += 1
         return RetryAttemptContext(self.policy, self)
 
 
 class RetryAttemptContext:
-    """
-    Context manager representing one retry attempt.
-
-    Use `set_result(value)` when you want result-based retry inside a block.
-    """
+    """Context manager representing one synchronous retry attempt."""
 
     def __init__(self, policy: RetryPolicy[Any], iterator: RetryBlockIterator) -> None:
         self.policy = policy
@@ -72,27 +59,40 @@ class RetryAttemptContext:
 
     @property
     def number(self) -> int:
-        """Return the one-based attempt number."""
         return self.iterator.attempt_number
 
     def set_result(self, value: Any) -> Any:
-        """
-        Store a returned value for result-based retry decisions.
-
-        The value is returned unchanged so users can write:
-
-            response = attempt.set_result(call_api())
-        """
         self._has_result = True
         self._result_value = value
         return value
 
-    def _apply_exhausted_behavior_in_exit(
+    def _result(
+        self,
+        *,
+        value: Any = None,
+        error: BaseException | None = None,
+        exhausted: bool = False,
+        retry_cause: str | None = None,
+    ) -> RetryResult[Any]:
+        cause = retry_cause if retry_cause in {"exception", "result"} else None
+        return RetryResult(
+            attempts=tuple(self.iterator.attempts),
+            value=value,
+            error=error,
+            started_at=self.iterator.started_at,
+            ended_at=now(),
+            exhausted=exhausted,
+            retry_cause=cause,  # type: ignore[arg-type]
+            total_attempts=self.number,
+            total_failed_attempts=self.iterator._total_failed,
+            total_successful_attempts=self.iterator._total_successful,
+        )
+
+    def _apply_exhausted(
         self,
         result: RetryResult[Any],
         current_error: BaseException | None,
     ) -> bool:
-        """Translate finish_exhausted behavior into an __exit__ return value."""
         try:
             resolved = finish_exhausted(self.policy, result)
             self.iterator.outcome = resolved
@@ -104,7 +104,6 @@ class RetryAttemptContext:
             raise
 
     def __enter__(self) -> RetryAttemptContext:
-        """Enter a retry attempt."""
         self.attempt_started_at = now()
         self.policy.emit(
             RetryEvent(
@@ -127,36 +126,52 @@ class RetryAttemptContext:
         exc: BaseException | None,
         traceback: TracebackType | None,
     ) -> bool:
-        """Exit a retry attempt and decide whether the loop should continue."""
+        del exc_type, traceback
         if exc is not None:
             return self._handle_exception(exc)
-
         return self._handle_success_or_result()
 
-    def _handle_exception(self, error: BaseException) -> bool:
-        """Handle an exception raised inside the block."""
-        if not isinstance(error, Exception):
-            return False
-
-        attempt_ended_at = now()
-        self.iterator.attempts.append(
-            AttemptRecord(
-                number=self.number,
-                started_at=self.attempt_started_at,
-                ended_at=attempt_ended_at,
+    def _giveup(
+        self,
+        *,
+        value: Any = None,
+        error: BaseException | None = None,
+        retry_cause: str,
+    ) -> None:
+        self.policy.emit(
+            RetryEvent(
+                name="after_giveup",
+                attempt_number=self.number,
+                function_name=self.iterator.name,
+                value=value,
                 error=error,
+                state=_state(
+                    function_name=self.iterator.name,
+                    attempt_number=self.number,
+                    started_at=self.iterator.started_at,
+                    attempts=self.iterator.attempts,
+                    last_value=value,
+                    last_error=error,
+                    has_value=error is None and self._has_result,
+                    retry_cause=retry_cause,
+                    will_stop=True,
+                ),
             )
         )
+
+    def _handle_exception(self, error: BaseException) -> bool:
+        if not isinstance(error, Exception):
+            return False
+        ended_at = now()
+        self.iterator.attempts.append(
+            AttemptRecord(self.number, self.attempt_started_at, ended_at, error=error)
+        )
         self.iterator._total_failed += 1
-
-        elapsed = attempt_ended_at - self.iterator.started_at
-        # TryAgain bypasses the condition check — it is always a retry signal.
-        if isinstance(error, TryAgain):
-            should_retry = True
-        else:
-            should_retry = self.policy.condition.should_retry_exception(error)
+        elapsed = ended_at - self.iterator.started_at
+        should_retry = isinstance(error, TryAgain) or self.policy.condition.should_retry_exception(
+            error
+        )
         should_stop = self.policy.stop_strategy.should_stop(self.number, elapsed)
-
         self.policy.emit(
             RetryEvent(
                 name="after_failure",
@@ -178,66 +193,16 @@ class RetryAttemptContext:
 
         if not should_retry:
             self.iterator.finished = True
-            self.iterator.result = RetryResult(
-                attempts=tuple(self.iterator.attempts),
-                error=error,
-                started_at=self.iterator.started_at,
-                ended_at=now(),
-                total_attempts=self.number,
-                total_failed_attempts=self.iterator._total_failed,
-                total_successful_attempts=self.iterator._total_successful,
-            )
-            self.policy.emit(
-                RetryEvent(
-                    name="after_giveup",
-                    attempt_number=self.number,
-                    function_name=self.iterator.name,
-                    error=error,
-                    state=_state(
-                        function_name=self.iterator.name,
-                        attempt_number=self.number,
-                        started_at=self.iterator.started_at,
-                        attempts=self.iterator.attempts,
-                        last_error=error,
-                        retry_cause="exception",
-                        will_stop=True,
-                    ),
-                )
-            )
+            self.iterator.result = self._result(error=error)
+            self._giveup(error=error, retry_cause="exception")
             return False
 
         if should_stop:
             self.iterator.finished = True
-            exhausted_result: RetryResult[Any] = RetryResult(
-                attempts=tuple(self.iterator.attempts),
-                error=error,
-                started_at=self.iterator.started_at,
-                ended_at=now(),
-                exhausted=True,
-                retry_cause="exception",
-                total_attempts=self.number,
-                total_failed_attempts=self.iterator._total_failed,
-                total_successful_attempts=self.iterator._total_successful,
-            )
-            self.iterator.result = exhausted_result
-            self.policy.emit(
-                RetryEvent(
-                    name="after_giveup",
-                    attempt_number=self.number,
-                    function_name=self.iterator.name,
-                    error=error,
-                    state=_state(
-                        function_name=self.iterator.name,
-                        attempt_number=self.number,
-                        started_at=self.iterator.started_at,
-                        attempts=self.iterator.attempts,
-                        last_error=error,
-                        retry_cause="exception",
-                        will_stop=True,
-                    ),
-                )
-            )
-            return self._apply_exhausted_behavior_in_exit(exhausted_result, error)
+            result = self._result(error=error, exhausted=True, retry_cause="exception")
+            self.iterator.result = result
+            self._giveup(error=error, retry_cause="exception")
+            return self._apply_exhausted(result, error)
 
         pre_sleep_state = _state(
             function_name=self.iterator.name,
@@ -248,83 +213,59 @@ class RetryAttemptContext:
             retry_cause="exception",
             will_retry=True,
         )
-        delay = resolve_delay(self.policy.delay_strategy, self.number, pre_sleep_state)
-        if should_stop_before_sleep(self.policy.stop_strategy, self.number, elapsed, delay):
+        plan = plan_retry_wait(self.policy, self.number, pre_sleep_state)
+        if should_stop_before_sleep(
+            self.policy.stop_strategy, self.number, elapsed, plan.total_delay
+        ):
+            release_retry_wait(plan)
             self.iterator.finished = True
-            budget_result: RetryResult[Any] = RetryResult(
-                attempts=tuple(self.iterator.attempts),
-                error=error,
-                started_at=self.iterator.started_at,
-                ended_at=now(),
-                exhausted=True,
-                retry_cause="exception",
-                total_attempts=self.number,
-                total_failed_attempts=self.iterator._total_failed,
-                total_successful_attempts=self.iterator._total_successful,
-            )
-            self.iterator.result = budget_result
-            self.policy.emit(
-                RetryEvent(
-                    name="after_giveup",
-                    attempt_number=self.number,
-                    function_name=self.iterator.name,
-                    error=error,
-                    state=_state(
-                        function_name=self.iterator.name,
-                        attempt_number=self.number,
-                        started_at=self.iterator.started_at,
-                        attempts=self.iterator.attempts,
-                        last_error=error,
-                        retry_cause="exception",
-                        will_stop=True,
-                    ),
-                )
-            )
-            return self._apply_exhausted_behavior_in_exit(budget_result, error)
+            result = self._result(error=error, exhausted=True, retry_cause="exception")
+            self.iterator.result = result
+            self._giveup(error=error, retry_cause="exception")
+            return self._apply_exhausted(result, error)
+
         self.policy.emit(
             RetryEvent(
                 name="before_sleep",
                 attempt_number=self.number,
                 function_name=self.iterator.name,
-                delay=delay,
+                delay=plan.total_delay,
                 error=error,
-                state=_dc_replace(pre_sleep_state, next_delay=delay),
+                state=_dc_replace(
+                    pre_sleep_state,
+                    next_delay=plan.total_delay,
+                    policy_delay=plan.policy_delay,
+                    budget_delay=plan.budget_delay,
+                ),
             )
         )
-        self.policy.sleep(delay)
+        try:
+            self.policy.sleep(plan.total_delay)
+        except BaseException:
+            release_retry_wait(plan)
+            raise
         return True
 
     def _handle_success_or_result(self) -> bool:
-        """Handle a block that did not raise an exception."""
-        attempt_ended_at = now()
+        ended_at = now()
         value = self._result_value if self._has_result else None
-
         self.iterator.attempts.append(
             AttemptRecord(
-                number=self.number,
-                started_at=self.attempt_started_at,
-                ended_at=attempt_ended_at,
+                self.number,
+                self.attempt_started_at,
+                ended_at,
                 value=value,
                 has_value=self._has_result,
             )
         )
         self.iterator._total_successful += 1
-
         should_retry = self._has_result and self.policy.condition.should_retry_result(value)
-        elapsed = attempt_ended_at - self.iterator.started_at
+        elapsed = ended_at - self.iterator.started_at
         should_stop = self.policy.stop_strategy.should_stop(self.number, elapsed)
 
         if not should_retry:
             self.iterator.finished = True
-            self.iterator.result = RetryResult(
-                attempts=tuple(self.iterator.attempts),
-                value=value,
-                started_at=self.iterator.started_at,
-                ended_at=now(),
-                total_attempts=self.number,
-                total_failed_attempts=self.iterator._total_failed,
-                total_successful_attempts=self.iterator._total_successful,
-            )
+            self.iterator.result = self._result(value=value)
             self.policy.emit(
                 RetryEvent(
                     name="after_success",
@@ -345,37 +286,10 @@ class RetryAttemptContext:
 
         if should_stop:
             self.iterator.finished = True
-            stop_result: RetryResult[Any] = RetryResult(
-                attempts=tuple(self.iterator.attempts),
-                value=value,
-                started_at=self.iterator.started_at,
-                ended_at=now(),
-                exhausted=True,
-                retry_cause="result",
-                total_attempts=self.number,
-                total_failed_attempts=self.iterator._total_failed,
-                total_successful_attempts=self.iterator._total_successful,
-            )
-            self.iterator.result = stop_result
-            self.policy.emit(
-                RetryEvent(
-                    name="after_giveup",
-                    attempt_number=self.number,
-                    function_name=self.iterator.name,
-                    value=value,
-                    state=_state(
-                        function_name=self.iterator.name,
-                        attempt_number=self.number,
-                        started_at=self.iterator.started_at,
-                        attempts=self.iterator.attempts,
-                        last_value=value,
-                        has_value=self._has_result,
-                        retry_cause="result",
-                        will_stop=True,
-                    ),
-                )
-            )
-            return self._apply_exhausted_behavior_in_exit(stop_result, None)
+            result = self._result(value=value, exhausted=True, retry_cause="result")
+            self.iterator.result = result
+            self._giveup(value=value, retry_cause="result")
+            return self._apply_exhausted(result, None)
 
         pre_sleep_state = _state(
             function_name=self.iterator.name,
@@ -387,51 +301,37 @@ class RetryAttemptContext:
             retry_cause="result",
             will_retry=True,
         )
-        delay = resolve_delay(self.policy.delay_strategy, self.number, pre_sleep_state)
-        if should_stop_before_sleep(self.policy.stop_strategy, self.number, elapsed, delay):
+        plan = plan_retry_wait(self.policy, self.number, pre_sleep_state)
+        if should_stop_before_sleep(
+            self.policy.stop_strategy, self.number, elapsed, plan.total_delay
+        ):
+            release_retry_wait(plan)
             self.iterator.finished = True
-            budget_stop_result: RetryResult[Any] = RetryResult(
-                attempts=tuple(self.iterator.attempts),
-                value=value,
-                started_at=self.iterator.started_at,
-                ended_at=now(),
-                exhausted=True,
-                retry_cause="result",
-                total_attempts=self.number,
-                total_failed_attempts=self.iterator._total_failed,
-                total_successful_attempts=self.iterator._total_successful,
-            )
-            self.iterator.result = budget_stop_result
-            self.policy.emit(
-                RetryEvent(
-                    name="after_giveup",
-                    attempt_number=self.number,
-                    function_name=self.iterator.name,
-                    value=value,
-                    state=_state(
-                        function_name=self.iterator.name,
-                        attempt_number=self.number,
-                        started_at=self.iterator.started_at,
-                        attempts=self.iterator.attempts,
-                        last_value=value,
-                        has_value=self._has_result,
-                        retry_cause="result",
-                        will_stop=True,
-                    ),
-                )
-            )
-            return self._apply_exhausted_behavior_in_exit(budget_stop_result, None)
+            result = self._result(value=value, exhausted=True, retry_cause="result")
+            self.iterator.result = result
+            self._giveup(value=value, retry_cause="result")
+            return self._apply_exhausted(result, None)
+
         self.policy.emit(
             RetryEvent(
                 name="before_sleep",
                 attempt_number=self.number,
                 function_name=self.iterator.name,
-                delay=delay,
+                delay=plan.total_delay,
                 value=value,
-                state=_dc_replace(pre_sleep_state, next_delay=delay),
+                state=_dc_replace(
+                    pre_sleep_state,
+                    next_delay=plan.total_delay,
+                    policy_delay=plan.policy_delay,
+                    budget_delay=plan.budget_delay,
+                ),
             )
         )
-        self.policy.sleep(delay)
+        try:
+            self.policy.sleep(plan.total_delay)
+        except BaseException:
+            release_retry_wait(plan)
+            raise
         return False
 
 
@@ -447,29 +347,22 @@ class AsyncRetryBlockIterator:
         self.finished = False
         self.result: RetryResult[Any] | None = None
         self.outcome: Any = None
-        self.has_outcome: bool = False
-        self._total_failed: int = 0
-        self._total_successful: int = 0
+        self.has_outcome = False
+        self._total_failed = 0
+        self._total_successful = 0
 
     def __aiter__(self) -> AsyncRetryBlockIterator:
-        """Return this async iterator."""
         return self
 
     async def __anext__(self) -> AsyncRetryAttemptContext:
-        """Return the next async attempt context manager."""
         if self.finished:
             raise StopAsyncIteration
-
         self.attempt_number += 1
         return AsyncRetryAttemptContext(self.policy, self)
 
 
 class AsyncRetryAttemptContext:
-    """
-    Async context manager representing one retry attempt.
-
-    Use `set_result(value)` when you want result-based retry inside a block.
-    """
+    """Async context manager representing one retry attempt."""
 
     def __init__(self, policy: RetryPolicy[Any], iterator: AsyncRetryBlockIterator) -> None:
         self.policy = policy
@@ -480,21 +373,40 @@ class AsyncRetryAttemptContext:
 
     @property
     def number(self) -> int:
-        """Return the one-based attempt number."""
         return self.iterator.attempt_number
 
     def set_result(self, value: Any) -> Any:
-        """Store a returned value for result-based retry decisions."""
         self._has_result = True
         self._result_value = value
         return value
 
-    def _apply_exhausted_behavior_in_exit(
+    def _result(
+        self,
+        *,
+        value: Any = None,
+        error: BaseException | None = None,
+        exhausted: bool = False,
+        retry_cause: str | None = None,
+    ) -> RetryResult[Any]:
+        cause = retry_cause if retry_cause in {"exception", "result"} else None
+        return RetryResult(
+            attempts=tuple(self.iterator.attempts),
+            value=value,
+            error=error,
+            started_at=self.iterator.started_at,
+            ended_at=now(),
+            exhausted=exhausted,
+            retry_cause=cause,  # type: ignore[arg-type]
+            total_attempts=self.number,
+            total_failed_attempts=self.iterator._total_failed,
+            total_successful_attempts=self.iterator._total_successful,
+        )
+
+    def _apply_exhausted(
         self,
         result: RetryResult[Any],
         current_error: BaseException | None,
     ) -> bool:
-        """Translate finish_exhausted behavior into an __aexit__ return value."""
         try:
             resolved = finish_exhausted(self.policy, result)
             self.iterator.outcome = resolved
@@ -506,7 +418,6 @@ class AsyncRetryAttemptContext:
             raise
 
     async def __aenter__(self) -> AsyncRetryAttemptContext:
-        """Enter an async retry attempt."""
         self.attempt_started_at = now()
         self.policy.emit(
             RetryEvent(
@@ -529,36 +440,52 @@ class AsyncRetryAttemptContext:
         exc: BaseException | None,
         traceback: TracebackType | None,
     ) -> bool:
-        """Exit an async retry attempt and decide whether the loop should continue."""
+        del exc_type, traceback
         if exc is not None:
             return await self._handle_exception(exc)
-
         return await self._handle_success_or_result()
 
-    async def _handle_exception(self, error: BaseException) -> bool:
-        """Handle an exception raised inside the async block."""
-        if not isinstance(error, Exception):
-            return False
-
-        attempt_ended_at = now()
-        self.iterator.attempts.append(
-            AttemptRecord(
-                number=self.number,
-                started_at=self.attempt_started_at,
-                ended_at=attempt_ended_at,
+    def _giveup(
+        self,
+        *,
+        value: Any = None,
+        error: BaseException | None = None,
+        retry_cause: str,
+    ) -> None:
+        self.policy.emit(
+            RetryEvent(
+                name="after_giveup",
+                attempt_number=self.number,
+                function_name=self.iterator.name,
+                value=value,
                 error=error,
+                state=_state(
+                    function_name=self.iterator.name,
+                    attempt_number=self.number,
+                    started_at=self.iterator.started_at,
+                    attempts=self.iterator.attempts,
+                    last_value=value,
+                    last_error=error,
+                    has_value=error is None and self._has_result,
+                    retry_cause=retry_cause,
+                    will_stop=True,
+                ),
             )
         )
+
+    async def _handle_exception(self, error: BaseException) -> bool:
+        if not isinstance(error, Exception):
+            return False
+        ended_at = now()
+        self.iterator.attempts.append(
+            AttemptRecord(self.number, self.attempt_started_at, ended_at, error=error)
+        )
         self.iterator._total_failed += 1
-
-        elapsed = attempt_ended_at - self.iterator.started_at
-        # TryAgain bypasses the condition check — it is always a retry signal.
-        if isinstance(error, TryAgain):
-            should_retry = True
-        else:
-            should_retry = self.policy.condition.should_retry_exception(error)
+        elapsed = ended_at - self.iterator.started_at
+        should_retry = isinstance(error, TryAgain) or self.policy.condition.should_retry_exception(
+            error
+        )
         should_stop = self.policy.stop_strategy.should_stop(self.number, elapsed)
-
         self.policy.emit(
             RetryEvent(
                 name="after_failure",
@@ -580,66 +507,16 @@ class AsyncRetryAttemptContext:
 
         if not should_retry:
             self.iterator.finished = True
-            self.iterator.result = RetryResult(
-                attempts=tuple(self.iterator.attempts),
-                error=error,
-                started_at=self.iterator.started_at,
-                ended_at=now(),
-                total_attempts=self.number,
-                total_failed_attempts=self.iterator._total_failed,
-                total_successful_attempts=self.iterator._total_successful,
-            )
-            self.policy.emit(
-                RetryEvent(
-                    name="after_giveup",
-                    attempt_number=self.number,
-                    function_name=self.iterator.name,
-                    error=error,
-                    state=_state(
-                        function_name=self.iterator.name,
-                        attempt_number=self.number,
-                        started_at=self.iterator.started_at,
-                        attempts=self.iterator.attempts,
-                        last_error=error,
-                        retry_cause="exception",
-                        will_stop=True,
-                    ),
-                )
-            )
+            self.iterator.result = self._result(error=error)
+            self._giveup(error=error, retry_cause="exception")
             return False
 
         if should_stop:
             self.iterator.finished = True
-            exhausted_result: RetryResult[Any] = RetryResult(
-                attempts=tuple(self.iterator.attempts),
-                error=error,
-                started_at=self.iterator.started_at,
-                ended_at=now(),
-                exhausted=True,
-                retry_cause="exception",
-                total_attempts=self.number,
-                total_failed_attempts=self.iterator._total_failed,
-                total_successful_attempts=self.iterator._total_successful,
-            )
-            self.iterator.result = exhausted_result
-            self.policy.emit(
-                RetryEvent(
-                    name="after_giveup",
-                    attempt_number=self.number,
-                    function_name=self.iterator.name,
-                    error=error,
-                    state=_state(
-                        function_name=self.iterator.name,
-                        attempt_number=self.number,
-                        started_at=self.iterator.started_at,
-                        attempts=self.iterator.attempts,
-                        last_error=error,
-                        retry_cause="exception",
-                        will_stop=True,
-                    ),
-                )
-            )
-            return self._apply_exhausted_behavior_in_exit(exhausted_result, error)
+            result = self._result(error=error, exhausted=True, retry_cause="exception")
+            self.iterator.result = result
+            self._giveup(error=error, retry_cause="exception")
+            return self._apply_exhausted(result, error)
 
         pre_sleep_state = _state(
             function_name=self.iterator.name,
@@ -650,83 +527,59 @@ class AsyncRetryAttemptContext:
             retry_cause="exception",
             will_retry=True,
         )
-        delay = resolve_delay(self.policy.delay_strategy, self.number, pre_sleep_state)
-        if should_stop_before_sleep(self.policy.stop_strategy, self.number, elapsed, delay):
+        plan = plan_retry_wait(self.policy, self.number, pre_sleep_state)
+        if should_stop_before_sleep(
+            self.policy.stop_strategy, self.number, elapsed, plan.total_delay
+        ):
+            release_retry_wait(plan)
             self.iterator.finished = True
-            budget_result: RetryResult[Any] = RetryResult(
-                attempts=tuple(self.iterator.attempts),
-                error=error,
-                started_at=self.iterator.started_at,
-                ended_at=now(),
-                exhausted=True,
-                retry_cause="exception",
-                total_attempts=self.number,
-                total_failed_attempts=self.iterator._total_failed,
-                total_successful_attempts=self.iterator._total_successful,
-            )
-            self.iterator.result = budget_result
-            self.policy.emit(
-                RetryEvent(
-                    name="after_giveup",
-                    attempt_number=self.number,
-                    function_name=self.iterator.name,
-                    error=error,
-                    state=_state(
-                        function_name=self.iterator.name,
-                        attempt_number=self.number,
-                        started_at=self.iterator.started_at,
-                        attempts=self.iterator.attempts,
-                        last_error=error,
-                        retry_cause="exception",
-                        will_stop=True,
-                    ),
-                )
-            )
-            return self._apply_exhausted_behavior_in_exit(budget_result, error)
+            result = self._result(error=error, exhausted=True, retry_cause="exception")
+            self.iterator.result = result
+            self._giveup(error=error, retry_cause="exception")
+            return self._apply_exhausted(result, error)
+
         self.policy.emit(
             RetryEvent(
                 name="before_sleep",
                 attempt_number=self.number,
                 function_name=self.iterator.name,
-                delay=delay,
+                delay=plan.total_delay,
                 error=error,
-                state=_dc_replace(pre_sleep_state, next_delay=delay),
+                state=_dc_replace(
+                    pre_sleep_state,
+                    next_delay=plan.total_delay,
+                    policy_delay=plan.policy_delay,
+                    budget_delay=plan.budget_delay,
+                ),
             )
         )
-        await self.policy.async_sleep(delay)
+        try:
+            await self.policy.async_sleep(plan.total_delay)
+        except BaseException:
+            release_retry_wait(plan)
+            raise
         return True
 
     async def _handle_success_or_result(self) -> bool:
-        """Handle an async block that did not raise an exception."""
-        attempt_ended_at = now()
+        ended_at = now()
         value = self._result_value if self._has_result else None
-
         self.iterator.attempts.append(
             AttemptRecord(
-                number=self.number,
-                started_at=self.attempt_started_at,
-                ended_at=attempt_ended_at,
+                self.number,
+                self.attempt_started_at,
+                ended_at,
                 value=value,
                 has_value=self._has_result,
             )
         )
         self.iterator._total_successful += 1
-
         should_retry = self._has_result and self.policy.condition.should_retry_result(value)
-        elapsed = attempt_ended_at - self.iterator.started_at
+        elapsed = ended_at - self.iterator.started_at
         should_stop = self.policy.stop_strategy.should_stop(self.number, elapsed)
 
         if not should_retry:
             self.iterator.finished = True
-            self.iterator.result = RetryResult(
-                attempts=tuple(self.iterator.attempts),
-                value=value,
-                started_at=self.iterator.started_at,
-                ended_at=now(),
-                total_attempts=self.number,
-                total_failed_attempts=self.iterator._total_failed,
-                total_successful_attempts=self.iterator._total_successful,
-            )
+            self.iterator.result = self._result(value=value)
             self.policy.emit(
                 RetryEvent(
                     name="after_success",
@@ -747,37 +600,10 @@ class AsyncRetryAttemptContext:
 
         if should_stop:
             self.iterator.finished = True
-            stop_result: RetryResult[Any] = RetryResult(
-                attempts=tuple(self.iterator.attempts),
-                value=value,
-                started_at=self.iterator.started_at,
-                ended_at=now(),
-                exhausted=True,
-                retry_cause="result",
-                total_attempts=self.number,
-                total_failed_attempts=self.iterator._total_failed,
-                total_successful_attempts=self.iterator._total_successful,
-            )
-            self.iterator.result = stop_result
-            self.policy.emit(
-                RetryEvent(
-                    name="after_giveup",
-                    attempt_number=self.number,
-                    function_name=self.iterator.name,
-                    value=value,
-                    state=_state(
-                        function_name=self.iterator.name,
-                        attempt_number=self.number,
-                        started_at=self.iterator.started_at,
-                        attempts=self.iterator.attempts,
-                        last_value=value,
-                        has_value=self._has_result,
-                        retry_cause="result",
-                        will_stop=True,
-                    ),
-                )
-            )
-            return self._apply_exhausted_behavior_in_exit(stop_result, None)
+            result = self._result(value=value, exhausted=True, retry_cause="result")
+            self.iterator.result = result
+            self._giveup(value=value, retry_cause="result")
+            return self._apply_exhausted(result, None)
 
         pre_sleep_state = _state(
             function_name=self.iterator.name,
@@ -789,49 +615,35 @@ class AsyncRetryAttemptContext:
             retry_cause="result",
             will_retry=True,
         )
-        delay = resolve_delay(self.policy.delay_strategy, self.number, pre_sleep_state)
-        if should_stop_before_sleep(self.policy.stop_strategy, self.number, elapsed, delay):
+        plan = plan_retry_wait(self.policy, self.number, pre_sleep_state)
+        if should_stop_before_sleep(
+            self.policy.stop_strategy, self.number, elapsed, plan.total_delay
+        ):
+            release_retry_wait(plan)
             self.iterator.finished = True
-            budget_stop_result: RetryResult[Any] = RetryResult(
-                attempts=tuple(self.iterator.attempts),
-                value=value,
-                started_at=self.iterator.started_at,
-                ended_at=now(),
-                exhausted=True,
-                retry_cause="result",
-                total_attempts=self.number,
-                total_failed_attempts=self.iterator._total_failed,
-                total_successful_attempts=self.iterator._total_successful,
-            )
-            self.iterator.result = budget_stop_result
-            self.policy.emit(
-                RetryEvent(
-                    name="after_giveup",
-                    attempt_number=self.number,
-                    function_name=self.iterator.name,
-                    value=value,
-                    state=_state(
-                        function_name=self.iterator.name,
-                        attempt_number=self.number,
-                        started_at=self.iterator.started_at,
-                        attempts=self.iterator.attempts,
-                        last_value=value,
-                        has_value=self._has_result,
-                        retry_cause="result",
-                        will_stop=True,
-                    ),
-                )
-            )
-            return self._apply_exhausted_behavior_in_exit(budget_stop_result, None)
+            result = self._result(value=value, exhausted=True, retry_cause="result")
+            self.iterator.result = result
+            self._giveup(value=value, retry_cause="result")
+            return self._apply_exhausted(result, None)
+
         self.policy.emit(
             RetryEvent(
                 name="before_sleep",
                 attempt_number=self.number,
                 function_name=self.iterator.name,
-                delay=delay,
+                delay=plan.total_delay,
                 value=value,
-                state=_dc_replace(pre_sleep_state, next_delay=delay),
+                state=_dc_replace(
+                    pre_sleep_state,
+                    next_delay=plan.total_delay,
+                    policy_delay=plan.policy_delay,
+                    budget_delay=plan.budget_delay,
+                ),
             )
         )
-        await self.policy.async_sleep(delay)
+        try:
+            await self.policy.async_sleep(plan.total_delay)
+        except BaseException:
+            release_retry_wait(plan)
+            raise
         return False

@@ -1,31 +1,17 @@
-"""
-Shared helpers for sync/async executors and context managers.
-
-Centralises the three functions that would otherwise be duplicated verbatim
-in execute_sync, execute_async, and the context manager module.
-"""
+"""Helpers shared by executors and retry-block context managers."""
 
 from __future__ import annotations
 
-from collections import deque
-from typing import TYPE_CHECKING, Any
+from collections.abc import Iterable
+from typing import Any
 
+from relinker.attempt import AttemptRecord
 from relinker.internal.clock import now
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
-
-    from relinker.attempt import AttemptRecord
-    from relinker.state import RetryCause, RetryState
-
-
-def function_name(function: Callable[..., Any]) -> str:
-    """Return a readable function name for events and debug output."""
-    return getattr(function, "__name__", function.__class__.__name__)
+from relinker.state import RetryCause, RetryState
 
 
 def normalize_retry_cause(retry_cause: str | None) -> RetryCause | None:
-    """Return a RetryCause literal accepted by type checkers."""
+    """Return a RetryCause literal value accepted by type checkers."""
     if retry_cause == "exception":
         return "exception"
     if retry_cause == "result":
@@ -33,12 +19,17 @@ def normalize_retry_cause(retry_cause: str | None) -> RetryCause | None:
     return None
 
 
+def function_name(function: object) -> str:
+    """Return a readable name for events and diagnostics."""
+    return getattr(function, "__name__", function.__class__.__name__)
+
+
 def build_state(
     *,
     function_name: str,
     attempt_number: int,
     started_at: float,
-    attempts: deque[AttemptRecord],
+    attempts: Iterable[AttemptRecord],
     last_value: Any = None,
     last_error: BaseException | None = None,
     has_value: bool = False,
@@ -46,10 +37,10 @@ def build_state(
     retry_cause: str | None = None,
     will_retry: bool = False,
     will_stop: bool = False,
+    policy_delay: float | None = None,
+    budget_delay: float | None = None,
 ) -> RetryState:
-    """Build an immutable state snapshot for retry events."""
-    from relinker.state import RetryState
-
+    """Build an immutable runtime state snapshot."""
     return RetryState(
         function_name=function_name,
         attempt_number=attempt_number,
@@ -63,4 +54,6 @@ def build_state(
         retry_cause=normalize_retry_cause(retry_cause),
         will_retry=will_retry,
         will_stop=will_stop,
+        policy_delay=policy_delay,
+        budget_delay=budget_delay,
     )

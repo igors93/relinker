@@ -7,6 +7,7 @@ change, but these names should remain stable whenever possible.
 
 from __future__ import annotations
 
+from relinker.budget import RetryBudget
 from relinker.context import AsyncRetryAttemptContext, RetryAttemptContext
 from relinker.diagnostics import (
     PolicyHealthReport,
@@ -45,6 +46,7 @@ __all__ = [
     "PolicyHealthReport",
     "PolicyWarning",
     "RetryAttemptContext",
+    "RetryBudget",
     "RetryExhaustedError",
     "RelinkerError",
     "RetryPolicy",
@@ -69,4 +71,4 @@ __all__ = [
     "should_retry_http_status",
 ]
 
-__version__ = "0.7.0"
+__version__ = "0.8.0"

@@ -16,6 +16,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
 from typing import Any, Generic, Literal, cast, overload
 
+from relinker.budget import RetryBudget
 from relinker.conditions.base import RetryCondition
 from relinker.conditions.composite import AllCondition, AnyCondition
 from relinker.conditions.custom import CustomCondition
@@ -74,12 +75,21 @@ class RetryPolicy(Generic[T]):
     sleep: Callable[[float], None] = default_sleep
     async_sleep: Callable[[float], Awaitable[None]] = default_async_sleep
     history_limit: int | None = 1000
+    retry_budget: RetryBudget | None = None
+    retry_budget_key: str | None = None
 
     def __post_init__(self) -> None:
         if self.history_limit is not None:
             from relinker.internal.validation import ensure_positive_int
 
             ensure_positive_int("history_limit", self.history_limit)
+        if self.retry_budget is None and self.retry_budget_key is not None:
+            raise InvalidRetryConfigError("retry_budget_key requires a RetryBudget")
+        if self.retry_budget is not None:
+            if not isinstance(self.retry_budget, RetryBudget):
+                raise InvalidRetryConfigError("retry_budget must be a RetryBudget")
+            if self.retry_budget_key is None or not self.retry_budget_key.strip():
+                raise InvalidRetryConfigError("retry budget key must be a non-empty string")
 
     # ------------------------------------------------------------------ stop
 
@@ -94,10 +104,8 @@ class RetryPolicy(Generic[T]):
     def max_time(self, seconds: float) -> RetryPolicy[T]:
         """Return a new policy that stops after the given elapsed time.
 
-        Note: this is a time budget for the retry loop, not a hard timeout. A
-        function call that is already running will not be interrupted — the
-        budget check happens between attempts, before the next sleep or attempt
-        starts.
+        This is a retry-loop time budget, not a hard timeout for a function call.
+        The budget is checked between attempts and before sleeping.
         """
         return replace(self, stop_strategy=StopAfterDelay(seconds))
 
@@ -146,14 +154,15 @@ class RetryPolicy(Generic[T]):
     def on(self, *exception_types: type[BaseException]) -> RetryPolicy[T]:
         """Return a new policy that retries on the given exception types."""
         types = exception_types or (Exception,)
-        for t in types:
-            if not isinstance(t, type):
+        for exception_type in types:
+            if not isinstance(exception_type, type):
                 raise InvalidRetryConfigError(
-                    f"exception types must be classes, got {type(t).__name__}"
+                    f"exception types must be classes, got {type(exception_type).__name__}"
                 )
-            if not issubclass(t, Exception):
+            if not issubclass(exception_type, Exception):
                 raise InvalidRetryConfigError(
-                    f"{t.__name__} is a BaseException subclass that the executor never catches"
+                    f"{exception_type.__name__} is a BaseException subclass"
+                    " that the executor never catches"
                 )
         return replace(self, condition=ExceptionCondition(types))
 
@@ -304,13 +313,7 @@ class RetryPolicy(Generic[T]):
 
     def raise_last(self) -> RetryPolicy[T]:
         """Return a new policy that re-raises the last original exception."""
-        return replace(
-            self,
-            should_raise_last=True,
-            should_return_result=False,
-            exhausted_callback=None,
-            exhausted_exception_factory=None,
-        )
+        return replace(self, should_raise_last=True, should_return_result=False)
 
     def return_result(self) -> RetryPolicy[T]:
         """Return a new policy that returns RetryResult instead of raising."""
@@ -397,23 +400,37 @@ class RetryPolicy(Generic[T]):
             should_return_result=False,
         )
 
-    # --------------------------------------------------- history
+    # --------------------------------------------------- history / budget
 
     def keep_history(self, maximum: int | None) -> RetryPolicy[T]:
-        """
-        Return a new policy that retains at most maximum attempt records.
-
-        - Positive integer: keep only the last N AttemptRecord objects in
-          RetryResult.attempts and RetryState.attempts. Attempt numbers always
-          count all attempts, even those not retained.
-        - None: keep unlimited history (use with care for long-running policies).
-        - Zero, negative values, and booleans are rejected.
-        """
+        """Return a policy retaining at most ``maximum`` attempt records."""
         if maximum is not None:
             from relinker.internal.validation import ensure_positive_int
 
             ensure_positive_int("maximum", maximum)
         return replace(self, history_limit=maximum)
+
+    def with_retry_budget(
+        self,
+        budget: RetryBudget,
+        *,
+        key: str,
+    ) -> RetryPolicy[T]:
+        """Return a policy sharing retry capacity through ``budget`` and ``key``.
+
+        Policy configuration remains immutable. The budget is an explicitly
+        shared runtime collaborator, so derived policies using the same object
+        and key intentionally share capacity.
+        """
+        if not isinstance(budget, RetryBudget):
+            raise InvalidRetryConfigError("budget must be a RetryBudget")
+        if not isinstance(key, str) or not key.strip():
+            raise InvalidRetryConfigError("retry budget key must be a non-empty string")
+        return replace(self, retry_budget=budget, retry_budget_key=key)
+
+    def without_retry_budget(self) -> RetryPolicy[T]:
+        """Return a policy with shared retry budgeting disabled."""
+        return replace(self, retry_budget=None, retry_budget_key=None)
 
     # -------------------------------------------------- sleep / test hooks
 

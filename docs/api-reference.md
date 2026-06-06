@@ -8,6 +8,7 @@ This is a high-level public API reference. Internal modules may change.
 |---|---|
 | `retry` | Simple decorator entry point |
 | `RetryPolicy` | Fluent policy builder |
+| `RetryBudget` | Shared process-local retry capacity |
 | `RetryResult` | Rich execution result |
 | `RetryState` | Immutable runtime state snapshot |
 | `RetryEvent` | Event object used by hooks |
@@ -99,6 +100,11 @@ This is a high-level public API reference. Internal modules may change.
 - `on_exhausted_return()`
 - `on_exhausted_return_value()`
 - `on_exhausted_raise()`
+
+### Retry budget
+
+- `with_retry_budget()`
+- `without_retry_budget()`
 
 ### Observability
 

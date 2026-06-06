@@ -4,6 +4,27 @@ All notable changes to Relinker will be documented in this file.
 
 Relinker follows practical semantic versioning while the project is still pre-1.0. Breaking changes may happen before 1.0, but they should be documented clearly.
 
+## 0.8.0
+
+### Added
+
+- Added `RetryBudget(max_retries=..., per=...)` for process-local shared retry-rate protection.
+- Added `RetryPolicy.with_retry_budget()` and `without_retry_budget()` with explicit keys.
+- Added policy and budget delay details to `RetryState` and structured logs.
+- Added deterministic unit, sync, async, cancellation, and context-manager tests.
+
+### Behavior
+
+- Only additional attempts consume capacity; the original call is never counted.
+- Normal delays and shared budget waiting are combined into one actual sleep.
+- `max_time()` includes budget waiting and rejected waits release their reservation.
+- Interrupted or canceled sleeps release unused reservations and preserve the original interruption.
+- Simulation does not invent shared runtime waits; `preview()` reports the limitation.
+
+### Scope
+
+- Retry budgets are in-memory and process-local, with no new runtime dependency.
+
 ## 0.7.0
 
 ### Added
@@ -16,74 +37,31 @@ Relinker follows practical semantic versioning while the project is still pre-1.
 ### Fixed
 
 - `max_time()` now acts as a real time budget: the executor no longer sleeps past the deadline. If the computed delay would exceed the remaining budget the run is exhausted immediately instead of oversleeping.
-- `RetryResult.last_value` and `RetryState.has_value` now correctly represent functions that return `None` (was returning `False`/`None` instead of the actual result).
-- `parse_retry_after()` no longer returns arbitrarily large delays; values above `MAX_RETRY_AFTER_SECONDS` are capped and negative values fall back to the `default` argument.
-- `ensure_non_negative()` and `ensure_positive()` now reject `NaN`, `inf`, and boolean arguments via `ensure_finite_float()`.
-- Empty `AnyCondition`, `AllCondition`, `AnyStopStrategy`, and `AllStopStrategy` now raise `InvalidRetryConfigError` at construction time instead of producing silent undefined behaviour.
-- Context manager exhaustion paths (`RetryAttemptContext`, `AsyncRetryAttemptContext`) now apply all `finish_exhausted()` behaviors (return_result, exhausted_callback, exhausted_exception_factory) consistently with the function executors. The combined `not should_retry or should_stop` branch was split into two explicit conditions.
+- `RetryResult.last_value` and `RetryState.has_value` now correctly represent functions that return `None`.
+- `parse_retry_after()` caps excessive values and rejects unsafe numeric configuration.
+- Empty composite conditions and stop strategies now raise `InvalidRetryConfigError`.
+- Context manager exhaustion paths now apply the same behavior as function executors.
 
 ### Changed
 
-- `RetryResult.total_attempts` field added; `attempt_count` property now returns `total_attempts` when set, falling back to `len(attempts)` for backward compatibility.
-- `SECURITY.md` expanded with sections on input validation, Retry-After safety cap, and memory/history limits.
-- PyPI publish workflow now runs full lint, type checks, and tests before building; verifies version consistency, `py.typed` presence, and package metadata via `twine check --strict`.
-- CI matrix extended to macOS and Python 3.13; added `pytest-cov` and a `validate-package` job with wheel smoke test.
+- Added complete-attempt counters independent of retained history.
+- Expanded release, security, CI, package validation, and Python-version checks.
 
 ## 0.6.1
 
 ### Changed
 
 - Updated README with corrected installation instructions and usage examples.
-- Updated documentation pages (`getting-started.md`, `installation.md`, `release.md`, `roadmap.md`).
-- Added `Programming Language :: Python :: 3.12` and `Typing :: Typed` classifiers to `pyproject.toml`.
+- Updated documentation pages and package classifiers.
 
 ## 0.6.0
 
 ### Added
 
-- Added `RetryPolicy.doctor()` for human-friendly policy health reports.
-- Added `PolicyHealthReport` with risk levels and JSON-friendly output.
-- Added `RetryPolicy.preview()` for concise retry timing previews.
-- Added more human-friendly `RetryPolicy.explain()` output.
-- Added shortcut event methods:
-  - `on_before_attempt()`
-  - `on_success()`
-  - `on_failure()`
-  - `on_retry()`
-  - `on_giveup()`
-- Added `with_structured_logging()` for compact JSON logs.
-- Added dependency-free HTTP helpers:
-  - `should_retry_http_status()`
-  - `retry_if_status()`
-  - `retry_after_delay()`
-  - `parse_retry_after()`
-  - `http_retry_policy()`
-- Added safer handling for large or invalid `Retry-After` headers.
-- Added documentation-focused examples for production-style workflows.
-
-### Improved
-
-- Improved policy diagnostics for risky retry loops.
-- Improved simulation and preview readability.
-- Improved structured logging safety by excluding error messages by default.
-- Improved the public API exports for HTTP and diagnostics helpers.
-- Improved tests around diagnostics, HTTP helpers, simulation, logging, and policy guidance.
-
-### Notes
-
-This release strengthens the core project direction:
-
-> Simple by default, powerful by composition, safe by guidance.
+- Added diagnostics, preview, event shortcuts, structured logging, HTTP helpers, and production guidance.
 
 ## 0.4.0
 
 ### Added
 
-- Added the initial public retry policy builder.
-- Added retry decorator support.
-- Added sync and async execution.
-- Added retry by exception and result.
-- Added core delay strategies.
-- Added presets.
-- Added result objects and statistics.
-- Added initial diagnostics and simulation support.
+- Added the initial retry policy builder, decorator, sync/async execution, delay strategies, presets, results, statistics, diagnostics, and simulation support.

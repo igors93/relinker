@@ -27,21 +27,17 @@ def _class_name(value: object) -> str:
 
 
 def _has_user_callback(strategy: Any) -> bool:
-    """Return True when any node in the delay strategy tree is a user callback."""
+    """Return True when any delay strategy node contains a user callback."""
     if _class_name(strategy) in {"CustomDelay", "StatefulCustomDelay"}:
         return True
     strategies = getattr(strategy, "strategies", None)
     if strategies:
-        return any(_has_user_callback(s) for s in strategies)
+        return any(_has_user_callback(item) for item in strategies)
     return False
 
 
 def _safe_next_delay(policy: Any, attempt_number: int) -> float:
-    """Return next delay without executing user-provided callbacks.
-
-    Raises InvalidRetryConfigError for custom or stateful delay strategies so
-    that simulate() and warnings() never cause application side effects.
-    """
+    """Resolve simulation delay without executing user callbacks."""
     if _has_user_callback(policy.delay_strategy):
         raise InvalidRetryConfigError(
             "Simulation is not supported for policies with custom delay callbacks"
@@ -178,6 +174,12 @@ def explain_policy(policy: Any) -> str:
         f"- {_describe_delay(policy)}",
         f"- {_describe_exhaustion(policy)}",
     ]
+    if policy.retry_budget is not None:
+        lines.append(
+            f"- share at most {policy.retry_budget.max_retries} retries every "
+            f"{_format_seconds(policy.retry_budget.per)} under the budget key "
+            f'"{policy.retry_budget_key}"'
+        )
 
     lines.extend(
         [
@@ -188,6 +190,8 @@ def explain_policy(policy: Any) -> str:
             f"- Condition: {_class_name(policy.condition)}",
         ]
     )
+    if policy.retry_budget is not None:
+        lines.append("- Retry budget: RetryBudget")
 
     policy_warnings = policy.warnings()
     if policy_warnings:
@@ -217,6 +221,17 @@ def preview_policy(policy: Any, attempts: int = 5) -> str:
         lines.append(
             f"- Attempt {attempt.attempt_number}: "
             f"wait {attempt.delay_before_next_attempt:.4f}s{marker}"
+        )
+
+    if policy.retry_budget is not None:
+        lines.extend(
+            [
+                "",
+                (
+                    "Shared retry-budget waiting is not included because it depends "
+                    "on runtime activity."
+                ),
+            ]
         )
 
     warnings = policy.warnings()

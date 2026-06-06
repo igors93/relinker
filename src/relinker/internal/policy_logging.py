@@ -104,5 +104,11 @@ def _structured_payload(
                 "will_stop": event.state.will_stop,
             }
         )
+        if event.state.policy_delay is not None:
+            payload["policy_delay"] = event.state.policy_delay
+        if event.state.budget_delay is not None:
+            payload["budget_delay"] = event.state.budget_delay
+        if event.state.next_delay is not None:
+            payload["total_delay"] = event.state.next_delay
 
     return payload

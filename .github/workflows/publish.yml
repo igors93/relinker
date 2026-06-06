@@ -27,7 +27,7 @@ jobs:
 
     steps:
       - name: Checkout release tag
-        uses: actions/checkout@v6ss
+        uses: actions/checkout@v6
         with:
           ref: ${{ env.RELEASE_TAG }}
 

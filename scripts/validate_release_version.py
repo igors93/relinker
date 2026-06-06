@@ -12,8 +12,9 @@ import argparse
 import ast
 import os
 import sys
-import tomllib
 from pathlib import Path
+
+import tomllib
 
 
 class VersionValidationError(RuntimeError):

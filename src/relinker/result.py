@@ -144,10 +144,16 @@ class RetryResult(Generic[T]):
     def error_types(self) -> tuple[type[BaseException], ...]:
         """Return distinct exception types available in the retained history."""
         seen: list[type[BaseException]] = []
+
         for attempt in self.attempts:
-            error_type = type(attempt.error)
-            if attempt.error is not None and error_type not in seen:
+            if attempt.error is None:
+                continue
+
+            error_type: type[BaseException] = type(attempt.error)
+
+            if error_type not in seen:
                 seen.append(error_type)
+
         return tuple(seen)
 
     def last_attempt(self) -> AttemptRecord | None:

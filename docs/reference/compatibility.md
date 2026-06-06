@@ -1,7 +1,7 @@
 # Compatibility policy
 
-This document defines the compatibility promises for Relinker while it evolves
-toward a stable `1.0` release.
+This document defines the compatibility promises for Relinker starting from
+version `1.0.0`.
 
 ## Supported Python versions
 
@@ -21,6 +21,20 @@ The release version is stored in:
 Tests require these values to match. The README intentionally does not duplicate
 a current version number. Release history belongs in `CHANGELOG.md`.
 
+## Semantic versioning
+
+From `1.0.0`, Relinker follows semantic versioning:
+
+- **Patch** releases contain compatible bug fixes only. No public API additions
+  or removals.
+- **Minor** releases may add new compatible functionality and introduce
+  deprecations. Deprecated items are announced in documentation and
+  `CHANGELOG.md`.
+- **Major** releases contain incompatible changes, including removals of
+  previously deprecated items.
+- Critical security or correctness issues may require faster action. Any
+  exception to the normal schedule must be documented with a migration path.
+
 ## API tiers
 
 Relinker separates supported API into explicit tiers.
@@ -34,8 +48,10 @@ Users should prefer:
 from relinker import RetryPolicy, RetryBudget, retry
 ```
 
-The snapshot of `relinker.__all__` is deliberate. Incompatible changes to this
-list require documentation, `CHANGELOG.md` notes, migration guidance, and an
+The snapshot of `relinker.__all__` is deliberate. The order of entries is
+protected by an automated snapshot, but application code should not depend on
+position in the list for any runtime logic. Incompatible changes to this list
+require documentation, `CHANGELOG.md` notes, migration guidance, and an
 updated public API contract.
 
 `relinker.__version__` is package metadata and remains available directly. It is
@@ -72,33 +88,33 @@ behavior:
 - event names and order;
 - `RetryResult` aggregate meanings;
 - parity between sync, async, decorated, and context-manager execution;
-- the rule that an original call does not consume retry-budget capacity.
+- the rule that an original call does not consume retry-budget capacity;
+- the distinction between a function returning `None` and a context-manager
+  block that completed without calling `set_result()`;
+- async cancellation signals propagate out of the retry loop;
+- `max_time()` controls the retry loop between attempts and does not interrupt
+  a user function that is already running.
 
 The contract suite in `tests/contracts/` protects these semantics during internal
 refactoring.
 
 ## Deprecation policy
 
-### Pre-1.0 changes
+### Historical note
 
-Before `1.0`, incompatible changes remain possible, but they must be deliberate:
+Before `1.0`, incompatible changes were possible but required documentation,
+migration guidance, and updated snapshots. That phase is closed.
 
-1. explain the reason in `CHANGELOG.md`;
-2. include migration guidance;
-3. add or update snapshots and contract tests;
-4. update the reference documentation;
-5. avoid combining an incompatible change with unrelated refactoring.
+### Active policy (from 1.0.0)
 
-Where practical, deprecation warnings should be preferred over immediate removal.
-
-### After 1.0
-
-After `1.0`, public APIs should normally be deprecated in a minor release and
-removed only in a later major release. The recommended minimum is at least one
-full minor release between deprecation and removal.
-
-Security or critical correctness issues may require faster action, but the
-exception and migration path must be documented clearly.
+1. Deprecation is announced in a minor release via documentation and
+   `CHANGELOG.md`.
+2. When appropriate, a runtime warning is emitted for deprecated usage.
+3. A deprecated item remains available for at least one full minor release after
+   the deprecation announcement.
+4. Removal happens only in a subsequent major release.
+5. Critical security or correctness exceptions must include justification and a
+   migration path in the release notes.
 
 ## Scope limitations
 
@@ -108,3 +124,7 @@ distributed guarantee.
 
 `max_time()` controls the retry loop between attempts; it does not interrupt a
 user function that is already running.
+
+Relinker is not a circuit breaker, scheduler, task queue, or distributed rate
+limiter. These are explicit non-goals, not gaps to be filled by future releases
+without a separate major decision.

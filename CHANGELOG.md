@@ -2,9 +2,13 @@
 
 All notable changes to Relinker will be documented in this file.
 
-Relinker follows practical semantic versioning while the project is still pre-1.0. Breaking changes may happen before 1.0, but they should be documented clearly.
+Relinker follows semantic versioning. Public APIs introduced in `1.0.0` follow
+the compatibility and deprecation policy documented in
+`docs/reference/compatibility.md`.
 
 ## Unreleased
+
+## 1.0.0 - 2026-06-06
 
 ### Added
 
@@ -29,6 +33,14 @@ Relinker follows practical semantic versioning while the project is still pre-1.
 ### Documentation
 
 - Documented retry lifecycle, exhaustion behavior, compatibility tiers, architecture, public API, development checks, and release validation.
+
+### Stable API
+
+- `relinker.__all__` is the stable root public API. All names listed there are covered by the compatibility and deprecation policy starting from this release.
+- `relinker.context.__all__` is a documented module API with the same stability guarantee.
+- Behaviors protected by contracts include retry and stop decisions, exhaustion precedence, event names and order, `RetryResult` aggregate meanings, parity between sync, async, decorated, and context-manager execution, and the rule that an original call does not consume retry-budget capacity.
+- Internal modules (`relinker.internal`, `relinker.context._shared`, underscore-prefixed objects) carry no compatibility guarantee.
+- The deprecation policy documented in `docs/reference/compatibility.md` applies from this release.
 
 ## 0.8.0
 

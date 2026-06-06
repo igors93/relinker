@@ -32,6 +32,7 @@ This directory is organized by intent:
 
 | Guide | Purpose |
 |---|---|
+| [Migrating to 1.0](guides/migrating-to-1.0.md) | Review stable APIs, behavior guarantees, and migration checks |
 | [Async execution](guides/async.md) | Retry coroutine functions safely |
 | [Context manager usage](guides/context-manager.md) | Retry inline sync and async blocks |
 | [HTTP retry](guides/http.md) | Retry status codes and respect `Retry-After` |

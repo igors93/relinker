@@ -1,8 +1,10 @@
 # API Reference
 
-The stable root import surface is `relinker.__all__`. This page documents that
-surface exactly. For compatibility guarantees and API tiers, see the
-[Compatibility policy](compatibility.md).
+The stable root import surface is `relinker.__all__`. All exports listed here
+are stable from `1.0.0` and covered by the compatibility and deprecation policy.
+For compatibility guarantees and API tiers, see the
+[Compatibility policy](compatibility.md). For upgrade guidance, see
+[Migrating to 1.0](../guides/migrating-to-1.0.md).
 
 For behavioral details, see [Retry lifecycle](../concepts/retry-lifecycle.md) and
 [Exhaustion behavior](../concepts/exhaustion.md).

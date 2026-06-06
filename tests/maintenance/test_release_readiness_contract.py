@@ -4,11 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-try:
-    import tomllib
-except ModuleNotFoundError:  # pragma: no cover - Python 3.10
-    import tomli as tomllib
-
 ROOT = Path(__file__).resolve().parents[2]
 IGNORED_SCAN_PARTS = {".venv", ".git", "dist", "build"}
 
@@ -16,7 +11,7 @@ IGNORED_SCAN_PARTS = {".venv", ".git", "dist", "build"}
 def _unreleased_block() -> str:
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     start = changelog.index("## Unreleased")
-    end = changelog.index("## 0.8.0")
+    end = changelog.index("## 1.0.0")
     return changelog[start:end]
 
 
@@ -34,29 +29,21 @@ def test_changelog_has_unreleased_before_current_release() -> None:
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
 
     assert "## Unreleased" in changelog
-    assert changelog.index("## Unreleased") < changelog.index("## 0.8.0")
+    assert changelog.index("## Unreleased") < changelog.index("## 1.0.0")
 
 
-def test_changelog_unreleased_has_required_sections() -> None:
+def test_changelog_unreleased_is_empty() -> None:
     unreleased = _unreleased_block()
+    content_after_heading = unreleased[len("## Unreleased") :].strip()
 
-    for section in ("### Added", "### Changed", "### Fixed", "### Documentation"):
-        assert section in unreleased
+    assert content_after_heading == ""
 
 
 def test_changelog_history_remains_present_once() -> None:
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
 
-    for heading in ("## 0.8.0", "## 0.7.0", "## 0.6.1", "## 0.6.0", "## 0.4.0"):
+    for heading in ("## 1.0.0", "## 0.8.0", "## 0.7.0", "## 0.6.1", "## 0.6.0", "## 0.4.0"):
         assert changelog.count(heading) == 1
-
-
-def test_release_preparation_has_not_promoted_project_version() -> None:
-    """Update this temporary contract in the separate release commit."""
-    with (ROOT / "pyproject.toml").open("rb") as file:
-        project_version = tomllib.load(file)["project"]["version"]
-
-    assert project_version == "0.8.0"
 
 
 def test_gitignore_contains_required_repository_hygiene_patterns() -> None:
@@ -152,11 +139,9 @@ def test_public_typing_examples_exist_and_use_public_api() -> None:
         assert "relinker.internal" not in content
 
 
-def test_one_zero_readiness_does_not_claim_ready() -> None:
+def test_one_zero_readiness_record_is_honest() -> None:
     readiness = (ROOT / "docs/maintainers/1.0-readiness.md").read_text(encoding="utf-8")
 
-    assert "- [ ] Release `0.9.0`." in readiness
-    assert (
-        "- [ ] Validate the `0.9.x` series in at least one real application or representative "
-        "integration."
-    ) in readiness
+    assert "Not recorded" in readiness
+    assert "does not claim external adoption" in readiness
+    assert "technically prepared for version 1.0.0" in readiness

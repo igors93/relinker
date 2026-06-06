@@ -1,6 +1,20 @@
 # Release process
 
-This document describes how to verify and build Relinker locally.
+This document describes how to verify and build Relinker locally before a
+release. Repository publication steps (tagging, pushing, PyPI upload) are
+performed manually by the maintainer after CI is green.
+
+## Release phases
+
+1. Prepare release notes in `CHANGELOG.md`.
+2. Review public API snapshots (`relinker.__all__` and `relinker.context.__all__`).
+3. Update version sources (`pyproject.toml` and `src/relinker/__init__.py`).
+4. Run the full local validation pipeline.
+5. Build clean artifacts.
+6. Validate the wheel in an isolated environment.
+7. Review the generated diff for unexpected changes.
+8. The maintainer performs repository publication actions separately after CI is
+   green (tag creation, remote push, PyPI upload).
 
 ## Local checks
 
@@ -42,41 +56,7 @@ Before the version bump:
 - review the public API snapshot;
 - review `relinker.context.__all__`;
 - confirm that `docs/reference/api.md` corresponds to the exports;
-- confirm compatibility and migration guidance for incompatible changes.
-
-## Prepare a pre-1.0 release
-
-Preparation and publication happen in separate commits.
-
-### Commit de preparação
-
-- update `Unreleased`;
-- validate the public API;
-- validate the installed wheel;
-- run the full suite;
-- do not change the version.
-
-### Commit de release
-
-Only after everything is green:
-
-- update `pyproject.toml`;
-- update `src/relinker/__init__.py`;
-- move `Unreleased` items to `## 0.9.0 - YYYY-MM-DD`;
-- create a new empty `Unreleased`;
-- run the pipeline again;
-- create the tag only after CI is green.
-
-Checklist for `0.9.0`:
-
-- changelog preparado
-- API snapshot revisado
-- typing examples passam
-- wheel validator passa
-- stability matrix revisada
-- 1.0 readiness permanece honesta
-
-Do not mark external-validation items complete based only on CI.
+- confirm compatibility and migration guidance for any incompatible changes.
 
 ## Version bump
 
@@ -87,7 +67,9 @@ Update the version in two places:
 
 ## CHANGELOG
 
-Add an entry to `CHANGELOG.md` with the new version, date, and a summary of changes. Move everything under `## Unreleased` to the new versioned section.
+Add an entry to `CHANGELOG.md` with the new version, date, and a summary of
+changes. Move everything under `## Unreleased` to the new versioned section.
+Leave a new empty `## Unreleased` section at the top.
 
 ## Build
 
@@ -101,23 +83,20 @@ This produces:
 
 ## Verify the build
 
+Install the wheel in an isolated virtual environment and run the validator:
+
 ```bash
-pip install dist/relinker-X.Y.Z-py3-none-any.whl
 python scripts/validate_installed_wheel.py
 ```
 
-## Publish to PyPI
+## Checklist for 1.0.0
 
-Push the tag and the GitHub Actions workflow handles publishing via Trusted Publishing:
-
-```bash
-git tag v0.X.Y
-git push origin v0.X.Y
-```
-
-After publishing, verify the release:
-
-```bash
-pip install relinker==0.X.Y
-python -c "import relinker; print(relinker.__version__)"
-```
+- [ ] `pyproject.toml` reports `1.0.0`.
+- [ ] `relinker.__version__` reports `1.0.0`.
+- [ ] `CHANGELOG.md` contains a dated `1.0.0` section.
+- [ ] A new empty `Unreleased` section exists.
+- [ ] Public API snapshots are unchanged.
+- [ ] Migration guidance is published.
+- [ ] Ruff, mypy, tests, coverage, build, and Twine pass.
+- [ ] The installed wheel validator passes.
+- [ ] The maintainer reviewed known scope boundaries.

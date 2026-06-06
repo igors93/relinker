@@ -121,16 +121,55 @@ def test_compatibility_guide_documents_internal_scope() -> None:
     assert "process-local" in compatibility
 
 
-def test_pre_one_zero_documents_do_not_claim_external_validation_is_complete() -> None:
+def test_readiness_record_does_not_invent_external_adoption() -> None:
     readiness = (ROOT / "docs/maintainers/1.0-readiness.md").read_text(encoding="utf-8")
 
-    assert "- [ ] Release `0.9.0`." in readiness
-    assert "- [ ] Complete at least one full feedback cycle on the `0.9.x` series." in readiness
-    assert (
-        "- [ ] Validate the `0.9.x` series in at least one real application or representative "
-        "integration."
-    ) in readiness
-    assert "These items must not be checked by automation alone." in readiness
+    assert "Not recorded" in readiness
+    assert "does not claim external adoption" in readiness
+
+
+def test_documentation_index_contains_migration_guide() -> None:
+    index = (ROOT / "docs/README.md").read_text(encoding="utf-8")
+
+    assert "guides/migrating-to-1.0.md" in index
+    assert (ROOT / "docs/guides/migrating-to-1.0.md").is_file()
+
+
+def test_readme_does_not_say_alpha() -> None:
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert "status-alpha" not in readme
+    assert "currently in alpha" not in readme
+
+
+def test_compatibility_references_one_zero() -> None:
+    compat = (ROOT / "docs/reference/compatibility.md").read_text(encoding="utf-8")
+
+    assert "1.0.0" in compat
+
+
+def test_release_docs_contain_one_zero_checklist() -> None:
+    release = (ROOT / "docs/maintainers/release.md").read_text(encoding="utf-8")
+
+    assert "1.0.0" in release
+    assert "Checklist" in release
+
+
+def test_migration_guide_internal_links_resolve() -> None:
+    guide = ROOT / "docs/guides/migrating-to-1.0.md"
+    content = guide.read_text(encoding="utf-8")
+
+    import re
+    from urllib.parse import unquote
+
+    pattern = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
+    for raw_target in pattern.findall(content):
+        target = raw_target.strip().split("#", 1)[0]
+        if not target or "://" in target or target.startswith("mailto:"):
+            continue
+        decoded = unquote(target)
+        resolved = (guide.parent / decoded).resolve()
+        assert resolved.exists(), f"Migration guide links to missing file: {resolved}"
 
 
 def test_architectural_decision_records_have_required_sections() -> None:

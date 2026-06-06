@@ -68,11 +68,18 @@ template.
 
 No pull request should lower the coverage floor to make a change pass.
 
-## Pre-1.0 stabilization
+## Stable release maintenance
 
-The `0.9.x` series prioritizes bugs, contracts, documentation, and
-compatibility. Large features should wait for a separate decision.
+Relinker has a stable public API from `1.0.0`. Contributions must respect:
 
-Every bug fix needs a regression test. Public API changes require snapshot,
-documentation, and changelog updates. Do not reduce coverage or mark external
-validation complete without evidence.
+- Incompatible changes to public exports or behavioral contracts do not enter
+  patch or minor releases. They require a major version and a prior deprecation.
+- New features must preserve existing contracts. If a feature touches
+  `relinker.__all__` or `relinker.context.__all__`, update the snapshot, the
+  API reference, and `CHANGELOG.md`.
+- Deprecations must be documented in `CHANGELOG.md`, announced in the reference
+  documentation, and include a runtime warning when practical.
+- Every bug fix must include a focused regression test.
+- Coverage must not decrease. Do not reduce the coverage floor to pass a change.
+- Keep changes small and focused. Separate mechanical refactors from behavior
+  changes.

@@ -108,3 +108,17 @@ comfortably higher for a while.
 ## Branch protection
 
 Repository settings should require the CI jobs to pass before merging to `main`.
+
+## Stable API discipline
+
+From `1.0.0`, the public API is stable and changes require care:
+
+- Changes to `relinker.__all__` or `relinker.context.__all__` require a
+  compatibility review. Update the snapshot, the API reference, and
+  `CHANGELOG.md`.
+- Removing or renaming a public export requires a major version increment. A
+  deprecation warning in a minor release must come first.
+- Deprecations must follow the policy in `docs/reference/compatibility.md`.
+- Internal modules may change freely, but behavioral contracts must not regress.
+  The contract suite in `tests/contracts/` is the protection boundary.
+- Every bug fix must include a regression test before merging.

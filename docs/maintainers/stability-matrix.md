@@ -1,7 +1,11 @@
 # Stability matrix
 
+This matrix is the behavioral baseline for Relinker 1.0.0.
+
 This table is a map of automated contracts. It is not evidence of production
-adoption or real-world operational usage.
+adoption or real-world operational usage. See [1.0 release record](1.0-readiness.md)
+for the full release evidence record. The contracts themselves are in
+[tests/contracts](../../tests/contracts).
 
 | Capability | Sync run | Async run | Sync decorator | Async decorator | Sync context | Async context | Primary contract |
 |---|---|---|---|---|---|---|---|

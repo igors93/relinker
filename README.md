@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/igors93/relinker/actions/workflows/ci.yml/badge.svg)](https://github.com/igors93/relinker/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
-![Status](https://img.shields.io/badge/status-alpha-orange)
+![Status](https://img.shields.io/badge/status-stable-brightgreen)
 ![Typing](https://img.shields.io/badge/typing-typed-blue)
 ![Dependencies](https://img.shields.io/badge/dependencies-zero-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -79,7 +79,13 @@ Relinker currently provides:
 
 ## Current status
 
-Relinker is currently in alpha and follows practical semantic versioning. Release history lives in [`CHANGELOG.md`](CHANGELOG.md); package version metadata is validated automatically during tests and release checks.
+Relinker 1.0 provides a stable public API for Python 3.10 through 3.13.
+Compatibility guarantees apply to the documented exports and behaviors described
+in the [compatibility policy](docs/reference/compatibility.md). Release history lives in
+[`CHANGELOG.md`](CHANGELOG.md).
+
+See the [migration guide](docs/guides/migrating-to-1.0.md) if you are upgrading
+from an earlier version.
 
 Install from PyPI:
 

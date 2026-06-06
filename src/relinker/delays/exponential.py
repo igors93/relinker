@@ -29,6 +29,8 @@ class ExponentialDelay(DelayMixin):
 
     def next_delay(self, attempt_number: int) -> float:
         """Return exponential delay for the given attempt number."""
+        if self.base == 0.0:
+            return 0.0
         try:
             delay = self.base * (self.factor ** max(0, attempt_number - 1))
         except OverflowError:

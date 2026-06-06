@@ -147,6 +147,10 @@ class RetryPolicy(Generic[T]):
         """Return a new policy that retries on the given exception types."""
         types = exception_types or (Exception,)
         for t in types:
+            if not isinstance(t, type):
+                raise InvalidRetryConfigError(
+                    f"exception types must be classes, got {type(t).__name__}"
+                )
             if not issubclass(t, Exception):
                 raise InvalidRetryConfigError(
                     f"{t.__name__} is a BaseException subclass that the executor never catches"

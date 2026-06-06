@@ -36,7 +36,9 @@ def make_decorated(
     def with_policy(new_policy: RetryPolicy[Any]) -> Callable[..., Any]:
         return new_policy(function)
 
-    if inspect.iscoroutinefunction(function):
+    if inspect.iscoroutinefunction(function) or inspect.iscoroutinefunction(
+        getattr(type(function), "__call__", None)
+    ):
 
         @wraps(function)
         async def async_wrapper(*args: Any, **kwargs: Any) -> Any:

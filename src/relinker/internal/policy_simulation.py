@@ -26,14 +26,23 @@ def _class_name(value: object) -> str:
     return value.__class__.__name__
 
 
+def _has_user_callback(strategy: Any) -> bool:
+    """Return True when any node in the delay strategy tree is a user callback."""
+    if _class_name(strategy) in {"CustomDelay", "StatefulCustomDelay"}:
+        return True
+    strategies = getattr(strategy, "strategies", None)
+    if strategies:
+        return any(_has_user_callback(s) for s in strategies)
+    return False
+
+
 def _safe_next_delay(policy: Any, attempt_number: int) -> float:
     """Return next delay without executing user-provided callbacks.
 
     Raises InvalidRetryConfigError for custom or stateful delay strategies so
     that simulate() and warnings() never cause application side effects.
     """
-    name = _class_name(policy.delay_strategy)
-    if name in {"CustomDelay", "StatefulCustomDelay"}:
+    if _has_user_callback(policy.delay_strategy):
         raise InvalidRetryConfigError(
             "Simulation is not supported for policies with custom delay callbacks"
         )

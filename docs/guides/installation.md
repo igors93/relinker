@@ -18,7 +18,7 @@ To install a specific tag or branch:
 
 ```bash
 pip install git+https://github.com/igors93/relinker.git@main
-pip install git+https://github.com/igors93/relinker.git@v0.6.0
+pip install git+https://github.com/igors93/relinker.git@v0.8.0
 ```
 
 ## From source

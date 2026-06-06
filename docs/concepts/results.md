@@ -62,3 +62,23 @@ print(fetch_user.retry_stats.to_dict())
 ```
 
 Statistics are in-memory and attached to the decorated function.
+
+Use `snapshot()` when you want an immutable view of the current counters:
+
+```python
+snapshot = fetch_user.retry_stats.snapshot()
+
+print(snapshot.calls)
+print(snapshot.average_attempts)
+print(snapshot.success_rate)
+```
+
+Reset counters when a test or process-level reporting interval needs a clean
+state:
+
+```python
+fetch_user.retry_stats.reset()
+```
+
+Statistics are in-memory, per decorated function, thread-safe for basic counter
+updates, and dependency-free.

@@ -62,7 +62,7 @@ def test_documentation_index_contains_the_stability_guides() -> None:
         "concepts/retry-lifecycle.md",
         "concepts/exhaustion.md",
         "reference/compatibility.md",
-        "development/architecture.md",
+        "maintainers/architecture.md",
     ):
         assert relative_path in index
         assert (ROOT / "docs" / relative_path).is_file()

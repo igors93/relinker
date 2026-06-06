@@ -90,6 +90,17 @@ class RetryPolicy(Generic[T]):
                 raise InvalidRetryConfigError("retry_budget must be a RetryBudget")
             if self.retry_budget_key is None or not self.retry_budget_key.strip():
                 raise InvalidRetryConfigError("retry budget key must be a non-empty string")
+        explicit_exhaustion_behaviors = sum(
+            (
+                self.should_return_result,
+                self.exhausted_callback is not None,
+                self.exhausted_exception_factory is not None,
+            )
+        )
+        if explicit_exhaustion_behaviors > 1 or (
+            self.should_raise_last and explicit_exhaustion_behaviors > 0
+        ):
+            raise InvalidRetryConfigError("exhaustion behaviors are mutually exclusive")
 
     # ------------------------------------------------------------------ stop
 
@@ -311,19 +322,34 @@ class RetryPolicy(Generic[T]):
 
     # -------------------------------------------------- exhausted behavior
 
-    def raise_last(self) -> RetryPolicy[T]:
-        """Return a new policy that re-raises the last original exception."""
+    def _replace_exhaustion(
+        self,
+        *,
+        should_raise_last: bool = False,
+        should_return_result: bool = False,
+        exhausted_callback: ExhaustedCallback | None = None,
+        exhausted_exception_factory: ExceptionFactory | None = None,
+    ) -> RetryPolicy[T]:
+        """Return a new policy with one mutually exclusive exhaustion behavior."""
         return replace(
             self,
+            should_raise_last=should_raise_last,
+            should_return_result=should_return_result,
+            exhausted_callback=exhausted_callback,
+            exhausted_exception_factory=exhausted_exception_factory,
+        )
+
+    def raise_last(self) -> RetryPolicy[T]:
+        """Return a new policy that re-raises the last original exception."""
+        return self._replace_exhaustion(
             should_raise_last=True,
-            should_return_result=False,
-            exhausted_callback=None,
-            exhausted_exception_factory=None,
         )
 
     def return_result(self) -> RetryPolicy[T]:
         """Return a new policy that returns RetryResult instead of raising."""
-        return replace(self, should_return_result=True, should_raise_last=False)
+        return self._replace_exhaustion(
+            should_return_result=True,
+        )
 
     def raise_on_result_exhausted(self) -> RetryPolicy[T]:
         """
@@ -345,11 +371,8 @@ class RetryPolicy(Generic[T]):
         The callback receives RetryResult and its return value becomes the final
         return value.
         """
-        return replace(
-            self,
+        return self._replace_exhaustion(
             exhausted_callback=callback,
-            exhausted_exception_factory=None,
-            should_return_result=False,
         )
 
     def on_exhausted_return_value(self, value: Any) -> RetryPolicy[T]:
@@ -399,11 +422,8 @@ class RetryPolicy(Generic[T]):
         else:
             raise InvalidRetryConfigError("exception must be an exception, class, or factory")
 
-        return replace(
-            self,
+        return self._replace_exhaustion(
             exhausted_exception_factory=resolved_factory,
-            exhausted_callback=None,
-            should_return_result=False,
         )
 
     # --------------------------------------------------- history / budget

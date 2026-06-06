@@ -21,6 +21,9 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 ```
 
+See [Installation](installation.md) for GitHub, source, and verification
+options.
+
 ## Basic decorator
 
 ```python

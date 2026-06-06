@@ -15,6 +15,12 @@ def always_fails() -> None:
     raise RuntimeError("original")
 
 
+def always_booms() -> None:
+    """Raise the deterministic exception used by precedence contract tests."""
+
+    raise RuntimeError("boom")
+
+
 def test_raise_last_configured_after_fallback_rethrows_original_error() -> None:
     policy = policy_without_sleep(RetryPolicy().attempts(1).fallback_value("safe").raise_last())
 
@@ -60,6 +66,59 @@ def test_fallback_configured_last_replaces_return_result() -> None:
     policy = policy_without_sleep(RetryPolicy().attempts(1).return_result().fallback_value("safe"))
 
     assert policy.run(always_fails) == "safe"
+
+
+def test_raise_last_then_return_result_returns_retry_result() -> None:
+    policy = policy_without_sleep(RetryPolicy().attempts(1).raise_last().return_result())
+
+    result = policy.run(always_booms)
+
+    assert result.exhausted is True
+    assert isinstance(result.error, RuntimeError)
+
+
+def test_return_result_then_raise_last_rethrows_original_error() -> None:
+    policy = policy_without_sleep(RetryPolicy().attempts(1).return_result().raise_last())
+
+    with pytest.raises(RuntimeError, match="boom"):
+        policy.run(always_booms)
+
+
+def test_custom_exception_then_return_result_returns_retry_result() -> None:
+    policy = policy_without_sleep(
+        RetryPolicy().attempts(1).on_exhausted_raise(ValueError("custom")).return_result()
+    )
+
+    result = policy.run(always_booms)
+
+    assert result.exhausted is True
+    assert isinstance(result.error, RuntimeError)
+
+
+def test_return_result_then_custom_exception_raises_custom_error() -> None:
+    policy = policy_without_sleep(
+        RetryPolicy().attempts(1).return_result().on_exhausted_raise(ValueError("custom"))
+    )
+
+    with pytest.raises(ValueError, match="custom"):
+        policy.run(always_booms)
+
+
+def test_custom_exception_then_fallback_returns_fallback_value() -> None:
+    policy = policy_without_sleep(
+        RetryPolicy().attempts(1).on_exhausted_raise(ValueError("custom")).fallback_value("safe")
+    )
+
+    assert policy.run(always_booms) == "safe"
+
+
+def test_fallback_then_custom_exception_raises_custom_error() -> None:
+    policy = policy_without_sleep(
+        RetryPolicy().attempts(1).fallback_value("safe").on_exhausted_raise(ValueError("custom"))
+    )
+
+    with pytest.raises(ValueError, match="custom"):
+        policy.run(always_booms)
 
 
 @pytest.mark.asyncio

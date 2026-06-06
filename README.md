@@ -14,7 +14,7 @@
 Relinker is a clear, modular, and debuggable retry library for Python.  
 It helps you retry temporary failures without hiding what your code is doing.
 
-[Overview](#overview) · [Features](#features) · [Quick Start](#quick-start) · [Guidance](#guidance) · [HTTP](#http-retry) · [Observability](#observability) · [Examples](#examples) · [Documentation](#documentation) · [Roadmap](#roadmap)
+[Overview](#overview) · [Features](#features) · [Quick Start](#quick-start) · [Guidance](#guidance) · [HTTP](#http-retry) · [Observability](#observability) · [Examples](#examples) · [Documentation](#documentation)
 
 </div>
 
@@ -157,7 +157,7 @@ policy = (
 
 `RetryBudget` is in-memory and process-local. Separate processes do not share
 capacity. Normal policy delays and `max_time()` continue to apply. See
-[Retry budgets](docs/retry-budgets.md) for the complete behavior and scope.
+[Retry budgets](docs/concepts/retry-budgets.md) for the complete behavior and scope.
 
 ### Use the full builder
 
@@ -332,22 +332,21 @@ See [`examples/README.md`](examples/README.md) for the full list.
 The documentation is organized by topic:
 
 - [Documentation index](docs/README.md)
-- [Getting started](docs/getting-started.md)
+- [Getting started](docs/guides/getting-started.md)
 - [Retry lifecycle](docs/concepts/retry-lifecycle.md)
 - [Exhaustion behavior](docs/concepts/exhaustion.md)
-- [Policy builder](docs/policy-builder.md)
-- [Retry budgets](docs/retry-budgets.md)
-- [Diagnostics and guidance](docs/diagnostics.md)
-- [HTTP retry](docs/http.md)
-- [Observability](docs/observability.md)
-- [Results and statistics](docs/results.md)
-- [Context manager usage](docs/context-manager.md)
-- [Testing retry code](docs/testing.md)
-- [API reference](docs/api-reference.md)
+- [Policy builder](docs/guides/policy-builder.md)
+- [Retry budgets](docs/concepts/retry-budgets.md)
+- [Diagnostics and guidance](docs/guides/diagnostics.md)
+- [HTTP retry](docs/guides/http.md)
+- [Observability](docs/guides/observability.md)
+- [Results and statistics](docs/concepts/results.md)
+- [Context manager usage](docs/guides/context-manager.md)
+- [Testing retry code](docs/guides/testing.md)
+- [API reference](docs/reference/api.md)
 - [Compatibility policy](docs/reference/compatibility.md)
-- [Architecture](docs/development/architecture.md)
-- [Production checklist](docs/production-checklist.md)
-- [Roadmap](docs/roadmap.md)
+- [Architecture](docs/maintainers/architecture.md)
+- [Production checklist](docs/guides/production-checklist.md)
 
 ---
 
@@ -383,20 +382,6 @@ Relinker is guided by these principles:
 8. Debugging should be built in.
 9. No unnecessary magic.
 10. Production behavior should be explainable.
-
----
-
-## Roadmap
-
-Relinker is still evolving. Planned areas include:
-
-- richer documentation and examples
-- more production recipes
-- improved context manager consistency
-- expanded HTTP guidance
-- optional integrations without required runtime dependencies
-
-See [docs/roadmap.md](docs/roadmap.md).
 
 ---
 

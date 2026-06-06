@@ -37,7 +37,7 @@ def make_decorated(
         return new_policy(function)
 
     if inspect.iscoroutinefunction(function) or inspect.iscoroutinefunction(
-        getattr(type(function), "__call__", None)
+        type(function).__call__
     ):
 
         @wraps(function)

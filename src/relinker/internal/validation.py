@@ -49,5 +49,6 @@ def ensure_exception_types(exception_types: tuple[type[BaseException], ...]) -> 
             )
         if not issubclass(exception_type, Exception):
             raise InvalidRetryConfigError(
-                f"{exception_type.__name__} is a BaseException subclass that the executor never catches"
+                f"{exception_type.__name__} is a BaseException subclass"
+                " that the executor never catches"
             )

@@ -2,6 +2,10 @@
 
 This is a high-level public API reference. Internal modules may change.
 
+For behavioral details, see [Retry lifecycle](concepts/retry-lifecycle.md),
+[Exhaustion behavior](concepts/exhaustion.md), and the
+[Compatibility policy](reference/compatibility.md).
+
 ## Core
 
 | Name | Purpose |

@@ -56,6 +56,7 @@ Relinker currently provides:
 
 - simple `@retry` decorator
 - fluent `RetryPolicy` builder
+- shared, process-local `RetryBudget` protection against retry storms
 - sync and async execution
 - retry by exception, returned result, or custom condition
 - fixed, linear, chain, exponential, random, randomized exponential, custom, additive, and state-aware delays
@@ -78,7 +79,7 @@ Relinker currently provides:
 
 ## Current status
 
-Relinker is in alpha. The current package version is **0.7.0**.
+Relinker is currently in alpha and follows practical semantic versioning. Release history lives in [`CHANGELOG.md`](CHANGELOG.md); package version metadata is validated automatically during tests and release checks.
 
 Install from PyPI:
 
@@ -134,6 +135,29 @@ Presets are regular policies. You can keep customizing them:
 ```python
 policy = network().attempts(8).fallback_value({"status": "offline"})
 ```
+
+### Share a retry budget
+
+A retry budget limits additional attempts across executions that share the same
+budget object and key. The original attempt is never counted.
+
+```python
+from relinker import RetryBudget, RetryPolicy
+
+budget = RetryBudget(max_retries=20, per=60)
+
+policy = (
+    RetryPolicy()
+    .attempts(5)
+    .on(TimeoutError)
+    .exponential_delay(base=1, maximum=30)
+    .with_retry_budget(budget, key="external-api")
+)
+```
+
+`RetryBudget` is in-memory and process-local. Separate processes do not share
+capacity. Normal policy delays and `max_time()` continue to apply. See
+[Retry budgets](docs/retry-budgets.md) for the complete behavior and scope.
 
 ### Use the full builder
 
@@ -309,7 +333,10 @@ The documentation is organized by topic:
 
 - [Documentation index](docs/README.md)
 - [Getting started](docs/getting-started.md)
+- [Retry lifecycle](docs/concepts/retry-lifecycle.md)
+- [Exhaustion behavior](docs/concepts/exhaustion.md)
 - [Policy builder](docs/policy-builder.md)
+- [Retry budgets](docs/retry-budgets.md)
 - [Diagnostics and guidance](docs/diagnostics.md)
 - [HTTP retry](docs/http.md)
 - [Observability](docs/observability.md)
@@ -317,7 +344,8 @@ The documentation is organized by topic:
 - [Context manager usage](docs/context-manager.md)
 - [Testing retry code](docs/testing.md)
 - [API reference](docs/api-reference.md)
-- [Design principles](docs/design-principles.md)
+- [Compatibility policy](docs/reference/compatibility.md)
+- [Architecture](docs/development/architecture.md)
 - [Production checklist](docs/production-checklist.md)
 - [Roadmap](docs/roadmap.md)
 

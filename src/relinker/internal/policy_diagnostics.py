@@ -122,19 +122,6 @@ def compute_warnings(policy: Any) -> tuple[PolicyWarning, ...]:
         except Exception:  # noqa: BLE001
             pass
 
-    if policy.should_return_result and (
-        policy.exhausted_callback is not None or policy.exhausted_exception_factory is not None
-    ):
-        warnings.append(
-            PolicyWarning(
-                code="return_result_precedence",
-                message="return_result() takes precedence over fallback and exhausted errors.",
-                hint=(
-                    "Configure fallback/on_exhausted_raise after deciding "
-                    "whether to return RetryResult."
-                ),
-            )
-        )
 
     if (
         _has_result_condition(policy.condition)

@@ -111,12 +111,21 @@ def test_existing_warning_codes_still_present() -> None:
     assert "broad_exception" in codes
 
 
-def test_return_result_precedence_warning_still_works() -> None:
-    # Calling .on_exhausted_raise() first, then .return_result() keeps both flags set,
-    # which triggers the return_result_precedence warning.
-    policy = RetryPolicy().attempts(3).on_exhausted_raise(RuntimeError).return_result()
-    codes = {w.code for w in policy.warnings()}
-    assert "return_result_precedence" in codes
+def test_return_result_replaces_custom_exhaustion_behavior() -> None:
+    policy = (
+        RetryPolicy()
+        .attempts(3)
+        .on_exhausted_raise(RuntimeError)
+        .return_result()
+    )
+
+    codes = {warning.code for warning in policy.warnings()}
+
+    assert policy.should_return_result is True
+    assert policy.should_raise_last is False
+    assert policy.exhausted_callback is None
+    assert policy.exhausted_exception_factory is None
+    assert "return_result_precedence" not in codes
 
 
 # --- warnings() robustness tests ---

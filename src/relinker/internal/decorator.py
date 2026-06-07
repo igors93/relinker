@@ -8,11 +8,11 @@ the public API is the RetryPolicy()(function) call.
 
 from __future__ import annotations
 
-import inspect
 from collections.abc import Callable
 from functools import wraps
 from typing import TYPE_CHECKING, Any, cast
 
+from relinker.internal.callables import ensure_retryable_callable, is_async_callable
 from relinker.internal.exhaustion import resolve_tracked_result
 from relinker.stats import RetryStats
 
@@ -31,14 +31,13 @@ def make_decorated(
     Both wrappers preserve the original function's __name__, __doc__, and
     other attributes via functools.wraps.
     """
+    ensure_retryable_callable(function)
     stats = RetryStats()
 
     def with_policy(new_policy: RetryPolicy[Any]) -> Callable[..., Any]:
         return new_policy(function)
 
-    if inspect.iscoroutinefunction(function) or inspect.iscoroutinefunction(
-        type(function).__call__
-    ):
+    if is_async_callable(function):
 
         @wraps(function)
         async def async_wrapper(*args: Any, **kwargs: Any) -> Any:

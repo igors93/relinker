@@ -12,11 +12,11 @@ from typing import Any, Literal, Protocol, overload
 
 from relinker.policy import RetryPolicy
 from relinker.result import RetryResult
-from relinker.typing import P, T
+from relinker.typing import P, RetryWrappedFunction, T
 
 
 class _RawRetryDecorator(Protocol):
-    def __call__(self, function: Callable[P, T]) -> Callable[P, T]: ...
+    def __call__(self, function: Callable[P, T]) -> RetryWrappedFunction[P, T]: ...
 
 
 class _ReturnResultRetryDecorator(Protocol):
@@ -24,10 +24,10 @@ class _ReturnResultRetryDecorator(Protocol):
     def __call__(  # type: ignore[overload-overlap]
         self,
         function: Callable[P, Coroutine[Any, Any, T]],
-    ) -> Callable[P, Coroutine[Any, Any, RetryResult[T]]]: ...
+    ) -> RetryWrappedFunction[P, Coroutine[Any, Any, RetryResult[T]]]: ...
 
     @overload
-    def __call__(self, function: Callable[P, T]) -> Callable[P, RetryResult[T]]: ...
+    def __call__(self, function: Callable[P, T]) -> RetryWrappedFunction[P, RetryResult[T]]: ...
 
 
 class _DynamicRetryDecorator(Protocol):
@@ -35,14 +35,14 @@ class _DynamicRetryDecorator(Protocol):
     def __call__(
         self,
         function: Callable[P, Coroutine[Any, Any, T]],
-    ) -> Callable[P, Coroutine[Any, Any, T | RetryResult[T]]]: ...
+    ) -> RetryWrappedFunction[P, Coroutine[Any, Any, T | RetryResult[T]]]: ...
 
     @overload
-    def __call__(self, function: Callable[P, T]) -> Callable[P, T | RetryResult[T]]: ...
+    def __call__(self, function: Callable[P, T]) -> RetryWrappedFunction[P, T | RetryResult[T]]: ...
 
 
 @overload
-def retry(function: Callable[P, T]) -> Callable[P, T]: ...
+def retry(function: Callable[P, T]) -> RetryWrappedFunction[P, T]: ...
 
 
 @overload
@@ -56,7 +56,7 @@ def retry(
 
 
 @overload
-def retry(
+def retry(  # type: ignore[overload-overlap]
     *,
     attempts: int = 3,
     delay: float = 0.0,

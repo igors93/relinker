@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from relinker.exceptions import InvalidRetryConfigError, RetryExhaustedError
+from relinker.exceptions import InvalidRetryConfigError, RetryExhaustedError, TryAgain
 
 if TYPE_CHECKING:
     from relinker.policy import RetryPolicy
@@ -33,6 +33,27 @@ def should_stop_before_sleep(
     not trigger early because they do not depend on elapsed time.
     """
     return stop_strategy.should_stop(attempt_number, elapsed + delay)
+
+
+def resolve_final_error(error: BaseException | None) -> BaseException | None:
+    """Return the operational final error represented by a retry signal."""
+    if not isinstance(error, TryAgain):
+        return error
+
+    cause = error.__cause__
+    if isinstance(cause, Exception) and not isinstance(cause, TryAgain):
+        return cause
+
+    context = error.__context__
+    if (
+        context is not None
+        and not error.__suppress_context__
+        and isinstance(context, Exception)
+        and not isinstance(context, TryAgain)
+    ):
+        return context
+
+    return error
 
 
 def finish_exhausted(policy: RetryPolicy[Any], result: RetryResult[Any]) -> Any:

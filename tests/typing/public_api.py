@@ -36,7 +36,9 @@ def accept_snapshot(snapshot: RetryStatsSnapshot) -> float:
     return snapshot.success_rate
 
 
-def accept_wrapped(function: RetryWrappedFunction) -> RetryWrappedFunction:
+def accept_wrapped(
+    function: RetryWrappedFunction[..., object],
+) -> RetryWrappedFunction[..., object]:
     return function.with_policy(RetryPolicy[object]().attempts(1))
 
 

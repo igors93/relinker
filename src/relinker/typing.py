@@ -8,7 +8,16 @@ easier to read.
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from typing import TYPE_CHECKING, Any, ParamSpec, Protocol, TypeAlias, TypeVar, runtime_checkable
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ParamSpec,
+    Protocol,
+    TypeAlias,
+    TypeVar,
+    overload,
+    runtime_checkable,
+)
 
 if TYPE_CHECKING:
     from relinker.policy import RetryPolicy
@@ -25,7 +34,7 @@ ExceptionTypes: TypeAlias = tuple[type[BaseException], ...]
 
 
 @runtime_checkable
-class RetryWrappedFunction(Protocol):
+class RetryWrappedFunction(Protocol[P, T]):
     """
     Protocol describing a function decorated by Relinker.
 
@@ -45,10 +54,20 @@ class RetryWrappedFunction(Protocol):
     retry_stats: RetryStats
     retry_policy: RetryPolicy[Any]
 
-    def with_policy(self, policy: RetryPolicy[Any]) -> RetryWrappedFunction:
+    def with_policy(self, policy: RetryPolicy[Any]) -> RetryWrappedFunction[P, T]:
         """Return a new wrapped version of the same function with a different policy."""
         ...
 
-    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> T:
         """Call the wrapped function."""
+        ...
+
+    @overload
+    def __get__(self, instance: None, owner: type[Any]) -> RetryWrappedFunction[P, T]:
+        """Return the unbound wrapped function."""
+        ...
+
+    @overload
+    def __get__(self, instance: object, owner: type[Any] | None = None) -> Callable[..., T]:
+        """Return the bound wrapped method."""
         ...

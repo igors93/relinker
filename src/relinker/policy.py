@@ -44,6 +44,7 @@ from relinker.event import EventHandler, EventName, RetryEvent
 from relinker.exceptions import InvalidRetryConfigError
 from relinker.executors.async_ import execute_async
 from relinker.executors.sync import execute_sync
+from relinker.internal.callables import ensure_retryable_callable, is_async_callable
 from relinker.internal.sleep import async_sleep as default_async_sleep
 from relinker.internal.sleep import sleep as default_sleep
 from relinker.result import RetryResult
@@ -52,7 +53,7 @@ from relinker.stop.attempts import StopAfterAttempt
 from relinker.stop.base import StopStrategy
 from relinker.stop.forever import StopForever
 from relinker.stop.max_time import StopAfterDelay
-from relinker.typing import P, T
+from relinker.typing import P, RetryWrappedFunction, T
 
 ResultExhaustedBehavior = Literal["return_last", "raise"]
 ExhaustedCallback = Callable[[RetryResult[Any]], Any]
@@ -85,6 +86,60 @@ def _copy_exception_instance(exception: BaseException) -> BaseException:
     copied.__context__ = None
     copied.__suppress_context__ = getattr(exception, "__suppress_context__", False)
     return copied
+
+
+def _flatten_any_conditions(conditions: tuple[RetryCondition, ...]) -> tuple[RetryCondition, ...]:
+    flattened: list[RetryCondition] = []
+    for condition in conditions:
+        if isinstance(condition, AnyCondition):
+            flattened.extend(condition.conditions)
+        else:
+            flattened.append(condition)
+    return tuple(flattened)
+
+
+def _flatten_all_conditions(conditions: tuple[RetryCondition, ...]) -> tuple[RetryCondition, ...]:
+    flattened: list[RetryCondition] = []
+    for condition in conditions:
+        if isinstance(condition, AllCondition):
+            flattened.extend(condition.conditions)
+        else:
+            flattened.append(condition)
+    return tuple(flattened)
+
+
+def _flatten_additive_delays(strategies: tuple[DelayStrategy, ...]) -> tuple[DelayStrategy, ...]:
+    flattened: list[DelayStrategy] = []
+    for strategy in strategies:
+        if isinstance(strategy, AdditiveDelay):
+            flattened.extend(strategy.strategies)
+        else:
+            flattened.append(strategy)
+    return tuple(flattened)
+
+
+def _flatten_any_stop_strategies(strategies: tuple[StopStrategy, ...]) -> tuple[StopStrategy, ...]:
+    from relinker.stop.composite import AnyStopStrategy
+
+    flattened: list[StopStrategy] = []
+    for strategy in strategies:
+        if isinstance(strategy, AnyStopStrategy):
+            flattened.extend(strategy.strategies)
+        else:
+            flattened.append(strategy)
+    return tuple(flattened)
+
+
+def _flatten_all_stop_strategies(strategies: tuple[StopStrategy, ...]) -> tuple[StopStrategy, ...]:
+    from relinker.stop.composite import AllStopStrategy
+
+    flattened: list[StopStrategy] = []
+    for strategy in strategies:
+        if isinstance(strategy, AllStopStrategy):
+            flattened.extend(strategy.strategies)
+        else:
+            flattened.append(strategy)
+    return tuple(flattened)
 
 
 @dataclass(frozen=True, slots=True)
@@ -173,7 +228,9 @@ class RetryPolicy(Generic[T]):
 
         return replace(
             self,
-            stop_strategy=AnyStopStrategy((self.stop_strategy, StopAfterAttempt(maximum))),
+            stop_strategy=AnyStopStrategy(
+                _flatten_any_stop_strategies((self.stop_strategy, StopAfterAttempt(maximum)))
+            ),
         )
 
     def or_stop_after_time(self, seconds: float) -> RetryPolicy[T]:
@@ -182,7 +239,9 @@ class RetryPolicy(Generic[T]):
 
         return replace(
             self,
-            stop_strategy=AnyStopStrategy((self.stop_strategy, StopAfterDelay(seconds))),
+            stop_strategy=AnyStopStrategy(
+                _flatten_any_stop_strategies((self.stop_strategy, StopAfterDelay(seconds)))
+            ),
         )
 
     def and_stop_after_attempts(self, maximum: int) -> RetryPolicy[T]:
@@ -191,7 +250,9 @@ class RetryPolicy(Generic[T]):
 
         return replace(
             self,
-            stop_strategy=AllStopStrategy((self.stop_strategy, StopAfterAttempt(maximum))),
+            stop_strategy=AllStopStrategy(
+                _flatten_all_stop_strategies((self.stop_strategy, StopAfterAttempt(maximum)))
+            ),
         )
 
     def and_stop_after_time(self, seconds: float) -> RetryPolicy[T]:
@@ -200,7 +261,9 @@ class RetryPolicy(Generic[T]):
 
         return replace(
             self,
-            stop_strategy=AllStopStrategy((self.stop_strategy, StopAfterDelay(seconds))),
+            stop_strategy=AllStopStrategy(
+                _flatten_all_stop_strategies((self.stop_strategy, StopAfterDelay(seconds)))
+            ),
         )
 
     # ----------------------------------------------------------- conditions
@@ -237,24 +300,28 @@ class RetryPolicy(Generic[T]):
 
     def any_condition(self, *conditions: RetryCondition) -> RetryPolicy[T]:
         """Return a new policy that retries when any condition matches."""
-        return replace(self, condition=AnyCondition(conditions))
+        return replace(self, condition=AnyCondition(_flatten_any_conditions(conditions)))
 
     def all_conditions(self, *conditions: RetryCondition) -> RetryPolicy[T]:
         """Return a new policy that retries only when all conditions match."""
-        return replace(self, condition=AllCondition(conditions))
+        return replace(self, condition=AllCondition(_flatten_all_conditions(conditions)))
 
     def or_on(self, *exception_types: type[BaseException]) -> RetryPolicy[T]:
         """Return a new policy that OR-combines current condition with exception retry."""
         return replace(
             self,
-            condition=AnyCondition((self.condition, ExceptionCondition(exception_types))),
+            condition=AnyCondition(
+                _flatten_any_conditions((self.condition, ExceptionCondition(exception_types)))
+            ),
         )
 
     def or_retry_if_result(self, predicate: Callable[[Any], bool]) -> RetryPolicy[T]:
         """Return a new policy that OR-combines current condition with result retry."""
         return replace(
             self,
-            condition=AnyCondition((self.condition, ResultCondition(predicate))),
+            condition=AnyCondition(
+                _flatten_any_conditions((self.condition, ResultCondition(predicate)))
+            ),
         )
 
     # --------------------------------------------------------------- delays
@@ -346,11 +413,19 @@ class RetryPolicy(Generic[T]):
             RetryPolicy().exponential_delay(base=1).jitter(maximum=0.5)
         """
         jitter_delay = RandomDelay(minimum=minimum, maximum=maximum, seed=seed)
-        return replace(self, delay_strategy=AdditiveDelay((self.delay_strategy, jitter_delay)))
+        return replace(
+            self,
+            delay_strategy=AdditiveDelay(
+                _flatten_additive_delays((self.delay_strategy, jitter_delay))
+            ),
+        )
 
     def add_delay(self, strategy: DelayStrategy) -> RetryPolicy[T]:
         """Return a new policy that adds a delay strategy to the current strategy."""
-        return replace(self, delay_strategy=AdditiveDelay((self.delay_strategy, strategy)))
+        return replace(
+            self,
+            delay_strategy=AdditiveDelay(_flatten_additive_delays((self.delay_strategy, strategy))),
+        )
 
     def custom_delay(self, callback: Callable[[int], float]) -> RetryPolicy[T]:
         """Return a new policy with a custom delay callback (receives attempt number)."""
@@ -545,6 +620,10 @@ class RetryPolicy(Generic[T]):
 
     def on_event(self, name: EventName, handler: EventHandler) -> RetryPolicy[T]:
         """Return a new policy with an additional event handler."""
+        if is_async_callable(handler):
+            raise InvalidRetryConfigError(
+                "Async event handlers are not supported; use a synchronous handler."
+            )
         return replace(self, event_handlers=(*self.event_handlers, (name, handler)))
 
     def on_before_attempt(self, handler: EventHandler) -> RetryPolicy[T]:
@@ -745,6 +824,7 @@ class RetryPolicy(Generic[T]):
 
     def run(self, function: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> Any:
         """Run a synchronous function with this policy."""
+        ensure_retryable_callable(function)
         return execute_sync(self, function, *args, **kwargs)
 
     async def run_async(
@@ -754,6 +834,7 @@ class RetryPolicy(Generic[T]):
         **kwargs: P.kwargs,
     ) -> Any:
         """Run an asynchronous function with this policy."""
+        ensure_retryable_callable(function)
         return await execute_async(self, function, *args, **kwargs)
 
     # ---------------------------------------------- decorator / __call__
@@ -762,13 +843,13 @@ class RetryPolicy(Generic[T]):
     def __call__(
         self,
         function: Callable[P, T],
-    ) -> Callable[P, T | RetryResult[T]]: ...
+    ) -> RetryWrappedFunction[P, T | RetryResult[T]]: ...
 
     @overload
     def __call__(
         self,
         function: Callable[P, Awaitable[T]],
-    ) -> Callable[P, Awaitable[T | RetryResult[T]]]: ...
+    ) -> RetryWrappedFunction[P, Awaitable[T | RetryResult[T]]]: ...
 
     def __call__(self, function: Callable[..., Any]) -> Callable[..., Any]:
         """

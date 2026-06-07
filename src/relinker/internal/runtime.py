@@ -7,6 +7,7 @@ from typing import Any
 
 from relinker.attempt import AttemptRecord
 from relinker.internal.executor_helpers import build_state, normalize_retry_cause
+from relinker.internal.exhaustion import resolve_final_error
 from relinker.result import RetryResult
 from relinker.state import RetryState
 
@@ -110,14 +111,18 @@ class RetryRuntime:
         exhausted: bool = False,
         retry_cause: str | None = None,
     ) -> RetryResult[Any]:
+        final_retry_cause = normalize_retry_cause(retry_cause)
+        final_error = (
+            resolve_final_error(error) if exhausted and final_retry_cause == "exception" else error
+        )
         return RetryResult(
             attempts=tuple(self.attempts),
             value=value,
-            error=error,
+            error=final_error,
             started_at=self.started_at,
             ended_at=ended_at,
             exhausted=exhausted,
-            retry_cause=normalize_retry_cause(retry_cause),
+            retry_cause=final_retry_cause,
             total_attempts=self.attempt_number,
             total_failed_attempts=self.failed_count,
             total_successful_attempts=self.success_count,

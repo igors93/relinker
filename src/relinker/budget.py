@@ -173,21 +173,28 @@ class RetryBudget:
         # Existing reservations are already legal. Any consecutive block of
         # ``max_retries`` reservations inside one period creates an open interval
         # where an additional candidate would overfill some rolling window.
-        for index in range(0, len(scheduled_times) - self._max_retries + 1):
-            first = scheduled_times[index]
-            last = scheduled_times[index + self._max_retries - 1]
-            if last - first >= self._per:
-                continue
-            forbidden_start = last - self._per
-            forbidden_end = first + self._per
-            if forbidden_start < candidate < forbidden_end:
-                candidate = forbidden_end
-        # Float rounding can place `candidate` exactly on a boundary where
-        # `candidate - per` rounds to a value less than an existing reservation,
-        # making the slot illegal according to _is_legal_slot.  Advance by one
-        # ULP until the candidate is genuinely legal.
-        while not self._is_legal_slot(candidate, scheduled_times):
-            candidate = math.nextafter(candidate, math.inf)
+        # Re-scan after each advance: moving candidate to one boundary may place
+        # it inside a different forbidden region.  After the scan converges,
+        # a single nextafter step handles the case where float arithmetic places
+        # candidate exactly on a boundary value that rounds back into the window
+        # (e.g. first + per - per < first due to rounding); a re-scan then
+        # catches any further forbidden region uncovered by that step.
+        changed = True
+        while changed:
+            changed = False
+            for index in range(0, len(scheduled_times) - self._max_retries + 1):
+                first = scheduled_times[index]
+                last = scheduled_times[index + self._max_retries - 1]
+                if last - first >= self._per:
+                    continue
+                forbidden_start = last - self._per
+                forbidden_end = first + self._per
+                if forbidden_start < candidate < forbidden_end:
+                    candidate = forbidden_end
+                    changed = True
+            if not changed and not self._is_legal_slot(candidate, scheduled_times):
+                candidate = math.nextafter(candidate, math.inf)
+                changed = True
         return candidate
 
     def _is_legal_slot(self, candidate: float, scheduled_times: list[float]) -> bool:

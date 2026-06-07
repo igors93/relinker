@@ -11,7 +11,7 @@ IGNORED_SCAN_PARTS = {".venv", ".git", "dist", "build"}
 def _unreleased_block() -> str:
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     start = changelog.index("## Unreleased")
-    end = changelog.index("## 1.0.1")
+    end = changelog.index("## 1.1.0")
     return changelog[start:end]
 
 
@@ -29,16 +29,18 @@ def test_changelog_has_unreleased_before_current_release() -> None:
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
 
     assert "## Unreleased" in changelog
-    assert changelog.index("## Unreleased") < changelog.index("## 1.0.0")
+    assert changelog.index("## Unreleased") < changelog.index("## 1.1.0")
 
 
-def test_changelog_unreleased_records_current_development_changes() -> None:
-    unreleased = _unreleased_block()
-    content_after_heading = unreleased[len("## Unreleased") :].strip()
+def test_changelog_one_one_records_released_changes() -> None:
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    start = changelog.index("## 1.1.0")
+    end = changelog.index("## 1.0.1")
+    block = changelog[start:end]
 
-    assert "RetryPolicy.named" in content_after_heading
-    assert "RetryPolicy.to_dict" in content_after_heading
-    assert "RetryBudgetSnapshot" in content_after_heading
+    assert "RetryPolicy.named" in block
+    assert "RetryPolicy.to_dict" in block
+    assert "RetryBudgetSnapshot" in block
 
 
 def test_changelog_history_remains_present_once() -> None:

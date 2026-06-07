@@ -8,6 +8,8 @@ the compatibility and deprecation policy documented in
 
 ## Unreleased
 
+## 1.1.0 - 2026-06-07
+
 ### Added
 
 - Added policy names with `RetryPolicy.named(...)`, propagated to retry state, events,

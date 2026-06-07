@@ -1,4 +1,4 @@
-"""Release contract for Relinker 1.0.1."""
+"""Release contract for Relinker 1.1.0."""
 
 from __future__ import annotations
 
@@ -19,8 +19,8 @@ def test_version_sources_report_one_zero_one() -> None:
     with (ROOT / "pyproject.toml").open("rb") as file:
         project_version = tomllib.load(file)["project"]["version"]
 
-    assert project_version == "1.0.1"
-    assert relinker.__version__ == "1.0.1"
+    assert project_version == "1.1.0"
+    assert relinker.__version__ == "1.1.0"
 
 
 def test_classifier_is_production_stable() -> None:
@@ -34,17 +34,17 @@ def test_classifier_is_production_stable() -> None:
 
 def test_changelog_has_dated_one_zero_one_section() -> None:
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    pattern = re.compile(r"^## 1\.0\.1 - \d{4}-\d{2}-\d{2}$", re.MULTILINE)
+    pattern = re.compile(r"^## 1\.1\.0 - \d{4}-\d{2}-\d{2}$", re.MULTILINE)
     matches = pattern.findall(changelog)
 
     assert len(matches) == 1
 
 
-def test_changelog_unreleased_records_current_development_changes() -> None:
+def test_changelog_one_one_records_release_changes() -> None:
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    start = changelog.index("## Unreleased")
+    start = changelog.index("## 1.1.0")
     end = changelog.index("## 1.0.1")
-    block = changelog[start + len("## Unreleased") : end].strip()
+    block = changelog[start:end]
 
     assert "RetryPolicy.named" in block
     assert "RetryPolicy.to_dict" in block
@@ -105,4 +105,4 @@ def test_wheel_validator_checks_version() -> None:
     content = (ROOT / "scripts/validate_installed_wheel.py").read_text(encoding="utf-8")
 
     assert "distribution_version" in content
-    assert "1.0.1" in content
+    assert "1.1.0" in content

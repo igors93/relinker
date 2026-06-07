@@ -19,16 +19,16 @@ def _unwrap_partial(function: Any) -> Any:
 def is_async_callable(function: Any) -> bool:
     """Return True when calling ``function`` produces an awaitable contract."""
     target = _unwrap_partial(function)
+    if inspect.isclass(target):
+        return False
+
     if inspect.iscoroutinefunction(target):
         return True
 
-    if inspect.isclass(function):
+    if not callable(target):
         return False
 
-    if not callable(function):
-        return False
-
-    call = type(function).__call__
+    call = type(target).__call__
     return inspect.iscoroutinefunction(_unwrap_partial(call))
 
 
@@ -46,13 +46,13 @@ def ensure_retryable_callable(function: Any) -> None:
             "async generator inside a retried function."
         )
 
-    if inspect.isclass(function):
+    if inspect.isclass(target):
         return
 
-    if not callable(function):
+    if not callable(target):
         return
 
-    call = type(function).__call__
+    call = type(target).__call__
     call_target = _unwrap_partial(call)
     if inspect.isgeneratorfunction(call_target):
         raise InvalidRetryConfigError(

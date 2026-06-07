@@ -10,6 +10,25 @@ the compatibility and deprecation policy documented in
 
 ### Fixed
 
+- `TryAgain` now preserves the real retry cause in result history and final
+  errors, including explicit causes, implicit contexts, and plain `TryAgain`
+  exceptions.
+- Generator and async-generator functions are now rejected because exceptions
+  raised during iteration occur outside the retry call and cannot be retried
+  safely.
+- Async event handlers are now rejected explicitly instead of creating an
+  unawaited coroutine, including partial-wrapped callable handler objects.
+- Corrected callable-kind detection for `functools.partial` wrapping callable
+  objects, so async `__call__` targets are decorated as async wrappers while
+  sync, generator, async-generator, nested partial, and callable-class cases keep
+  their safe contracts.
+- Improved `with_policy()` typing so reconfigured wrappers preserve their
+  original parameters and sync/async shape without promising a false return
+  type when the replacement policy may return `RetryResult`.
+- `add_delay()` and `jitter()` now preserve `AdditiveDelay` grouping so
+  floating-point addition order is not changed silently. Deep additive delay
+  trees are evaluated iteratively to avoid recursion errors without flattening
+  the arithmetic structure.
 - `RetryBudget` no longer places a reservation inside a full window when
   `per` is a decimal value whose floating-point arithmetic causes
   `(first + per) - per < first`. `_first_legal_slot` now re-scans after each

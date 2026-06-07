@@ -21,10 +21,12 @@ from typing import (
 
 if TYPE_CHECKING:
     from relinker.policy import RetryPolicy
+    from relinker.result import RetryResult
     from relinker.stats import RetryStats
 
 P = ParamSpec("P")
 T = TypeVar("T")
+NewT = TypeVar("NewT")
 
 SyncCallable: TypeAlias = Callable[P, T]
 AsyncCallable: TypeAlias = Callable[P, Awaitable[T]]
@@ -54,7 +56,19 @@ class RetryWrappedFunction(Protocol[P, T]):
     retry_stats: RetryStats
     retry_policy: RetryPolicy[Any]
 
-    def with_policy(self, policy: RetryPolicy[Any]) -> RetryWrappedFunction[P, T]:
+    @overload
+    def with_policy(
+        self: RetryWrappedFunction[P, Awaitable[Any]],
+        policy: RetryPolicy[NewT],
+    ) -> RetryWrappedFunction[P, Awaitable[NewT | RetryResult[NewT]]]:
+        """Return an async wrapped version of the same function with a different policy."""
+        ...
+
+    @overload
+    def with_policy(
+        self,
+        policy: RetryPolicy[NewT],
+    ) -> RetryWrappedFunction[P, NewT | RetryResult[NewT]]:
         """Return a new wrapped version of the same function with a different policy."""
         ...
 

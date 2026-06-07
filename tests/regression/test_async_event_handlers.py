@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from functools import partial
+
 import pytest
 
 from relinker import InvalidRetryConfigError, RetryPolicy
@@ -31,3 +33,11 @@ def test_async_event_handler_callable_object_is_rejected_at_registration() -> No
         match="Async event handlers are not supported",
     ):
         RetryPolicy().on_event("before_attempt", AsyncHandler())
+
+
+def test_partial_async_event_handler_callable_object_is_rejected_at_registration() -> None:
+    with pytest.raises(
+        InvalidRetryConfigError,
+        match="Async event handlers are not supported",
+    ):
+        RetryPolicy().on_event("before_attempt", partial(AsyncHandler()))

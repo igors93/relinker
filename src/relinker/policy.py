@@ -108,16 +108,6 @@ def _flatten_all_conditions(conditions: tuple[RetryCondition, ...]) -> tuple[Ret
     return tuple(flattened)
 
 
-def _flatten_additive_delays(strategies: tuple[DelayStrategy, ...]) -> tuple[DelayStrategy, ...]:
-    flattened: list[DelayStrategy] = []
-    for strategy in strategies:
-        if isinstance(strategy, AdditiveDelay):
-            flattened.extend(strategy.strategies)
-        else:
-            flattened.append(strategy)
-    return tuple(flattened)
-
-
 def _flatten_any_stop_strategies(strategies: tuple[StopStrategy, ...]) -> tuple[StopStrategy, ...]:
     from relinker.stop.composite import AnyStopStrategy
 
@@ -415,16 +405,14 @@ class RetryPolicy(Generic[T]):
         jitter_delay = RandomDelay(minimum=minimum, maximum=maximum, seed=seed)
         return replace(
             self,
-            delay_strategy=AdditiveDelay(
-                _flatten_additive_delays((self.delay_strategy, jitter_delay))
-            ),
+            delay_strategy=AdditiveDelay((self.delay_strategy, jitter_delay)),
         )
 
     def add_delay(self, strategy: DelayStrategy) -> RetryPolicy[T]:
         """Return a new policy that adds a delay strategy to the current strategy."""
         return replace(
             self,
-            delay_strategy=AdditiveDelay(_flatten_additive_delays((self.delay_strategy, strategy))),
+            delay_strategy=AdditiveDelay((self.delay_strategy, strategy)),
         )
 
     def custom_delay(self, callback: Callable[[int], float]) -> RetryPolicy[T]:

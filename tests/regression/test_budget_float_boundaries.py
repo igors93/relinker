@@ -13,8 +13,8 @@ Two float-boundary failure modes are covered:
 
 2. A candidate lands exactly on a boundary value that `_first_legal_slot`'s
    strict-inequality check does not advance, causing the post-loop validation
-   to walk ULP-by-ULP until a genuinely legal slot is found — which can require
-   hundreds of thousands of steps while the budget lock is held.
+   to walk one representable float at a time until a genuinely legal slot is
+   found while the budget lock is held.
 """
 
 from __future__ import annotations
@@ -196,3 +196,27 @@ def test_boundary_forced_slot_is_minimal() -> None:
         f"(capacity-violating), but no window was overfull. "
         f"The returned slot may not be minimal."
     )
+
+
+def test_rounded_up_boundary_does_not_skip_earliest_legal_float() -> None:
+    """The selected slot must be legal and no earlier legal float may be skipped."""
+    budget = RetryBudget(max_retries=1, per=0.3)
+    not_before = 0.6
+
+    first = budget._reserve(
+        "api",
+        current_time=0.0,
+        not_before=0.5000000000000002,
+    )
+    second = budget._reserve(
+        "api",
+        current_time=0.0,
+        not_before=not_before,
+    )
+
+    result = second.scheduled_at
+    previous = math.nextafter(result, -math.inf)
+
+    assert result >= not_before
+    assert budget._is_legal_slot(result, [first.scheduled_at])
+    assert previous < not_before or not budget._is_legal_slot(previous, [first.scheduled_at])

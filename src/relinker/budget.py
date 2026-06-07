@@ -199,9 +199,12 @@ class RetryBudget:
     def _first_slot_after_window(self, first: float) -> float:
         """Return the first float whose open-left window boundary excludes ``first``."""
         candidate = first + self._per
-        if candidate - self._per < first:
-            candidate = math.nextafter(candidate, math.inf)
-        return candidate
+        previous = math.nextafter(candidate, -math.inf)
+        if previous - self._per >= first:
+            return previous
+        if candidate - self._per >= first:
+            return candidate
+        return math.nextafter(candidate, math.inf)
 
     def _is_legal_slot(self, candidate: float, scheduled_times: list[float]) -> bool:
         """Return True when adding ``candidate`` keeps every rolling window in budget."""

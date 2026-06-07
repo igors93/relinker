@@ -33,7 +33,12 @@ from relinker.delays.linear import LinearDelay
 from relinker.delays.random_delay import RandomDelay
 from relinker.delays.random_exponential import RandomExponentialDelay
 from relinker.delays.stateful import StatefulCustomDelay
-from relinker.diagnostics import PolicyHealthReport, PolicyWarning, RetrySimulation
+from relinker.diagnostics import (
+    PolicyHealthReport,
+    PolicyWarning,
+    RetryLoadEstimate,
+    RetrySimulation,
+)
 from relinker.event import EventHandler, EventName, RetryEvent
 from relinker.exceptions import InvalidRetryConfigError
 from relinker.executors.async_ import execute_async
@@ -85,8 +90,12 @@ class RetryPolicy(Generic[T]):
     history_limit: int | None = 1000
     retry_budget: RetryBudget | None = None
     retry_budget_key: str | None = None
+    name: str | None = None
+    testing_mode: bool = False
 
     def __post_init__(self) -> None:
+        if self.name is not None and (not isinstance(self.name, str) or not self.name.strip()):
+            raise InvalidRetryConfigError("policy name must be a non-empty string")
         if self.history_limit is not None:
             from relinker.internal.validation import ensure_positive_int
 
@@ -109,6 +118,12 @@ class RetryPolicy(Generic[T]):
             self.should_raise_last and explicit_exhaustion_behaviors > 0
         ):
             raise InvalidRetryConfigError("exhaustion behaviors are mutually exclusive")
+
+    def named(self, name: str) -> RetryPolicy[T]:
+        """Return a new policy with a human-readable optional name."""
+        if not isinstance(name, str) or not name.strip():
+            raise InvalidRetryConfigError("policy name must be a non-empty string")
+        return replace(self, name=name)
 
     # ------------------------------------------------------------------ stop
 
@@ -494,7 +509,10 @@ class RetryPolicy(Generic[T]):
         They use real wall-clock time and will behave as if no time passes between
         retries.
         """
-        return self.with_sleep(_no_sleep, _no_sleep_async)
+        return replace(
+            self.with_sleep(_no_sleep, _no_sleep_async),
+            testing_mode=True,
+        )
 
     # ------------------------------------------------------------ events
 
@@ -601,6 +619,11 @@ class RetryPolicy(Generic[T]):
 
     def emit(self, event: RetryEvent) -> None:
         """Emit an event to all matching handlers."""
+        if self.name is not None and event.policy_name is None:
+            state = event.state
+            if state is not None and state.policy_name is None:
+                state = replace(state, policy_name=self.name)
+            event = replace(event, policy_name=self.name, state=state)
         for name, handler in self.event_handlers:
             if name == event.name:
                 handler(event)
@@ -649,11 +672,28 @@ class RetryPolicy(Generic[T]):
         """
         return self.simulate(attempts=attempts).describe()
 
-    def preview(self, attempts: int = 5) -> str:
+    def estimate_load(self, *, concurrent_executions: int) -> RetryLoadEstimate:
+        """Return a worst-case call estimate for concurrent executions."""
+        from relinker.internal.policy_simulation import estimate_policy_load
+
+        return estimate_policy_load(self, concurrent_executions)
+
+    def preview(
+        self,
+        attempts: int = 5,
+        *,
+        concurrent_executions: int | None = None,
+    ) -> str:
         """Return a concise preview of retry timing and policy warnings."""
         from relinker.internal.policy_simulation import preview_policy
 
-        return preview_policy(self, attempts)
+        return preview_policy(self, attempts, concurrent_executions)
+
+    def to_dict(self) -> dict[str, object]:
+        """Return a structured representation of this policy configuration."""
+        from relinker.internal.policy_serialization import policy_to_dict
+
+        return policy_to_dict(self)
 
     # -------------------------------------------------- iteration / blocks
 

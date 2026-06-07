@@ -27,28 +27,32 @@ def make_logging_handler(
     """
 
     def handler(event: RetryEvent) -> None:
+        policy_label = f" policy={event.policy_name}" if event.policy_name else ""
         if event.name == "before_sleep":
             logger.log(
                 level,
-                "Attempt %d failed (%s), retrying in %.2fs",
+                "Attempt %d failed (%s), retrying in %.2fs%s",
                 event.attempt_number,
                 event.error.__class__.__name__ if event.error is not None else "result rejected",
                 event.delay if event.delay is not None else 0.0,
+                policy_label,
             )
         elif event.name == "after_giveup":
             if event.error is not None:
                 logger.log(
                     level,
-                    "Giving up after attempt %d: %s: %s",
+                    "Giving up after attempt %d: %s: %s%s",
                     event.attempt_number,
                     event.error.__class__.__name__,
                     event.error,
+                    policy_label,
                 )
             else:
                 logger.log(
                     level,
-                    "Giving up after attempt %d: result retry exhausted",
+                    "Giving up after attempt %d: result retry exhausted%s",
                     event.attempt_number,
+                    policy_label,
                 )
 
     return handler
@@ -85,6 +89,8 @@ def _structured_payload(
         "function": event.function_name,
         "attempt": event.attempt_number,
     }
+    if event.policy_name is not None:
+        payload["policy"] = event.policy_name
 
     if event.delay is not None:
         payload["delay"] = event.delay

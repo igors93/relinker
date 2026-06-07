@@ -28,6 +28,7 @@ class RetryState:
     will_stop: bool = False
     policy_delay: float | None = None
     budget_delay: float | None = None
+    policy_name: str | None = None
 
     @property
     def attempt_count(self) -> int:

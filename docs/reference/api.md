@@ -41,6 +41,7 @@ root package exports.
 | `RetryStatsSnapshot` | Immutable retry statistics snapshot. |
 | `PolicyWarning` | Advisory warning about a policy. |
 | `PolicyHealthReport` | Doctor report for a policy. |
+| `RetryLoadEstimate` | Worst-case estimate of calls from concurrent executions. |
 | `RetrySimulation` | Simulated retry timeline. |
 | `RetrySimulationAttempt` | One simulated attempt. |
 
@@ -91,6 +92,19 @@ from relinker.context import (
 `RetryAttemptContext` and `AsyncRetryAttemptContext` are also root package
 exports. `RetryBlockIterator` and `AsyncRetryBlockIterator` remain documented
 exports of `relinker.context`.
+
+The documented public exports of `relinker.result_conditions` are:
+
+```python
+from relinker.result_conditions import (
+    retry_if_empty,
+    retry_if_false,
+    retry_if_none,
+    retry_if_value,
+)
+```
+
+These helpers are intentionally not root package exports.
 
 Underscore-prefixed modules and helpers are internal. In particular,
 `relinker.context._shared` is not public API.
@@ -154,6 +168,11 @@ part of `relinker.__all__`, so it is not included in the root star-import API.
 - `with_retry_budget()`
 - `without_retry_budget()`
 
+### Metadata and representation
+
+- `named()`
+- `to_dict()`
+
 ### Observability
 
 - `on_event()`
@@ -170,6 +189,7 @@ part of `relinker.__all__`, so it is not included in the root star-import API.
 
 - `warnings()`
 - `doctor()`
+- `estimate_load()`
 - `simulate()`
 - `timeline()`
 - `preview()`

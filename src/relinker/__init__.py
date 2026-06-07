@@ -12,6 +12,7 @@ from relinker.context import AsyncRetryAttemptContext, RetryAttemptContext
 from relinker.diagnostics import (
     PolicyHealthReport,
     PolicyWarning,
+    RetryLoadEstimate,
     RetrySimulation,
     RetrySimulationAttempt,
 )
@@ -49,6 +50,7 @@ __all__ = [
     "RetryBudget",
     "RetryBudgetSnapshot",
     "RetryExhaustedError",
+    "RetryLoadEstimate",
     "RelinkerError",
     "RetryPolicy",
     "RetryResult",

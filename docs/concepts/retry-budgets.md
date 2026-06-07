@@ -45,6 +45,29 @@ the actual total wait. The event state provides:
 
 The budget key is not included in structured logs by default.
 
+## Snapshot
+
+`budget.snapshot(key)` returns a momentary, read-only view of one key:
+
+```python
+snapshot = budget.snapshot("payments-api")
+
+print(snapshot.active)
+print(snapshot.queued)
+print(snapshot.available)
+print(snapshot.available_now)
+print(snapshot.next_available_in)
+```
+
+`active` counts reservations inside the current rolling window. `queued` counts
+reservations scheduled strictly in the future. `available` is kept for
+compatibility and means the same thing as `available_now`: how many retries could
+be reserved immediately without breaking the budget. `next_available_in` is an
+estimate, in seconds, based on the reservations currently known to this process.
+
+The snapshot is process-local and can become stale immediately after it is read.
+It is useful for diagnostics, not for distributed coordination.
+
 ## Scope and simulation
 
 `RetryBudget` is in-memory and process-local. State is lost on restart and is not

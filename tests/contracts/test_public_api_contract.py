@@ -16,6 +16,7 @@ EXPECTED_ROOT_PUBLIC_API = (
     "RetryBudget",
     "RetryBudgetSnapshot",
     "RetryExhaustedError",
+    "RetryLoadEstimate",
     "RelinkerError",
     "RetryPolicy",
     "RetryResult",

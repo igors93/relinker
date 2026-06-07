@@ -39,6 +39,7 @@ def build_state(
     will_stop: bool = False,
     policy_delay: float | None = None,
     budget_delay: float | None = None,
+    policy_name: str | None = None,
 ) -> RetryState:
     """Build an immutable runtime state snapshot."""
     return RetryState(
@@ -56,4 +57,5 @@ def build_state(
         will_stop=will_stop,
         policy_delay=policy_delay,
         budget_delay=budget_delay,
+        policy_name=policy_name,
     )

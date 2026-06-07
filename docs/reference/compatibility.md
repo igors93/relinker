@@ -65,7 +65,10 @@ Module-level APIs are supported only when they meet all of these requirements:
 - the module appears in the reference documentation;
 - the module has a contract test for that public surface.
 
-The current documented module API is `relinker.context.__all__`.
+The current documented module APIs are:
+
+- `relinker.context.__all__`;
+- `relinker.result_conditions.__all__`.
 
 ### Internal API
 
@@ -121,6 +124,10 @@ migration guidance, and updated snapshots. That phase is closed.
 `RetryBudget` is process-local and in-memory. It does not coordinate multiple
 processes or machines. This is a documented scope boundary, not an implicit
 distributed guarantee.
+
+`RetryPolicy.to_dict()` is a public structured representation of configuration.
+Minor releases may add keys, but existing keys should not change meaning
+silently. The output is not a serialization contract for rebuilding policies.
 
 `max_time()` controls the retry loop between attempts; it does not interrupt a
 user function that is already running.

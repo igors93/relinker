@@ -45,6 +45,7 @@ class RetryEvent:
     value: Any = None
     error: BaseException | None = None
     state: RetryState | None = None
+    policy_name: str | None = None
 
 
 EventHandler: TypeAlias = Callable[[RetryEvent], None]

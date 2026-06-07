@@ -37,6 +37,7 @@ class _BaseRetryBlockIterator:
             function_name=name,
             started_at=_context_now(),
             history_limit=policy.history_limit,
+            policy_name=policy.name,
         )
         self.finished = False
         self.result: RetryResult[Any] | None = None

@@ -55,6 +55,25 @@ This is useful in:
 print(policy.preview(attempts=5))
 ```
 
+It can also include a worst-case load estimate:
+
+```python
+print(policy.preview(attempts=5, concurrent_executions=1000))
+```
+
+For structured data, use `estimate_load()`:
+
+```python
+estimate = policy.estimate_load(concurrent_executions=1000)
+
+print(estimate.maximum_total_calls)
+print(estimate.describe())
+```
+
+The estimate is deliberately a worst case. It does not predict real traffic and
+does not subtract Retry Budget capacity from the total; a budget limits retry
+rate, not necessarily total operation duration.
+
 ## Timeline and simulation
 
 Use `simulate()` when you want structured data:
@@ -83,7 +102,26 @@ print(policy.timeline(attempts=5))
 | `many_attempts` | The policy uses many attempts |
 | `high_total_sleep` | The simulated sleep time is high |
 | `result_retry_without_observation` | Result-based retry may exhaust silently |
-| `return_result_precedence` | `return_result()` takes precedence over fallback or exhausted errors |
+| `missing_jitter` | Many deterministic delayed attempts may synchronize under concurrency |
+| `missing_retry_budget` | Many attempts or infinite retry may multiply load without a budget |
+| `silent_fallback` | A fallback may hide repeated failures without a give-up observer |
+| `infinite_retry_with_budget` | A Retry Budget controls rate, not total duration |
+| `for_testing_with_max_time` | `for_testing()` does not advance time for `max_time()` |
+
+## Structured policy view
+
+Use `to_dict()` when you want a safe, structured description of policy
+configuration:
+
+```python
+policy = RetryPolicy().named("payments-api").attempts(5)
+
+print(policy.to_dict())
+```
+
+The dictionary describes configuration only. It does not include runtime
+reservations, locks, arguments, return values, or a way to rebuild the policy.
+Future minor versions may add keys.
 
 ## Production recommendation
 

@@ -24,6 +24,9 @@ delays, event handlers). It is chainable and can be called at any point in the b
 > behave as if no time passes between retries, which may cause `max_time`-based exhaustion
 > to behave differently than in production.
 
+`doctor()` reports this combination explicitly when a policy created with
+`for_testing()` also uses `max_time()`.
+
 For lower-level control, you can inject custom sleep functions directly:
 
 ```python

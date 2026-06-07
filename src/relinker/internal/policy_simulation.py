@@ -10,8 +10,11 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from relinker.diagnostics import RetrySimulation, RetrySimulationAttempt
+from relinker.diagnostics import RetryLoadEstimate, RetrySimulation, RetrySimulationAttempt
 from relinker.exceptions import InvalidRetryConfigError
+from relinker.stop.attempts import StopAfterAttempt
+from relinker.stop.composite import AllStopStrategy, AnyStopStrategy
+from relinker.stop.forever import StopForever
 
 
 def _format_seconds(value: float | None) -> str:
@@ -81,6 +84,70 @@ def simulate_policy(policy: Any, attempts: int) -> RetrySimulation:
             break
 
     return RetrySimulation(tuple(simulated_attempts))
+
+
+def _estimate_attempts(strategy: Any) -> tuple[int | None, bool, bool]:
+    if isinstance(strategy, StopAfterAttempt):
+        return strategy.maximum, False, False
+    if isinstance(strategy, StopForever):
+        return None, True, False
+    if isinstance(strategy, AnyStopStrategy):
+        estimates = [_estimate_attempts(item) for item in strategy.strategies]
+        bounded = [
+            maximum
+            for maximum, unbounded, _partial in estimates
+            if maximum is not None and not unbounded
+        ]
+        if bounded:
+            return min(bounded), False, False
+        if any(unbounded for _maximum, unbounded, _partial in estimates):
+            return None, True, False
+        return None, False, True
+    if isinstance(strategy, AllStopStrategy):
+        estimates = [_estimate_attempts(item) for item in strategy.strategies]
+        if all(maximum is not None for maximum, _unbounded, _partial in estimates):
+            return (
+                max(cast(int, maximum) for maximum, _unbounded, _partial in estimates),
+                False,
+                False,
+            )
+        if all(unbounded for _maximum, unbounded, _partial in estimates):
+            return None, True, False
+        return None, False, True
+    return None, False, True
+
+
+def estimate_policy_load(policy: Any, concurrent_executions: int) -> RetryLoadEstimate:
+    """Estimate worst-case call load for concurrent executions of one policy."""
+    if (
+        not isinstance(concurrent_executions, int)
+        or isinstance(concurrent_executions, bool)
+        or concurrent_executions <= 0
+    ):
+        raise InvalidRetryConfigError("concurrent_executions must be a positive integer")
+
+    maximum_attempts, unbounded, partial = _estimate_attempts(policy.stop_strategy)
+    original_calls = concurrent_executions
+    if maximum_attempts is None:
+        maximum_additional_retries = None
+        maximum_total_calls = None
+    else:
+        maximum_additional_retries = concurrent_executions * max(0, maximum_attempts - 1)
+        maximum_total_calls = original_calls + maximum_additional_retries
+
+    budget = policy.retry_budget
+    return RetryLoadEstimate(
+        concurrent_executions=concurrent_executions,
+        maximum_attempts_per_execution=maximum_attempts,
+        original_calls=original_calls,
+        maximum_additional_retries=maximum_additional_retries,
+        maximum_total_calls=maximum_total_calls,
+        unbounded=unbounded,
+        retry_budget_configured=budget is not None,
+        retry_budget_capacity=budget.max_retries if budget is not None else None,
+        retry_budget_period=budget.per if budget is not None else None,
+        partial=partial,
+    )
 
 
 def _describe_stop(policy: Any) -> str:
@@ -174,6 +241,9 @@ def explain_policy(policy: Any) -> str:
         f"- {_describe_delay(policy)}",
         f"- {_describe_exhaustion(policy)}",
     ]
+    if policy.name is not None:
+        lines.insert(2, f"Name: {policy.name}")
+        lines.insert(3, "")
     if policy.retry_budget is not None:
         lines.append(
             f"- share at most {policy.retry_budget.max_retries} retries every "
@@ -204,7 +274,11 @@ def explain_policy(policy: Any) -> str:
     return "\n".join(lines)
 
 
-def preview_policy(policy: Any, attempts: int = 5) -> str:
+def preview_policy(
+    policy: Any,
+    attempts: int = 5,
+    concurrent_executions: int | None = None,
+) -> str:
     """Return a concise preview of the delay timeline and warnings."""
     simulation = simulate_policy(policy, attempts)
     lines = [
@@ -233,6 +307,11 @@ def preview_policy(policy: Any, attempts: int = 5) -> str:
                 ),
             ]
         )
+
+    if concurrent_executions is not None:
+        lines.extend(["", "Load worst-case estimate:"])
+        estimate = estimate_policy_load(policy, concurrent_executions)
+        lines.extend(f"- {line}" for line in estimate.describe().splitlines()[2:] if line)
 
     warnings = policy.warnings()
     if warnings:

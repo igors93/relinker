@@ -8,6 +8,27 @@ the compatibility and deprecation policy documented in
 
 ## Unreleased
 
+### Added
+
+- Added policy names with `RetryPolicy.named(...)`, propagated to retry state, events,
+  results, logs, structured logs, explanations, and policy dictionaries.
+- Added `RetryLoadEstimate` and `RetryPolicy.estimate_load(...)` for explicit
+  worst-case load estimates under concurrency.
+- Added `RetryPolicy.to_dict()` for a structured, log-safe view of policy
+  configuration.
+- Added `relinker.result_conditions` helpers for common result-based retry
+  predicates.
+- Expanded `doctor()` guidance with warnings for missing jitter, missing retry
+  budgets, silent fallbacks, infinite retry with a budget, and `for_testing()`
+  combined with `max_time()`.
+
+### Fixed
+
+- `RetryBudget` now reserves the first legal slot instead of treating distant
+  future reservations as blockers.
+- `RetryBudgetSnapshot` now distinguishes active reservations from future queued
+  reservations and reports immediate availability and next availability.
+
 ## 1.0.1 - 2026-06-06
 
 ### Fixed

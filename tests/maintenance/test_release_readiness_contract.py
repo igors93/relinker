@@ -32,11 +32,13 @@ def test_changelog_has_unreleased_before_current_release() -> None:
     assert changelog.index("## Unreleased") < changelog.index("## 1.0.0")
 
 
-def test_changelog_unreleased_is_empty() -> None:
+def test_changelog_unreleased_records_current_development_changes() -> None:
     unreleased = _unreleased_block()
     content_after_heading = unreleased[len("## Unreleased") :].strip()
 
-    assert content_after_heading == ""
+    assert "RetryPolicy.named" in content_after_heading
+    assert "RetryPolicy.to_dict" in content_after_heading
+    assert "RetryBudgetSnapshot" in content_after_heading
 
 
 def test_changelog_history_remains_present_once() -> None:

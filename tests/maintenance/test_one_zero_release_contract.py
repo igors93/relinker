@@ -40,13 +40,15 @@ def test_changelog_has_dated_one_zero_one_section() -> None:
     assert len(matches) == 1
 
 
-def test_changelog_unreleased_is_empty_before_one_zero_one() -> None:
+def test_changelog_unreleased_records_current_development_changes() -> None:
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     start = changelog.index("## Unreleased")
     end = changelog.index("## 1.0.1")
     block = changelog[start + len("## Unreleased") : end].strip()
 
-    assert block == ""
+    assert "RetryPolicy.named" in block
+    assert "RetryPolicy.to_dict" in block
+    assert "RetryBudgetSnapshot" in block
 
 
 def test_readme_is_stable() -> None:
@@ -88,7 +90,7 @@ def test_compatibility_doc_is_post_one_zero() -> None:
 
 
 def test_public_api_size_is_unchanged() -> None:
-    assert len(relinker.__all__) == 31
+    assert len(relinker.__all__) == 32
 
 
 def test_readiness_record_is_honest() -> None:

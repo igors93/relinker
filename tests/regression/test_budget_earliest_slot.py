@@ -5,9 +5,11 @@ which forced every new reservation to be at least as late as the most recently a
 one. This prevented using an earlier valid slot when a previous reservation had a larger
 not_before than the new one.
 
-With the fix: the FIFO line is removed. The capacity while-loop finds the earliest valid
-slot by using min(active) instead of active[0] (since the deque is no longer sorted).
-`_prune` is updated to filter all expired items (not just from the front).
+With the fix: the FIFO line is removed. The capacity while-loop checks whether adding
+the candidate would keep every rolling window within capacity, including windows that
+also contain future reservations. When the candidate is illegal, it moves to the next
+boundary where an existing reservation leaves a window. `_prune` is updated to filter
+all expired items (not just from the front).
 
 All tests that confirm the new (correct) behavior are below. The test
 `test_reservations_remain_ordered` in test_retry_budget.py has been updated to verify the
@@ -16,7 +18,91 @@ capacity invariant instead of the FIFO ordering invariant.
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+
 from relinker import RetryBudget
+
+
+def _assert_capacity_windows(times: list[float], *, capacity: int, per: float) -> None:
+    for end in times:
+        count = sum(1 for scheduled_at in times if end - per < scheduled_at <= end)
+        assert count <= capacity
+
+
+def test_distant_future_reservation_does_not_block_earlier_legal_slot() -> None:
+    budget = RetryBudget(max_retries=1, per=10)
+    future = budget._reserve("api", current_time=0, not_before=100)
+
+    earlier = budget._reserve("api", current_time=0, not_before=0)
+
+    assert future.scheduled_at == 100
+    assert earlier.scheduled_at == 0
+
+
+def test_near_future_reservation_blocks_earlier_slot_when_window_would_overfill() -> None:
+    budget = RetryBudget(max_retries=1, per=10)
+    future = budget._reserve("api", current_time=0, not_before=5)
+
+    earlier = budget._reserve("api", current_time=0, not_before=0)
+
+    assert future.scheduled_at == 5
+    assert earlier.scheduled_at == 15
+
+
+def test_capacity_two_uses_first_legal_slot_with_mixed_existing_reservations() -> None:
+    budget = RetryBudget(max_retries=2, per=10)
+    first = budget._reserve("api", current_time=0, not_before=1)
+    second = budget._reserve("api", current_time=0, not_before=3)
+    distant = budget._reserve("api", current_time=0, not_before=20)
+
+    mixed = budget._reserve("api", current_time=0, not_before=4)
+
+    times = [first.scheduled_at, second.scheduled_at, distant.scheduled_at, mixed.scheduled_at]
+    assert times == [1, 3, 20, 11]
+    _assert_capacity_windows(times, capacity=budget.max_retries, per=budget.per)
+
+
+def test_exact_boundaries_are_available_when_old_reservation_reaches_period() -> None:
+    budget = RetryBudget(max_retries=1, per=10)
+
+    reservations = [
+        budget._reserve("api", current_time=0, not_before=0),
+        budget._reserve("api", current_time=0, not_before=10),
+        budget._reserve("api", current_time=0, not_before=20),
+    ]
+
+    times = [reservation.scheduled_at for reservation in reservations]
+    assert times == [0, 10, 20]
+    _assert_capacity_windows(times, capacity=budget.max_retries, per=budget.per)
+
+
+def test_cancelled_reservation_stops_influencing_earliest_slot() -> None:
+    budget = RetryBudget(max_retries=1, per=10)
+    cancelled = budget._reserve("api", current_time=0, not_before=0)
+    blocked = budget._reserve("api", current_time=0, not_before=0)
+    assert blocked.scheduled_at == 10
+
+    budget._release(cancelled)
+    replacement = budget._reserve("api", current_time=0, not_before=0)
+
+    assert replacement.scheduled_at == 0
+
+
+def test_concurrent_reservations_respect_capacity_without_oversubscription() -> None:
+    budget = RetryBudget(max_retries=3, per=10)
+    not_befores = [0, 3, 1, 20, 7, 4, 9, 30, 2, 6, 12, 18]
+
+    def reserve(not_before: float) -> tuple[float, float]:
+        reservation = budget._reserve("api", current_time=0, not_before=not_before)
+        return not_before, reservation.scheduled_at
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        pairs = list(executor.map(reserve, not_befores))
+
+    times = [scheduled_at for _, scheduled_at in pairs]
+    for not_before, scheduled_at in pairs:
+        assert scheduled_at >= not_before
+    _assert_capacity_windows(times, capacity=budget.max_retries, per=budget.per)
 
 
 def test_reserve_uses_earlier_slot_when_later_reservation_exists() -> None:
@@ -60,7 +146,7 @@ def test_out_of_order_not_before_produces_earliest_slots() -> None:
     """Multiple reservations with mixed not_before values go to earliest valid slots.
 
     not_before sequence: 3, 1, 20, 4, 21.
-    Expected scheduled_at:  3, 1, 20, 13, 23.
+    Expected scheduled_at:  3, 1, 20, 11, 21.
     """
     budget = RetryBudget(max_retries=2, per=10)
     not_befores = (3, 1, 20, 4, 21)
@@ -80,8 +166,8 @@ def test_out_of_order_not_before_produces_earliest_slots() -> None:
         )
 
     # Exact values after earliest-slot scheduling.
-    assert times == [3, 1, 20, 13, 23], (
-        f"Expected earliest-slot times [3, 1, 20, 13, 23], got {times}."
+    assert times == [3, 1, 20, 11, 21], (
+        f"Expected earliest-slot times [3, 1, 20, 11, 21], got {times}."
     )
 
 

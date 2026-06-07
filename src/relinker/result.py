@@ -41,6 +41,7 @@ class RetryResult(Generic[T]):
     total_attempts: int = 0
     total_failed_attempts: int | None = None
     total_successful_attempts: int | None = None
+    policy_name: str | None = None
 
     @property
     def succeeded(self) -> bool:
@@ -177,6 +178,7 @@ class RetryResult(Generic[T]):
             "retained_attempt_count": self.retained_attempt_count,
             "history_truncated": self.history_truncated,
             "total_time": round(self.total_time, 3),
+            "policy_name": self.policy_name,
             "error": self.error.__class__.__name__ if self.error is not None else None,
             "error_types": [error_type.__name__ for error_type in self.error_types],
         }
@@ -205,6 +207,7 @@ class RetryResult(Generic[T]):
             "total_time": self.total_time,
             "started_at": self.started_at,
             "ended_at": self.ended_at,
+            "policy_name": self.policy_name,
             "error": None,
             "attempts": [
                 {

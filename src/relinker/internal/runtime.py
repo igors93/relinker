@@ -20,9 +20,11 @@ class RetryRuntime:
         function_name: str,
         started_at: float,
         history_limit: int | None,
+        policy_name: str | None = None,
     ) -> None:
         self.function_name = function_name
         self.started_at = started_at
+        self.policy_name = policy_name
         self.attempts: deque[AttemptRecord] = deque(maxlen=history_limit)
         self.attempt_number = 0
         self.failed_count = 0
@@ -96,6 +98,7 @@ class RetryRuntime:
             will_stop=will_stop,
             policy_delay=policy_delay,
             budget_delay=budget_delay,
+            policy_name=self.policy_name,
         )
 
     def result(
@@ -118,4 +121,5 @@ class RetryRuntime:
             total_attempts=self.attempt_number,
             total_failed_attempts=self.failed_count,
             total_successful_attempts=self.success_count,
+            policy_name=self.policy_name,
         )

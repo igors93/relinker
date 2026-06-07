@@ -30,6 +30,7 @@ async def execute_async(
         function_name=_function_name(function),
         started_at=now(),
         history_limit=policy.history_limit,
+        policy_name=policy.name,
     )
 
     while True:

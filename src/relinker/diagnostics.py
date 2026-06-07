@@ -177,3 +177,61 @@ class RetrySimulation:
                 f"{stop_marker}"
             )
         return "\n".join(lines)
+
+
+@dataclass(frozen=True, slots=True)
+class RetryLoadEstimate:
+    """Worst-case estimate of calls produced by concurrent retry executions."""
+
+    concurrent_executions: int
+    maximum_attempts_per_execution: int | None
+    original_calls: int
+    maximum_additional_retries: int | None
+    maximum_total_calls: int | None
+    unbounded: bool
+    retry_budget_configured: bool
+    retry_budget_capacity: int | None
+    retry_budget_period: float | None
+    partial: bool = False
+
+    def to_dict(self) -> dict[str, object]:
+        """Return this estimate as a JSON-friendly dictionary."""
+        return {
+            "concurrent_executions": self.concurrent_executions,
+            "maximum_attempts_per_execution": self.maximum_attempts_per_execution,
+            "original_calls": self.original_calls,
+            "maximum_additional_retries": self.maximum_additional_retries,
+            "maximum_total_calls": self.maximum_total_calls,
+            "unbounded": self.unbounded,
+            "retry_budget_configured": self.retry_budget_configured,
+            "retry_budget_capacity": self.retry_budget_capacity,
+            "retry_budget_period": self.retry_budget_period,
+            "partial": self.partial,
+        }
+
+    def describe(self) -> str:
+        """Return a readable load estimate."""
+        lines = [
+            "Relinker load worst-case estimate",
+            "",
+            f"Concurrent executions: {self.concurrent_executions}",
+            f"Original calls: {self.original_calls}",
+        ]
+        if self.unbounded:
+            lines.append("Maximum total calls: unbounded")
+        elif self.partial:
+            lines.append("Maximum total calls: unknown (partial estimate)")
+        else:
+            lines.extend(
+                [
+                    f"Maximum attempts per execution: {self.maximum_attempts_per_execution}",
+                    f"Maximum additional retries: {self.maximum_additional_retries}",
+                    f"Maximum total calls: {self.maximum_total_calls}",
+                ]
+            )
+        if self.retry_budget_configured:
+            lines.append(
+                "Retry Budget configured: "
+                f"{self.retry_budget_capacity} retries per {self.retry_budget_period:g} seconds"
+            )
+        return "\n".join(lines)

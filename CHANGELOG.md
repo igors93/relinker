@@ -8,6 +8,14 @@ the compatibility and deprecation policy documented in
 
 ## Unreleased
 
+### Fixed
+
+- `RetryBudget` no longer places a reservation outside a full window when
+  `per` is a decimal value whose floating-point arithmetic causes
+  `(first + per) - per < first`. `_first_legal_slot` now verifies its result
+  with `_is_legal_slot` and advances by one ULP when the boundary rounds back
+  inside an existing window.
+
 ## 1.1.0 - 2026-06-07
 
 ### Added

@@ -7,6 +7,7 @@ limiter: it only reserves times at which Relinker may perform retry attempts.
 
 from __future__ import annotations
 
+import math
 from bisect import bisect_left, bisect_right, insort
 from collections import deque
 from dataclasses import dataclass
@@ -181,6 +182,12 @@ class RetryBudget:
             forbidden_end = first + self._per
             if forbidden_start < candidate < forbidden_end:
                 candidate = forbidden_end
+        # Float rounding can place `candidate` exactly on a boundary where
+        # `candidate - per` rounds to a value less than an existing reservation,
+        # making the slot illegal according to _is_legal_slot.  Advance by one
+        # ULP until the candidate is genuinely legal.
+        while not self._is_legal_slot(candidate, scheduled_times):
+            candidate = math.nextafter(candidate, math.inf)
         return candidate
 
     def _is_legal_slot(self, candidate: float, scheduled_times: list[float]) -> bool:

@@ -25,8 +25,23 @@ the compatibility and deprecation policy documented in
 ### Fixed
 
 - Corrected load estimates for `ALL` stop strategies containing an unbounded condition.
+- Corrected load estimates for `OR` stop strategies so mixed bounded and
+  unbounded branches are reported as partial rather than fully unbounded.
 - Corrected `RetryPolicy.to_dict()` to describe result exhaustion separately.
 - Corrected testing-mode metadata when custom sleep functions replace `for_testing()`.
+- Restored default async sleep behavior when `with_sleep()` replaces only the
+  sync sleeper after `for_testing()`.
+- Validated resolved delays centrally after custom and composed delay strategies.
+- Ensured configured exhaustion exception instances are copied per exhaustion.
+- Honored `minimum` for zero-base `random_exponential_delay()` strategies.
+- Improved diagnostics for composed stop and exception conditions.
+- Clarified `simulate()` documentation for unsupported custom and stateful delay
+  callbacks.
+- Corrected `@retry(return_result=True)` typing to return `RetryResult`.
+- Clarified `Retry-After` documentation so invalid values fall back while large
+  valid values are capped.
+- Clarified `retry_if()` documentation for callbacks receiving a real `None`
+  result.
 - `RetryBudget` now reserves the first legal slot instead of treating distant
   future reservations as blockers.
 - `RetryBudgetSnapshot` now distinguishes active reservations from future queued

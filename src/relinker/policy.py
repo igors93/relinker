@@ -11,6 +11,7 @@ readable public facade.
 
 from __future__ import annotations
 
+import copy
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
@@ -65,6 +66,25 @@ def _no_sleep(_: float) -> None:
 
 async def _no_sleep_async(_: float) -> None:
     """No-op async sleep used by for_testing()."""
+
+
+def _copy_exception_instance(exception: BaseException) -> BaseException:
+    """Create a fresh exception instance from a configured exception object."""
+    try:
+        copied = copy.copy(exception)
+    except Exception:  # noqa: BLE001
+        copied = type(exception)(*exception.args)
+
+    if copied is exception:
+        copied = type(exception)(*exception.args)
+        if hasattr(exception, "__dict__"):
+            copied.__dict__.update(exception.__dict__)
+
+    copied.__traceback__ = None
+    copied.__cause__ = None
+    copied.__context__ = None
+    copied.__suppress_context__ = getattr(exception, "__suppress_context__", False)
+    return copied
 
 
 @dataclass(frozen=True, slots=True)
@@ -208,7 +228,10 @@ class RetryPolicy(Generic[T]):
         """
         Return a new policy with a fully custom retry condition.
 
-        The callback receives either an error or a value. Exactly one is non-None.
+        The callback receives ``(error, value)``. For exception decisions,
+        error is the raised exception and value is None. For result decisions,
+        error is None and value is the returned value; value may be None when
+        the wrapped function returned None.
         """
         return replace(self, condition=CustomCondition(callback))
 
@@ -437,7 +460,7 @@ class RetryPolicy(Generic[T]):
         elif isinstance(exception, BaseException):
 
             def make_from_instance(result: RetryResult[Any]) -> BaseException:
-                return exception
+                return _copy_exception_instance(exception)
 
             resolved_factory = make_from_instance
         elif callable(exception):
@@ -493,10 +516,13 @@ class RetryPolicy(Generic[T]):
 
         Useful for tests (with no_sleep()) and advanced integrations.
         """
+        resolved_async_sleep = async_sleep
+        if resolved_async_sleep is None:
+            resolved_async_sleep = default_async_sleep if self.testing_mode else self.async_sleep
         return replace(
             self,
             sleep=sleep,
-            async_sleep=async_sleep if async_sleep is not None else self.async_sleep,
+            async_sleep=resolved_async_sleep,
             testing_mode=False,
         )
 
@@ -652,8 +678,9 @@ class RetryPolicy(Generic[T]):
         """
         Simulate the delay timeline without executing user code.
 
-        The simulation is advisory and deterministic for fixed delays. For
-        StatefulCustomDelay, it uses a minimal state (no last_value/error).
+        The simulation is advisory and deterministic for built-in delays.
+        Policies with CustomDelay or StatefulCustomDelay callbacks are not supported
+        because simulating them would execute user code.
         """
         from relinker.internal.policy_simulation import simulate_policy
 

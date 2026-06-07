@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+import inspect
 from contextlib import suppress
+
+import pytest
 
 from relinker import InvalidRetryConfigError, RetryPolicy, RetryState
 from relinker.delays.exponential import ExponentialDelay
+from relinker.delays.fixed import FixedDelay
 from relinker.delays.random_exponential import RandomExponentialDelay
+from relinker.delays.stateful import StatefulCustomDelay
 
 
 def test_simulation_does_not_report_sleep_beyond_max_time_budget() -> None:
@@ -52,6 +57,41 @@ def test_simulate_does_not_execute_stateful_delay_callback() -> None:
         policy.simulate(attempts=3)
 
     assert calls == []
+
+
+def test_simulate_rejects_stateful_delay_inside_additive_without_calling_callback() -> None:
+    calls: list[RetryState] = []
+
+    def stateful_delay(state: RetryState) -> float:
+        calls.append(state)
+        return 1.0
+
+    policy = RetryPolicy().attempts(3).stateful_delay(stateful_delay).add_delay(FixedDelay(1.0))
+
+    with pytest.raises(InvalidRetryConfigError):
+        policy.simulate(attempts=3)
+
+    assert calls == []
+
+
+def test_simulate_docstring_does_not_claim_stateful_callbacks_are_executed() -> None:
+    doc = inspect.getdoc(RetryPolicy.simulate)
+
+    assert doc is not None
+    assert "without executing user code" in doc
+    assert "StatefulCustomDelay, it uses a minimal state" not in doc
+    assert "StatefulCustomDelay" in doc
+    assert "not supported" in doc
+
+
+def test_stateful_delay_next_delay_docstring_does_not_claim_simulation_support() -> None:
+    doc = inspect.getdoc(StatefulCustomDelay.next_delay)
+
+    assert doc is not None
+    assert "Simulation fallback" not in doc
+    assert "When simulate() calls this method" not in doc
+    assert "does not make" in doc
+    assert "RetryPolicy.simulate() support stateful callbacks" in doc
 
 
 def test_warnings_do_not_execute_custom_delay_callback() -> None:

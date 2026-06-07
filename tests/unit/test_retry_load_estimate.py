@@ -5,6 +5,8 @@ import dataclasses
 import pytest
 
 from relinker import InvalidRetryConfigError, RetryBudget, RetryLoadEstimate, RetryPolicy
+from relinker.stop.composite import AnyStopStrategy
+from relinker.stop.forever import StopForever
 
 
 def test_estimate_load_for_single_attempt_has_no_additional_retries() -> None:
@@ -36,6 +38,54 @@ def test_estimate_load_for_forever_retry_is_unbounded() -> None:
     assert estimate.maximum_total_calls is None
     assert estimate.unbounded is True
     assert estimate.partial is False
+
+
+def test_estimate_load_for_forever_or_max_time_is_partial_not_unbounded() -> None:
+    estimate = RetryPolicy().forever().or_stop_after_time(10).estimate_load(concurrent_executions=5)
+
+    assert estimate.maximum_attempts_per_execution is None
+    assert estimate.maximum_additional_retries is None
+    assert estimate.maximum_total_calls is None
+    assert estimate.unbounded is False
+    assert estimate.partial is True
+
+
+def test_estimate_load_for_forever_or_forever_is_unbounded() -> None:
+    estimate = (
+        RetryPolicy()
+        .stop_when(AnyStopStrategy((StopForever(), StopForever())))
+        .estimate_load(concurrent_executions=5)
+    )
+
+    assert estimate.maximum_attempts_per_execution is None
+    assert estimate.maximum_additional_retries is None
+    assert estimate.maximum_total_calls is None
+    assert estimate.unbounded is True
+    assert estimate.partial is False
+
+
+def test_estimate_load_for_forever_or_attempts_uses_known_attempt_limit() -> None:
+    estimate = (
+        RetryPolicy().forever().or_stop_after_attempts(3).estimate_load(concurrent_executions=5)
+    )
+
+    assert estimate.maximum_attempts_per_execution == 3
+    assert estimate.maximum_additional_retries == 10
+    assert estimate.maximum_total_calls == 15
+    assert estimate.unbounded is False
+    assert estimate.partial is False
+
+
+def test_estimate_load_for_max_time_or_max_time_is_partial() -> None:
+    estimate = (
+        RetryPolicy().max_time(60).or_stop_after_time(10).estimate_load(concurrent_executions=5)
+    )
+
+    assert estimate.maximum_attempts_per_execution is None
+    assert estimate.maximum_additional_retries is None
+    assert estimate.maximum_total_calls is None
+    assert estimate.unbounded is False
+    assert estimate.partial is True
 
 
 def test_estimate_load_for_known_composed_stop() -> None:

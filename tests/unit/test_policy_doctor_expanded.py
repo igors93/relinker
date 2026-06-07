@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from relinker import RetryBudget, RetryPolicy
+from relinker.conditions.composite import AnyCondition
+from relinker.conditions.exception import ExceptionCondition
 
 
 def _codes(policy: RetryPolicy[object]) -> list[str]:
@@ -89,6 +91,67 @@ def test_for_testing_with_max_time_warns_only_when_testing_mode_is_explicit() ->
 
     assert "for_testing_with_max_time" not in _codes(production)
     assert "for_testing_with_max_time" in _codes(testing)
+
+
+def test_composed_forever_and_attempts_warns_as_infinite_retry() -> None:
+    policy = RetryPolicy().forever().and_stop_after_attempts(3).no_delay()
+    codes = _codes(policy)
+
+    assert "forever" in codes
+    assert "tight_loop_risk" in codes
+    assert "missing_retry_budget" in codes
+
+
+def test_composed_forever_or_max_time_does_not_warn_as_infinite_retry() -> None:
+    policy = RetryPolicy().forever().or_stop_after_time(10).no_delay()
+    codes = _codes(policy)
+
+    assert "forever" not in codes
+    assert "tight_loop_risk" not in codes
+
+
+def test_broad_exception_inside_any_condition_warns() -> None:
+    policy = RetryPolicy().on(TimeoutError).or_on(Exception)
+
+    assert "broad_exception" in _codes(policy)
+
+
+def test_broad_exception_inside_all_condition_with_restriction_does_not_warn() -> None:
+    policy = RetryPolicy().all_conditions(
+        ExceptionCondition((Exception,)),
+        ExceptionCondition((TimeoutError,)),
+    )
+    codes = _codes(policy)
+
+    assert "broad_exception" not in codes
+    assert "background_broad_exception" not in codes
+
+
+def test_nested_condition_composition_warns_once_in_stable_order() -> None:
+    nested = AnyCondition(
+        (
+            ExceptionCondition((TimeoutError,)),
+            AnyCondition(
+                (
+                    ExceptionCondition((Exception,)),
+                    ExceptionCondition((ConnectionError,)),
+                )
+            ),
+        )
+    )
+    policy = RetryPolicy().forever().any_condition(nested).no_delay()
+
+    codes = _codes(policy)
+
+    assert codes == [
+        "forever",
+        "no_delay",
+        "tight_loop_risk",
+        "broad_exception",
+        "missing_retry_budget",
+        "background_broad_exception",
+    ]
+    assert len(codes) == len(set(codes))
 
 
 def test_new_warnings_have_deterministic_order_and_doctor_matches_warnings() -> None:

@@ -61,7 +61,8 @@ Supported formats:
 - integer seconds: `Retry-After: 120`
 - HTTP date values
 
-Invalid or unusually large header values fall back to the provided default.
+Invalid header values fall back to the provided default. Valid large header
+values are capped by the configured maximum.
 
 ## Idempotency warning
 

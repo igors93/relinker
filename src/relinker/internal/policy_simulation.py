@@ -100,7 +100,7 @@ def _estimate_attempts(strategy: Any) -> tuple[int | None, bool, bool]:
         ]
         if bounded:
             return min(bounded), False, False
-        if any(unbounded for _maximum, unbounded, _partial in estimates):
+        if all(unbounded for _maximum, unbounded, _partial in estimates):
             return None, True, False
         return None, False, True
     if isinstance(strategy, AllStopStrategy):

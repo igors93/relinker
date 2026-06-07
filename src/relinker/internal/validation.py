@@ -24,6 +24,17 @@ def ensure_non_negative(name: str, value: object) -> None:
         raise InvalidRetryConfigError(f"{name} must be greater than or equal to 0")
 
 
+def ensure_resolved_delay(value: object) -> float:
+    """Raise when a final resolved delay is not safe to pass to sleep."""
+    message = "resolved delay must be a finite non-negative number"
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise InvalidRetryConfigError(message)
+    resolved = float(value)
+    if not math.isfinite(resolved) or resolved < 0:
+        raise InvalidRetryConfigError(message)
+    return resolved
+
+
 def ensure_positive(name: str, value: object) -> None:
     """Raise when value is not a finite positive number."""
     resolved = ensure_finite_float(name, value)

@@ -169,11 +169,11 @@ def parse_retry_after(
     """
     Parse a Retry-After header value into a delay in seconds.
 
-    Accepts non-negative integer seconds and HTTP-date strings. Any unparseable,
-    negative, or excessively large header value falls back to default. Numeric
-    values are capped at maximum (default: MAX_RETRY_AFTER_SECONDS = 86400.0)
-    so a malformed header cannot cause an arbitrarily long delay. When default
-    exceeds maximum it is capped to maximum.
+    Accepts non-negative integer seconds and HTTP-date strings. Unparseable or
+    negative values fall back to default. Valid large header values are capped
+    at maximum (default: MAX_RETRY_AFTER_SECONDS = 86400.0) so a malformed
+    header cannot cause an arbitrarily long delay. When default exceeds maximum
+    it is capped to maximum.
     """
     ensure_non_negative("default", default)
     ensure_non_negative("maximum", maximum)

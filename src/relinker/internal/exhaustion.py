@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from relinker.exceptions import RetryExhaustedError
+from relinker.exceptions import InvalidRetryConfigError, RetryExhaustedError
 
 if TYPE_CHECKING:
     from relinker.policy import RetryPolicy
@@ -50,7 +50,10 @@ def finish_exhausted(policy: RetryPolicy[Any], result: RetryResult[Any]) -> Any:
         return policy.exhausted_callback(result)
 
     if policy.exhausted_exception_factory is not None:
-        raise policy.exhausted_exception_factory(result)
+        exception = policy.exhausted_exception_factory(result)
+        if not isinstance(exception, BaseException):
+            raise InvalidRetryConfigError("exception factory must return a BaseException instance")
+        raise exception
 
     if result.error is not None and policy.should_raise_last:
         raise result.error

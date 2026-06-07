@@ -38,10 +38,11 @@ class StatefulCustomDelay:
 
     def next_delay(self, attempt_number: int) -> float:
         """
-        Simulation fallback: build a minimal state from attempt_number only.
+        Attempt-number fallback for delay composition without a RetryState.
 
-        When simulate() calls this method, last_value and last_error will be None.
-        The callback should handle None gracefully (e.g. fall back to a default).
+        This path builds a minimal state and executes the callback. It does not make
+        RetryPolicy.simulate() support stateful callbacks; simulation rejects user
+        callbacks instead of executing application code.
         """
         from relinker.state import RetryState
 

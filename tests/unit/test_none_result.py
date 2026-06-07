@@ -12,6 +12,8 @@ None is a valid function return value. These tests verify that:
 
 from __future__ import annotations
 
+import pytest
+
 from relinker import RetryPolicy
 from relinker.attempt import AttemptRecord
 from relinker.result import RetryResult
@@ -148,6 +150,53 @@ class TestSyncNoneReturnE2E:
         assert isinstance(result, RetryResult)
         assert result.last_value == 42
         assert calls[0] == 2
+
+
+class TestRetryIfCallbackArguments:
+    def test_retry_if_receives_none_none_for_successful_none_result(self) -> None:
+        seen: list[tuple[BaseException | None, object]] = []
+
+        def callback(error: BaseException | None, value: object) -> bool:
+            seen.append((error, value))
+            return False
+
+        def returns_none() -> None:
+            return None
+
+        result = RetryPolicy().attempts(3).retry_if(callback).run(returns_none)
+
+        assert result is None
+        assert seen == [(None, None)]
+
+    def test_retry_if_receives_none_and_value_for_successful_value_result(self) -> None:
+        seen: list[tuple[BaseException | None, object]] = []
+
+        def callback(error: BaseException | None, value: object) -> bool:
+            seen.append((error, value))
+            return False
+
+        result = RetryPolicy().attempts(3).retry_if(callback).run(lambda: "done")
+
+        assert result == "done"
+        assert seen == [(None, "done")]
+
+    def test_retry_if_receives_error_and_none_for_exception(self) -> None:
+        seen: list[tuple[BaseException | None, object]] = []
+
+        def callback(error: BaseException | None, value: object) -> bool:
+            seen.append((error, value))
+            return False
+
+        error = ValueError("boom")
+
+        def fail() -> None:
+            raise error
+
+        with pytest.raises(ValueError) as exc_info:
+            RetryPolicy().attempts(3).retry_if(callback).run(fail)
+
+        assert exc_info.value is error
+        assert seen == [(error, None)]
 
 
 class TestAsyncNoneReturnE2E:

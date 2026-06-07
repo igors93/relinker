@@ -9,6 +9,7 @@ Contract:
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 
 import pytest
@@ -145,6 +146,97 @@ def test_with_sleep_after_for_testing_exits_testing_mode() -> None:
     assert restored.testing_mode is False
     assert "for_testing_with_max_time" not in {warning.code for warning in restored.warnings()}
     assert restored.to_dict()["testing"] == {"no_real_sleep": False}
+
+
+@pytest.mark.asyncio
+async def test_with_sync_sleep_after_for_testing_restores_default_async_sleep() -> None:
+    sync_sleeps: list[float] = []
+    marker_ran = False
+
+    def sync_sleep(seconds: float) -> None:
+        sync_sleeps.append(seconds)
+
+    async def marker() -> None:
+        nonlocal marker_ran
+        marker_ran = True
+
+    testing = RetryPolicy().attempts(2).max_time(5).on(ValueError).fixed_delay(0).for_testing()
+    restored = testing.with_sleep(sync_sleep)
+
+    assert testing.testing_mode is True
+    assert restored.testing_mode is False
+    assert "for_testing_with_max_time" not in {warning.code for warning in restored.warnings()}
+    assert restored.to_dict()["testing"] == {"no_real_sleep": False}
+
+    sync_calls = 0
+
+    def sync_task() -> str:
+        nonlocal sync_calls
+        sync_calls += 1
+        if sync_calls == 1:
+            raise ValueError("retry")
+        return "ok"
+
+    assert restored.run(sync_task) == "ok"
+    assert sync_sleeps == [0.0]
+
+    async_calls = 0
+
+    async def async_task() -> str:
+        nonlocal async_calls
+        async_calls += 1
+        if async_calls == 1:
+            raise ValueError("retry")
+        return "ok"
+
+    marker_task = asyncio.create_task(marker())
+    assert await restored.run_async(async_task) == "ok"
+    assert marker_ran is True
+    await marker_task
+
+
+@pytest.mark.asyncio
+async def test_with_sleep_after_for_testing_uses_supplied_sync_and_async_sleep() -> None:
+    sync_sleeps: list[float] = []
+    async_sleeps: list[float] = []
+
+    def sync_sleep(seconds: float) -> None:
+        sync_sleeps.append(seconds)
+
+    async def async_sleep(seconds: float) -> None:
+        async_sleeps.append(seconds)
+
+    policy = (
+        RetryPolicy()
+        .attempts(2)
+        .on(ValueError)
+        .fixed_delay(0)
+        .for_testing()
+        .with_sleep(sync_sleep, async_sleep)
+    )
+
+    sync_calls = 0
+
+    def sync_task() -> str:
+        nonlocal sync_calls
+        sync_calls += 1
+        if sync_calls == 1:
+            raise ValueError("retry")
+        return "ok"
+
+    async_calls = 0
+
+    async def async_task() -> str:
+        nonlocal async_calls
+        async_calls += 1
+        if async_calls == 1:
+            raise ValueError("retry")
+        return "ok"
+
+    assert policy.run(sync_task) == "ok"
+    assert await policy.run_async(async_task) == "ok"
+    assert sync_sleeps == [0.0]
+    assert async_sleeps == [0.0]
 
 
 def test_for_testing_can_be_applied_again_after_custom_sleep() -> None:

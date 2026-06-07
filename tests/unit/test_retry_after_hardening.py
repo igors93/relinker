@@ -82,6 +82,13 @@ class TestParseRetryAfterHTTPDate:
         result = parse_retry_after(future_str)
         assert 0.0 < result <= 31.0
 
+    def test_future_http_date_is_capped_by_maximum(self) -> None:
+        future_ts = time.time() + 3600.0
+        future_struct = time.gmtime(future_ts)
+        future_str = time.strftime("%a, %d %b %Y %H:%M:%S GMT", future_struct)
+        result = parse_retry_after(future_str, default=1.0, maximum=30.0)
+        assert result == 30.0
+
     def test_invalid_date_returns_default(self) -> None:
         result = parse_retry_after("Thu, 99 Foo 2999 25:99:99 GMT", default=5.0)
         assert result == 5.0

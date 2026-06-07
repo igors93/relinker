@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any
 
 from relinker.conditions.composite import AllCondition, AnyCondition
+from relinker.conditions.exception import ExceptionCondition
 from relinker.conditions.result import ResultCondition
 from relinker.delays.composite import AdditiveDelay
 from relinker.delays.exponential import ExponentialDelay
@@ -62,12 +63,58 @@ def _has_positive_deterministic_delay(strategy: Any) -> bool:
     return False
 
 
-def _high_attempt_count(policy: Any) -> bool:
-    return isinstance(policy.stop_strategy, StopAfterAttempt) and policy.stop_strategy.maximum >= 10
+def _stop_is_infinite(strategy: Any) -> bool:
+    if isinstance(strategy, StopForever):
+        return True
+    if isinstance(strategy, (StopAfterAttempt, StopAfterDelay)):
+        return False
+    if isinstance(strategy, AllStopStrategy):
+        return any(_stop_is_infinite(item) for item in strategy.strategies)
+    if isinstance(strategy, AnyStopStrategy):
+        return all(_stop_is_infinite(item) for item in strategy.strategies)
+    return False
 
 
 def _is_forever(policy: Any) -> bool:
-    return isinstance(policy.stop_strategy, StopForever)
+    return _stop_is_infinite(policy.stop_strategy)
+
+
+def _known_attempt_limit(strategy: Any) -> int | None:
+    if isinstance(strategy, StopAfterAttempt):
+        return strategy.maximum
+    if isinstance(strategy, (StopForever, StopAfterDelay)):
+        return None
+    if isinstance(strategy, AnyStopStrategy):
+        limits = [_known_attempt_limit(item) for item in strategy.strategies]
+        known = [limit for limit in limits if limit is not None]
+        return min(known) if known else None
+    if isinstance(strategy, AllStopStrategy):
+        if any(_stop_is_infinite(item) for item in strategy.strategies):
+            return None
+        limits = [_known_attempt_limit(item) for item in strategy.strategies]
+        if all(limit is not None for limit in limits):
+            return max(limit for limit in limits if limit is not None)
+    return None
+
+
+def _high_attempt_count(policy: Any) -> bool:
+    limit = _known_attempt_limit(policy.stop_strategy)
+    return limit is not None and limit >= 10
+
+
+def _many_attempts(policy: Any) -> bool:
+    limit = _known_attempt_limit(policy.stop_strategy)
+    return limit is not None and limit > 10
+
+
+def _has_broad_exception(condition: Any) -> bool:
+    if isinstance(condition, ExceptionCondition):
+        return any(exception_type is Exception for exception_type in condition.exception_types)
+    if isinstance(condition, AnyCondition):
+        return any(_has_broad_exception(item) for item in condition.conditions)
+    if isinstance(condition, AllCondition):
+        return all(_has_broad_exception(item) for item in condition.conditions)
+    return False
 
 
 def _has_max_time(strategy: Any) -> bool:
@@ -89,8 +136,6 @@ def compute_warnings(policy: Any) -> tuple[PolicyWarning, ...]:
     Accepts Any to avoid a circular import; the caller is always RetryPolicy.
     """
     warnings: list[PolicyWarning] = []
-
-    condition_name = policy.condition.__class__.__name__
 
     is_forever = _is_forever(policy)
     is_no_delay = _is_no_delay(policy)
@@ -125,35 +170,30 @@ def compute_warnings(policy: Any) -> tuple[PolicyWarning, ...]:
             )
         )
 
-    is_broad_exception = False
-    if condition_name == "ExceptionCondition":
-        exception_types = getattr(policy.condition, "exception_types", ())
-        if exception_types == (Exception,):
-            is_broad_exception = True
-            warnings.append(
-                PolicyWarning(
-                    code="broad_exception",
-                    message="This policy retries all Exception subclasses.",
-                    hint="Prefer specific exception types when possible.",
-                )
+    is_broad_exception = _has_broad_exception(policy.condition)
+    if is_broad_exception:
+        warnings.append(
+            PolicyWarning(
+                code="broad_exception",
+                message="This policy retries all Exception subclasses.",
+                hint="Prefer specific exception types when possible.",
             )
+        )
 
-    if isinstance(policy.stop_strategy, StopAfterAttempt) and policy.stop_strategy.maximum > 10:
+    if _many_attempts(policy):
+        attempt_limit = _known_attempt_limit(policy.stop_strategy)
         warnings.append(
             PolicyWarning(
                 code="many_attempts",
-                message=f"This policy uses {policy.stop_strategy.maximum} attempts.",
+                message=f"This policy uses {attempt_limit} attempts.",
                 hint="High attempt counts increase load on downstream services during incidents.",
             )
         )
 
     if not is_forever:
         try:
-            sim_count = (
-                policy.stop_strategy.maximum
-                if isinstance(policy.stop_strategy, StopAfterAttempt)
-                else 10
-            )
+            known_attempt_limit = _known_attempt_limit(policy.stop_strategy)
+            sim_count = known_attempt_limit if known_attempt_limit is not None else 10
             simulation = policy.simulate(attempts=sim_count)
             if simulation.total_sleep > 300:
                 warnings.append(

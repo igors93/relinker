@@ -103,6 +103,23 @@ def test_public_api_reference_identifies_root_surface() -> None:
     assert "relinker.__version__" in reference
 
 
+def test_retry_after_docs_describe_large_values_as_capped_not_defaulted() -> None:
+    guide = " ".join((ROOT / "docs/guides/http.md").read_text(encoding="utf-8").split())
+    docstring = " ".join((relinker.parse_retry_after.__doc__ or "").split())
+
+    assert "unusually large header values fall back" not in guide
+    assert "excessively large header value falls back" not in docstring
+    assert "large header values are capped" in guide
+    assert "large header values are capped" in docstring
+
+
+def test_retry_if_docstring_allows_none_as_a_real_return_value() -> None:
+    docstring = " ".join((relinker.RetryPolicy.retry_if.__doc__ or "").split())
+
+    assert "Exactly one is non-None" not in docstring
+    assert "value may be None" in docstring
+
+
 def test_compatibility_guide_defines_public_api_tiers() -> None:
     compatibility = (ROOT / "docs/reference/compatibility.md").read_text(encoding="utf-8")
 

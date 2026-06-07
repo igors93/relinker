@@ -759,10 +759,16 @@ class RetryPolicy(Generic[T]):
     # ---------------------------------------------- decorator / __call__
 
     @overload
-    def __call__(self, function: Callable[P, T]) -> Callable[P, T]: ...
+    def __call__(
+        self,
+        function: Callable[P, T],
+    ) -> Callable[P, T | RetryResult[T]]: ...
 
     @overload
-    def __call__(self, function: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[T]]: ...
+    def __call__(
+        self,
+        function: Callable[P, Awaitable[T]],
+    ) -> Callable[P, Awaitable[T | RetryResult[T]]]: ...
 
     def __call__(self, function: Callable[..., Any]) -> Callable[..., Any]:
         """

@@ -20,7 +20,7 @@ def _record_trace(trace: Trace) -> Callable[[RetryEvent], None]:
 
 
 def _trace_policy(trace: Trace) -> RetryPolicy[str]:
-    policy: RetryPolicy[str] = RetryPolicy[str]().attempts(3).on(TimeoutError).no_delay()
+    policy: RetryPolicy[str] = RetryPolicy().attempts(3).on(TimeoutError).no_delay()
     for name in (
         "before_attempt",
         "after_failure",

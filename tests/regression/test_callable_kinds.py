@@ -55,7 +55,7 @@ def test_sync_callable_object_executes_as_sync_wrapper() -> None:
         def __call__(self, value: int) -> int:
             return value + 1
 
-    wrapped = RetryPolicy[int]().attempts(2)(SyncCallable())
+    wrapped = RetryPolicy().attempts(2)(SyncCallable())
 
     assert not inspect.iscoroutinefunction(wrapped)
     assert wrapped(1) == 2
@@ -67,7 +67,7 @@ async def test_async_callable_object_executes_as_async_wrapper() -> None:
         async def __call__(self, value: int) -> int:
             return value + 1
 
-    wrapped = RetryPolicy[int]().attempts(2)(AsyncCallable())
+    wrapped = RetryPolicy().attempts(2)(AsyncCallable())
 
     assert inspect.iscoroutinefunction(wrapped)
     assert await wrapped(1) == 2
@@ -78,7 +78,7 @@ async def test_async_partial_executes_as_async_wrapper() -> None:
     async def add(left: int, right: int) -> int:
         return left + right
 
-    wrapped = RetryPolicy[int]().attempts(2)(partial(add, 1))
+    wrapped = RetryPolicy().attempts(2)(partial(add, 1))
 
     assert inspect.iscoroutinefunction(wrapped)
     assert await wrapped(2) == 3
@@ -97,7 +97,7 @@ async def test_partial_async_callable_object_retries_as_async_wrapper() -> None:
             return value + 1
 
     operation = AsyncOperation()
-    wrapped = RetryPolicy[int]().attempts(2).on(OSError).for_testing()(partial(operation, 1))
+    wrapped = RetryPolicy().attempts(2).on(OSError).for_testing()(partial(operation, 1))
 
     assert inspect.iscoroutinefunction(wrapped)
     assert await wrapped() == 2
@@ -115,7 +115,7 @@ def test_partial_sync_callable_object_executes_as_sync_wrapper() -> None:
         def __call__(self, left: int, right: int) -> int:
             return left + right
 
-    wrapped = RetryPolicy[int]().attempts(2)(partial(SyncOperation(), 1))
+    wrapped = RetryPolicy().attempts(2)(partial(SyncOperation(), 1))
 
     assert not inspect.iscoroutinefunction(wrapped)
     assert wrapped(2) == 3
@@ -127,7 +127,7 @@ def test_partial_generator_callable_object_is_rejected() -> None:
             yield 1
 
     with pytest.raises(InvalidRetryConfigError, match="Generator functions are not supported"):
-        RetryPolicy[int]().attempts(2)(partial(GeneratorOperation()))
+        RetryPolicy().attempts(2)(partial(GeneratorOperation()))
 
 
 def test_partial_async_generator_callable_object_is_rejected() -> None:
@@ -139,7 +139,7 @@ def test_partial_async_generator_callable_object_is_rejected() -> None:
         InvalidRetryConfigError,
         match="Async generator functions are not supported",
     ):
-        RetryPolicy[int]().attempts(2)(partial(AsyncGeneratorOperation()))
+        RetryPolicy().attempts(2)(partial(AsyncGeneratorOperation()))
 
 
 @pytest.mark.asyncio
@@ -149,7 +149,7 @@ async def test_nested_partial_async_callable_object_executes_as_async_wrapper() 
             return left + right
 
     operation = partial(partial(AsyncOperation(), 1), right=2)
-    wrapped = RetryPolicy[int]().attempts(2)(operation)
+    wrapped = RetryPolicy().attempts(2)(operation)
 
     assert inspect.iscoroutinefunction(wrapped)
     assert await wrapped() == 3
@@ -163,7 +163,7 @@ def test_partial_callable_class_is_not_classified_as_async() -> None:
         def __call__(self) -> int:
             return self.value
 
-    wrapped = RetryPolicy[CallableClass]().attempts(2)(partial(CallableClass, 3))
+    wrapped = RetryPolicy().attempts(2)(partial(CallableClass, 3))
 
     instance = wrapped()
     assert not inspect.iscoroutinefunction(wrapped)
@@ -184,7 +184,7 @@ async def test_wrapped_async_function_executes_as_async_wrapper() -> None:
     async def async_task(value: int) -> int:
         return value + 1
 
-    wrapped = RetryPolicy[int]().attempts(2)(async_task)
+    wrapped = RetryPolicy().attempts(2)(async_task)
 
     assert inspect.iscoroutinefunction(wrapped)
     assert await wrapped(1) == 2
@@ -198,7 +198,7 @@ def test_callable_class_is_not_classified_from_inherited_type_call() -> None:
         def __call__(self) -> int:
             return self.value
 
-    wrapped = RetryPolicy[CallableClass]().attempts(2)(CallableClass)
+    wrapped = RetryPolicy().attempts(2)(CallableClass)
 
     instance = wrapped(3)
     assert isinstance(instance, CallableClass)

@@ -25,8 +25,8 @@ def _fallback(_: object) -> str:
 
 
 def _base_policy() -> RetryPolicy[str]:
-    return (
-        RetryPolicy[str]()
+    policy: RetryPolicy[str] = (
+        RetryPolicy()
         .named("api")
         .keep_history(7)
         .with_retry_budget(RetryBudget(max_retries=2, per=10), key="api")
@@ -34,6 +34,7 @@ def _base_policy() -> RetryPolicy[str]:
         .on_before_attempt(_handler)
         .fallback(_fallback)
     )
+    return policy
 
 
 def _assert_preserved(base: RetryPolicy[str], derived: RetryPolicy[str]) -> None:

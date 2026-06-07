@@ -12,7 +12,7 @@ def test_decorated_function_stats_count_concurrent_calls_once_each() -> None:
     workers = 8
     barrier = Barrier(workers)
 
-    @RetryPolicy[int]().attempts(1)
+    @RetryPolicy().attempts(1)
     def task(value: int) -> int:
         barrier.wait(timeout=5)
         return value
@@ -31,11 +31,11 @@ def test_decorated_function_stats_count_concurrent_calls_once_each() -> None:
 
 
 def test_with_policy_uses_independent_statistics() -> None:
-    @RetryPolicy[str]().attempts(1)
+    @RetryPolicy().attempts(1)
     def task() -> str:
         return "ok"
 
-    stricter = task.with_policy(RetryPolicy[str]().attempts(1))
+    stricter = task.with_policy(RetryPolicy().attempts(1))
 
     assert task() == "ok"
     assert stricter() == "ok"

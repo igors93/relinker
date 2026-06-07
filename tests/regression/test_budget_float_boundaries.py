@@ -20,12 +20,16 @@ Two float-boundary failure modes are covered:
 from __future__ import annotations
 
 import math
+import os
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
 from relinker import RetryBudget
+
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def _assert_rolling_window_capacity(times: list[float], *, capacity: int, per: float) -> None:
@@ -85,25 +89,74 @@ print("ok")
 """
 
 
+_DECIMAL_BOUNDARY_SCENARIO = """\
+from relinker import RetryBudget
+
+
+def assert_rolling_window_capacity(times, *, capacity, per):
+    for window_end in times:
+        count = sum(1 for scheduled_at in times if window_end - per < scheduled_at <= window_end)
+        assert count <= capacity, (window_end, count, times)
+
+
+budget = RetryBudget(max_retries=2, per=0.4)
+reservations = [
+    budget._reserve("api", current_time=0.0, not_before=0.1),
+    budget._reserve("api", current_time=0.0, not_before=0.5),
+    budget._reserve("api", current_time=0.0, not_before=0.4),
+]
+times = [reservation.scheduled_at for reservation in reservations]
+
+assert reservations[-1].scheduled_at >= 0.4
+assert_rolling_window_capacity(times, capacity=budget.max_retries, per=budget.per)
+print("ok")
+"""
+
+
+def _run_budget_subprocess(
+    script: str,
+    *,
+    timeout: float = 5.0,
+) -> subprocess.CompletedProcess[str]:
+    env = os.environ.copy()
+    pythonpath_entries = [str(ROOT / "src")]
+    if env.get("PYTHONPATH"):
+        pythonpath_entries.append(env["PYTHONPATH"])
+    env["PYTHONPATH"] = os.pathsep.join(pythonpath_entries)
+
+    return subprocess.run(
+        [sys.executable, "-c", script],
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        cwd=ROOT,
+        env=env,
+    )
+
+
+def test_decimal_boundary_subprocess_completes_and_preserves_capacity() -> None:
+    """A decimal boundary candidate must terminate and preserve window capacity."""
+    result = _run_budget_subprocess(_DECIMAL_BOUNDARY_SCENARIO)
+    assert result.returncode == 0, (
+        f"subprocess failed or timed out.\nstdout: {result.stdout}\nstderr: {result.stderr}"
+    )
+    assert result.stdout.strip() == "ok"
+
+
 def test_boundary_exact_candidate_completes_without_ulp_walk() -> None:
     """_reserve must terminate promptly when a candidate lands on an exact boundary.
 
     The scenario builds a state where candidate=1.4 falls exactly on a
     forbidden-region boundary that the strict-inequality check in
     _first_legal_slot does not advance.  The previous ULP-by-ULP fallback
-    required ~100 000 iterations while holding the budget lock.
+    advanced one representable float at a time and did not complete within the
+    timeout.
 
     This test runs the scenario in a subprocess with a 5-second timeout.
     Termination verifies the invariant: _first_legal_slot must jump directly
     to the next relevant boundary rather than walking ULP-by-ULP.
     """
-    result = subprocess.run(
-        [sys.executable, "-c", _ULP_WALK_SCENARIO],
-        capture_output=True,
-        text=True,
-        timeout=5,
-        cwd=str(__file__).rsplit("/tests/", 1)[0],
-    )
+    result = _run_budget_subprocess(_ULP_WALK_SCENARIO)
     assert result.returncode == 0, (
         f"subprocess failed or timed out.\nstdout: {result.stdout}\nstderr: {result.stderr}"
     )

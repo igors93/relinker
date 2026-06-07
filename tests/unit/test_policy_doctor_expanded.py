@@ -1,6 +1,6 @@
-import pytest
-
 from __future__ import annotations
+
+import pytest
 
 from relinker import RetryBudget, RetryPolicy
 from relinker.conditions.composite import AnyCondition
@@ -189,6 +189,7 @@ def test_composed_delay_with_positive_child_is_not_no_delay() -> None:
     assert "no_delay" not in codes
     assert "tight_loop_risk" not in codes
 
+
 @pytest.mark.parametrize(
     "policy",
     [
@@ -198,12 +199,8 @@ def test_composed_delay_with_positive_child_is_not_no_delay() -> None:
         RetryPolicy().forever().exponential_delay(base=1, maximum=0),
         RetryPolicy().forever().chain_delay([0, 0, 0]),
         RetryPolicy().forever().random_delay(minimum=0, maximum=0),
-        RetryPolicy()
-        .forever()
-        .random_exponential_delay(base=0, minimum=0),
-        RetryPolicy()
-        .forever()
-        .random_exponential_delay(base=1, minimum=0, maximum=0),
+        RetryPolicy().forever().random_exponential_delay(base=0, minimum=0),
+        RetryPolicy().forever().random_exponential_delay(base=1, minimum=0, maximum=0),
     ],
 )
 def test_known_always_zero_delays_warn(
@@ -222,9 +219,7 @@ def test_known_always_zero_delays_warn(
         RetryPolicy().forever().exponential_delay(base=1),
         RetryPolicy().forever().chain_delay([0, 1, 0]),
         RetryPolicy().forever().random_delay(minimum=0, maximum=1),
-        RetryPolicy()
-        .forever()
-        .random_exponential_delay(base=1, minimum=0),
+        RetryPolicy().forever().random_exponential_delay(base=1, minimum=0),
     ],
 )
 def test_delays_that_can_be_positive_are_not_reported_as_no_delay(

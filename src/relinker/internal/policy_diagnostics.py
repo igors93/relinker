@@ -12,11 +12,11 @@ from typing import Any
 from relinker.conditions.composite import AllCondition, AnyCondition
 from relinker.conditions.exception import ExceptionCondition
 from relinker.conditions.result import ResultCondition
+from relinker.delays.chain import ChainDelay
 from relinker.delays.composite import AdditiveDelay
 from relinker.delays.exponential import ExponentialDelay
 from relinker.delays.fixed import FixedDelay
 from relinker.delays.linear import LinearDelay
-from relinker.delays.chain import ChainDelay
 from relinker.delays.random_delay import RandomDelay
 from relinker.delays.random_exponential import RandomExponentialDelay
 from relinker.diagnostics import PolicyHealthReport, PolicyWarning
@@ -42,10 +42,7 @@ def _delay_is_always_zero(strategy: Any) -> bool:
         return strategy.seconds == 0
 
     if isinstance(strategy, LinearDelay):
-        return (
-            strategy.maximum == 0
-            or (strategy.start == 0 and strategy.step == 0)
-        )
+        return strategy.maximum == 0 or (strategy.start == 0 and strategy.step == 0)
 
     if isinstance(strategy, ExponentialDelay):
         return strategy.base == 0 or strategy.maximum == 0
@@ -57,15 +54,10 @@ def _delay_is_always_zero(strategy: Any) -> bool:
         return strategy.minimum == 0 and strategy.maximum == 0
 
     if isinstance(strategy, RandomExponentialDelay):
-        return strategy.minimum == 0 and (
-            strategy.base == 0 or strategy.maximum == 0
-        )
+        return strategy.minimum == 0 and (strategy.base == 0 or strategy.maximum == 0)
 
     if isinstance(strategy, AdditiveDelay):
-        return all(
-            _delay_is_always_zero(item)
-            for item in strategy.strategies
-        )
+        return all(_delay_is_always_zero(item) for item in strategy.strategies)
 
     return False
 

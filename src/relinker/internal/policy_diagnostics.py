@@ -34,11 +34,20 @@ def _has_result_condition(condition: Any) -> bool:
     return False
 
 
+def _delay_is_always_zero(strategy: Any) -> bool:
+    """Return True when a known delay strategy always produces zero."""
+
+    if isinstance(strategy, FixedDelay):
+        return strategy.seconds == 0
+
+    if isinstance(strategy, AdditiveDelay):
+        return all(_delay_is_always_zero(item) for item in strategy.strategies)
+
+    return False
+
+
 def _is_no_delay(policy: Any) -> bool:
-    return (
-        policy.delay_strategy.__class__.__name__ == "FixedDelay"
-        and getattr(policy.delay_strategy, "seconds", None) == 0
-    )
+    return _delay_is_always_zero(policy.delay_strategy)
 
 
 def _has_random_delay(strategy: Any) -> bool:

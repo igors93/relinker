@@ -3,6 +3,7 @@ from __future__ import annotations
 from relinker import RetryBudget, RetryPolicy
 from relinker.conditions.composite import AnyCondition
 from relinker.conditions.exception import ExceptionCondition
+from relinker.delays.fixed import FixedDelay
 
 
 def _codes(policy: RetryPolicy[object]) -> list[str]:
@@ -167,3 +168,21 @@ def test_new_warnings_have_deterministic_order_and_doctor_matches_warnings() -> 
     assert [warning.code for warning in report.warnings] == codes
     assert report.ok is False
     assert report.risk_level == "warning"
+
+
+def test_composed_zero_delay_warns_as_no_delay() -> None:
+    policy = RetryPolicy().forever().no_delay().add_delay(FixedDelay(0))
+
+    codes = _codes(policy)
+
+    assert "no_delay" in codes
+    assert "tight_loop_risk" in codes
+
+
+def test_composed_delay_with_positive_child_is_not_no_delay() -> None:
+    policy = RetryPolicy().forever().no_delay().add_delay(FixedDelay(1))
+
+    codes = _codes(policy)
+
+    assert "no_delay" not in codes
+    assert "tight_loop_risk" not in codes

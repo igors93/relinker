@@ -497,6 +497,7 @@ class RetryPolicy(Generic[T]):
             self,
             sleep=sleep,
             async_sleep=async_sleep if async_sleep is not None else self.async_sleep,
+            testing_mode=False,
         )
 
     def for_testing(self) -> RetryPolicy[T]:

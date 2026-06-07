@@ -20,6 +20,10 @@ policy = (
 `for_testing()` returns a new policy and preserves all other settings (attempts, conditions,
 delays, event handlers). It is chainable and can be called at any point in the builder chain.
 
+Calling `with_sleep()` after `for_testing()` installs the custom sleep functions
+and leaves the official no-real-sleep testing mode. Call `for_testing()` again
+if you want to return to Relinker's no-op sleep mode.
+
 > **Note:** `max_time` and retry-budget windows still use real wall-clock time. They will
 > behave as if no time passes between retries, which may cause `max_time`-based exhaustion
 > to behave differently than in production.

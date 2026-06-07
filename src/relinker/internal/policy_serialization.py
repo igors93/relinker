@@ -122,7 +122,7 @@ def _delay_to_dict(strategy: object) -> dict[str, Any]:
     return {"type": "custom", "class": strategy.__class__.__name__}
 
 
-def _exhaustion_to_dict(policy: Any) -> dict[str, Any]:
+def _exception_exhaustion_to_dict(policy: Any) -> dict[str, Any]:
     if policy.should_return_result:
         return {"type": "return_result"}
     if policy.exhausted_callback is not None:
@@ -135,6 +135,28 @@ def _exhaustion_to_dict(policy: Any) -> dict[str, Any]:
     if policy.should_raise_last:
         return {"type": "raise_last"}
     return {"type": "return_none"}
+
+
+def _result_exhaustion_to_dict(policy: Any) -> dict[str, Any]:
+    if policy.should_return_result:
+        return {"type": "return_result"}
+    if policy.exhausted_callback is not None:
+        return {"type": "fallback", "callable": _callable_name(policy.exhausted_callback)}
+    if policy.exhausted_exception_factory is not None:
+        return {
+            "type": "raise_custom",
+            "callable": _callable_name(policy.exhausted_exception_factory),
+        }
+    if policy.result_exhausted_behavior == "raise":
+        return {"type": "raise"}
+    return {"type": "return_last"}
+
+
+def _exhaustion_to_dict(policy: Any) -> dict[str, Any]:
+    return {
+        "exception": _exception_exhaustion_to_dict(policy),
+        "result": _result_exhaustion_to_dict(policy),
+    }
 
 
 def policy_to_dict(policy: Any) -> dict[str, Any]:
@@ -157,6 +179,7 @@ def policy_to_dict(policy: Any) -> dict[str, Any]:
         "condition": _condition_to_dict(policy.condition),
         "delay": _delay_to_dict(policy.delay_strategy),
         "exhaustion": _exhaustion_to_dict(policy),
+        "history_limit": policy.history_limit,
         "retry_budget": retry_budget,
         "testing": {"no_real_sleep": bool(getattr(policy, "testing_mode", False))},
         "callbacks": {

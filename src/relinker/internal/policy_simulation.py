@@ -105,14 +105,14 @@ def _estimate_attempts(strategy: Any) -> tuple[int | None, bool, bool]:
         return None, False, True
     if isinstance(strategy, AllStopStrategy):
         estimates = [_estimate_attempts(item) for item in strategy.strategies]
+        if any(unbounded for _maximum, unbounded, _partial in estimates):
+            return None, True, False
         if all(maximum is not None for maximum, _unbounded, _partial in estimates):
             return (
                 max(cast(int, maximum) for maximum, _unbounded, _partial in estimates),
                 False,
                 False,
             )
-        if all(unbounded for _maximum, unbounded, _partial in estimates):
-            return None, True, False
         return None, False, True
     return None, False, True
 

@@ -61,6 +61,56 @@ def test_estimate_load_for_unestimable_composed_stop_is_partial() -> None:
     assert estimate.partial is True
 
 
+def test_estimate_load_for_forever_and_attempts_is_unbounded() -> None:
+    estimate = (
+        RetryPolicy().forever().and_stop_after_attempts(3).estimate_load(concurrent_executions=5)
+    )
+
+    assert estimate.maximum_attempts_per_execution is None
+    assert estimate.maximum_additional_retries is None
+    assert estimate.maximum_total_calls is None
+    assert estimate.unbounded is True
+    assert estimate.partial is False
+
+
+def test_estimate_load_for_forever_and_max_time_is_unbounded() -> None:
+    estimate = (
+        RetryPolicy().forever().and_stop_after_time(10).estimate_load(concurrent_executions=5)
+    )
+
+    assert estimate.maximum_attempts_per_execution is None
+    assert estimate.maximum_additional_retries is None
+    assert estimate.maximum_total_calls is None
+    assert estimate.unbounded is True
+    assert estimate.partial is False
+
+
+def test_estimate_load_for_attempts_and_attempts_uses_larger_limit() -> None:
+    estimate = (
+        RetryPolicy().attempts(3).and_stop_after_attempts(5).estimate_load(concurrent_executions=5)
+    )
+
+    assert estimate.maximum_attempts_per_execution == 5
+    assert estimate.maximum_additional_retries == 20
+    assert estimate.maximum_total_calls == 25
+    assert estimate.unbounded is False
+    assert estimate.partial is False
+
+
+def test_preview_reports_unbounded_all_stop_estimate() -> None:
+    preview = (
+        RetryPolicy()
+        .forever()
+        .and_stop_after_attempts(3)
+        .preview(
+            attempts=3,
+            concurrent_executions=5,
+        )
+    )
+
+    assert "Maximum total calls: unbounded" in preview
+
+
 def test_estimate_load_reports_retry_budget_without_subtracting_total_retries() -> None:
     policy = (
         RetryPolicy()

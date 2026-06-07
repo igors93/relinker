@@ -24,6 +24,9 @@ the compatibility and deprecation policy documented in
 
 ### Fixed
 
+- Corrected load estimates for `ALL` stop strategies containing an unbounded condition.
+- Corrected `RetryPolicy.to_dict()` to describe result exhaustion separately.
+- Corrected testing-mode metadata when custom sleep functions replace `for_testing()`.
 - `RetryBudget` now reserves the first legal slot instead of treating distant
   future reservations as blockers.
 - `RetryBudgetSnapshot` now distinguishes active reservations from future queued

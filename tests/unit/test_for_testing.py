@@ -129,3 +129,29 @@ def test_for_testing_does_not_mutate_original() -> None:
     _ = original.for_testing()
 
     assert original.sleep is original_sleep, "for_testing() must not modify the original policy"
+
+
+def test_with_sleep_after_for_testing_exits_testing_mode() -> None:
+    def sync_sleep(seconds: float) -> None:
+        return None
+
+    async def async_sleep(seconds: float) -> None:
+        return None
+
+    testing = RetryPolicy().max_time(5).for_testing()
+    restored = testing.with_sleep(sync_sleep, async_sleep)
+
+    assert testing.testing_mode is True
+    assert restored.testing_mode is False
+    assert "for_testing_with_max_time" not in {warning.code for warning in restored.warnings()}
+    assert restored.to_dict()["testing"] == {"no_real_sleep": False}
+
+
+def test_for_testing_can_be_applied_again_after_custom_sleep() -> None:
+    restored = RetryPolicy().max_time(5).for_testing().with_sleep(lambda seconds: None)
+    testing_again = restored.for_testing()
+
+    assert restored.testing_mode is False
+    assert testing_again.testing_mode is True
+    assert "for_testing_with_max_time" in {warning.code for warning in testing_again.warnings()}
+    assert testing_again.to_dict()["testing"] == {"no_real_sleep": True}

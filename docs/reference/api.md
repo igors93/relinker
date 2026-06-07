@@ -173,6 +173,9 @@ part of `relinker.__all__`, so it is not included in the root star-import API.
 - `named()`
 - `to_dict()`
 
+`to_dict()` returns configuration only. It describes exception exhaustion and
+result exhaustion separately and includes `history_limit`.
+
 ### Observability
 
 - `on_event()`

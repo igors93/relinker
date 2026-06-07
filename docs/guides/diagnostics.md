@@ -74,6 +74,9 @@ The estimate is deliberately a worst case. It does not predict real traffic and
 does not subtract Retry Budget capacity from the total; a budget limits retry
 rate, not necessarily total operation duration.
 
+For composed stop strategies, estimates use only safe attempt-count facts.
+`ALL` compositions that include `forever()` are reported as unbounded.
+
 ## Timeline and simulation
 
 Use `simulate()` when you want structured data:
@@ -121,7 +124,8 @@ print(policy.to_dict())
 
 The dictionary describes configuration only. It does not include runtime
 reservations, locks, arguments, return values, or a way to rebuild the policy.
-Future minor versions may add keys.
+It reports exception exhaustion separately from result exhaustion and includes
+the configured history limit. Future minor versions may add keys.
 
 ## Production recommendation
 

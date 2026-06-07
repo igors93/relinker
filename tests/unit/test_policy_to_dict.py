@@ -38,7 +38,11 @@ def test_to_dict_for_default_policy() -> None:
     assert data["stop"] == {"type": "attempts", "maximum": 3}
     assert data["condition"]["type"] == "exceptions"
     assert data["delay"] == {"type": "fixed", "seconds": 0}
-    assert data["exhaustion"] == {"type": "raise_last"}
+    assert data["exhaustion"] == {
+        "exception": {"type": "raise_last"},
+        "result": {"type": "return_last"},
+    }
+    assert data["history_limit"] == 1000
     assert data["retry_budget"] == {"enabled": False}
     assert data["testing"] == {"no_real_sleep": False}
 
@@ -148,14 +152,52 @@ def test_to_dict_represents_callbacks_fallback_and_testing() -> None:
     )
     data = policy.to_dict()
 
-    assert data["exhaustion"]["type"] == "fallback"
-    assert data["exhaustion"]["callable"].endswith(
+    assert data["exhaustion"]["exception"]["type"] == "fallback"
+    assert data["exhaustion"]["result"]["type"] == "fallback"
+    assert data["exhaustion"]["exception"]["callable"].endswith(
         "test_policy_to_dict.test_to_dict_represents_callbacks_fallback_and_testing.<locals>.fallback"
     )
+    assert data["exhaustion"]["exception"] == data["exhaustion"]["result"]
     assert data["callbacks"]["event_handlers"] == [
         {"event": "after_giveup", "callable": "<anonymous>"}
     ]
     assert data["testing"] == {"no_real_sleep": True}
+
+
+def test_to_dict_represents_result_exhaustion_options() -> None:
+    assert RetryPolicy().retry_if_result(retry_if_none()).raise_on_result_exhausted().to_dict()[
+        "exhaustion"
+    ]["result"] == {"type": "raise"}
+    assert RetryPolicy().retry_if_result(
+        retry_if_none()
+    ).return_last_on_result_exhausted().to_dict()["exhaustion"]["result"] == {"type": "return_last"}
+
+
+def test_to_dict_represents_return_result_for_both_exhaustion_paths() -> None:
+    data = RetryPolicy().return_result().to_dict()
+
+    assert data["exhaustion"] == {
+        "exception": {"type": "return_result"},
+        "result": {"type": "return_result"},
+    }
+
+
+def test_to_dict_represents_custom_exhaustion_exception_for_both_paths() -> None:
+    def factory(result: object) -> RuntimeError:
+        return RuntimeError("exhausted")
+
+    data = RetryPolicy().on_exhausted_raise(factory).to_dict()
+
+    assert data["exhaustion"]["exception"]["type"] == "raise_custom"
+    assert data["exhaustion"]["result"]["type"] == "raise_custom"
+    assert data["exhaustion"]["exception"] == data["exhaustion"]["result"]
+    assert data["exhaustion"]["exception"]["callable"].endswith(
+        "test_policy_to_dict.test_to_dict_represents_custom_exhaustion_exception_for_both_paths.<locals>.factory"
+    )
+
+
+def test_to_dict_represents_unlimited_history() -> None:
+    assert RetryPolicy().keep_history(None).to_dict()["history_limit"] is None
 
 
 def test_to_dict_contains_only_simple_types_and_no_memory_addresses() -> None:

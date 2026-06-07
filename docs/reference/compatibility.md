@@ -127,7 +127,8 @@ distributed guarantee.
 
 `RetryPolicy.to_dict()` is a public structured representation of configuration.
 Minor releases may add keys, but existing keys should not change meaning
-silently. The output is not a serialization contract for rebuilding policies.
+silently. The output separates exception exhaustion from result exhaustion and is
+not a serialization contract for rebuilding policies.
 
 `max_time()` controls the retry loop between attempts; it does not interrupt a
 user function that is already running.

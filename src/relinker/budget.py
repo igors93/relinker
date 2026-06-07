@@ -7,6 +7,7 @@ limiter: it only reserves times at which Relinker may perform retry attempts.
 
 from __future__ import annotations
 
+from bisect import bisect_left, bisect_right, insort
 from collections import deque
 from dataclasses import dataclass
 from threading import Lock
@@ -164,40 +165,35 @@ class RetryBudget:
         planned = list(scheduled_times)
         while self._is_legal_slot(candidate, planned):
             available += 1
-            planned.append(candidate)
+            insort(planned, candidate)
         return available
 
     def _first_legal_slot(self, candidate: float, scheduled_times: list[float]) -> float:
-        # Evaluate the complete rolling-window invariant. Future reservations only
-        # block the candidate when both could appear in the same ``per`` window.
-        while not self._is_legal_slot(candidate, scheduled_times):
-            candidate = self._next_candidate_after_conflict(candidate, scheduled_times)
+        # Existing reservations are already legal. Any consecutive block of
+        # ``max_retries`` reservations inside one period creates an open interval
+        # where an additional candidate would overfill some rolling window.
+        for index in range(0, len(scheduled_times) - self._max_retries + 1):
+            first = scheduled_times[index]
+            last = scheduled_times[index + self._max_retries - 1]
+            if last - first >= self._per:
+                continue
+            forbidden_start = last - self._per
+            forbidden_end = first + self._per
+            if forbidden_start < candidate < forbidden_end:
+                candidate = forbidden_end
         return candidate
 
     def _is_legal_slot(self, candidate: float, scheduled_times: list[float]) -> bool:
         """Return True when adding ``candidate`` keeps every rolling window in budget."""
-        combined = sorted((*scheduled_times, candidate))
-        for window_end in combined:
-            count = sum(
-                1
-                for scheduled_at in combined
-                if window_end - self._per < scheduled_at <= window_end
-            )
-            if count > self._max_retries:
+        # Existing reservations are already legal. Adding one reservation can only
+        # break windows that contain the candidate, so only those window endings
+        # need to be checked.
+        future_start = bisect_right(scheduled_times, candidate)
+        future_end = bisect_left(scheduled_times, candidate + self._per)
+        window_ends = (candidate, *scheduled_times[future_start:future_end])
+        for window_end in window_ends:
+            left = bisect_right(scheduled_times, window_end - self._per)
+            right = bisect_right(scheduled_times, window_end)
+            if right - left >= self._max_retries:
                 return False
         return True
-
-    def _next_candidate_after_conflict(
-        self,
-        candidate: float,
-        scheduled_times: list[float],
-    ) -> float:
-        """Move to the next boundary where an existing reservation leaves a window."""
-        next_candidates = [
-            scheduled_at + self._per
-            for scheduled_at in scheduled_times
-            if scheduled_at + self._per > candidate
-        ]
-        if not next_candidates:
-            return candidate + self._per
-        return min(next_candidates)

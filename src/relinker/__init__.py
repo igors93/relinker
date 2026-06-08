@@ -24,6 +24,7 @@ from relinker.exceptions import (
 )
 from relinker.http import (
     DEFAULT_RETRYABLE_STATUSES,
+    DEFAULT_RETRYABLE_TRANSPORT_EXCEPTIONS,
     MAX_RETRY_AFTER_SECONDS,
     http_retry_policy,
     parse_retry_after,
@@ -42,6 +43,7 @@ from relinker.typing import RetryWrappedFunction
 __all__ = [
     "AsyncRetryAttemptContext",
     "DEFAULT_RETRYABLE_STATUSES",
+    "DEFAULT_RETRYABLE_TRANSPORT_EXCEPTIONS",
     "MAX_RETRY_AFTER_SECONDS",
     "InvalidRetryConfigError",
     "PolicyHealthReport",
@@ -74,4 +76,4 @@ __all__ = [
     "should_retry_http_status",
 ]
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"

@@ -12,6 +12,22 @@ def log_event(event: RetryEvent) -> None:
 policy = RetryPolicy().on_event("after_failure", log_event)
 ```
 
+By default, handler failures propagate and stop the retry flow. For
+observational hooks such as metrics, use isolation:
+
+```python
+policy = RetryPolicy().on_event(
+    "before_sleep",
+    publish_metric,
+    failure_mode="isolate",
+)
+```
+
+Isolated handlers catch only `Exception`, report the failure through the
+`relinker.events` logger without the exception message, and continue to later
+handlers. `KeyboardInterrupt`, `SystemExit`, and cancellation-style
+`BaseException` subclasses are never isolated.
+
 Each event can include a `RetryState` object:
 
 ```python

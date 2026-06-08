@@ -84,6 +84,17 @@ def _is_no_delay(policy: Any) -> bool:
     return _delay_is_always_zero(policy.delay_strategy)
 
 
+def _uses_implicit_default_policy(policy: Any) -> bool:
+    return (
+        isinstance(policy.stop_strategy, StopAfterAttempt)
+        and policy.stop_strategy.maximum == 3
+        and isinstance(policy.delay_strategy, FixedDelay)
+        and policy.delay_strategy.seconds == 0
+        and isinstance(policy.condition, ExceptionCondition)
+        and policy.condition.exception_types == (Exception,)
+    )
+
+
 def _has_random_delay(strategy: Any) -> bool:
     stack = [strategy]
     while stack:
@@ -194,6 +205,18 @@ def compute_warnings(policy: Any) -> tuple[PolicyWarning, ...]:
 
     is_forever = _is_forever(policy)
     is_no_delay = _is_no_delay(policy)
+
+    if _uses_implicit_default_policy(policy):
+        warnings.append(
+            PolicyWarning(
+                code="implicit_default_policy",
+                message=(
+                    "This policy uses the implicit retry defaults: all Exception subclasses, "
+                    "three attempts, and no delay."
+                ),
+                hint="Specify exception types and a delay explicitly, or use a preset.",
+            )
+        )
 
     if is_forever:
         warnings.append(

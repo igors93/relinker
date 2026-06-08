@@ -159,9 +159,19 @@ def test_to_dict_represents_callbacks_fallback_and_testing() -> None:
     )
     assert data["exhaustion"]["exception"] == data["exhaustion"]["result"]
     assert data["callbacks"]["event_handlers"] == [
-        {"event": "after_giveup", "callable": "<anonymous>"}
+        {"event": "after_giveup", "callable": "<anonymous>", "failure_mode": "propagate"}
     ]
     assert data["testing"] == {"no_real_sleep": True}
+
+
+def test_to_dict_represents_event_handler_failure_mode() -> None:
+    data = (
+        RetryPolicy().on_event("before_sleep", lambda event: None, failure_mode="isolate").to_dict()
+    )
+
+    assert data["callbacks"]["event_handlers"] == [
+        {"event": "before_sleep", "callable": "<anonymous>", "failure_mode": "isolate"}
+    ]
 
 
 def test_to_dict_represents_result_exhaustion_options() -> None:

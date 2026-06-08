@@ -17,6 +17,7 @@ from relinker.delays.linear import LinearDelay
 from relinker.delays.random_delay import RandomDelay
 from relinker.delays.random_exponential import RandomExponentialDelay
 from relinker.delays.stateful import StatefulCustomDelay
+from relinker.event import EventHandlerRegistration
 from relinker.stop.attempts import StopAfterAttempt
 from relinker.stop.composite import AllStopStrategy, AnyStopStrategy
 from relinker.stop.forever import StopForever
@@ -32,6 +33,22 @@ def _callable_name(callback: object) -> str:
     if module:
         return f"{module}.{qualname}"
     return str(qualname)
+
+
+def _event_handler_to_dict(registration: object) -> dict[str, str]:
+    if isinstance(registration, EventHandlerRegistration):
+        return {
+            "event": registration.name,
+            "callable": _callable_name(registration.handler),
+            "failure_mode": registration.failure_mode,
+        }
+
+    name, handler = cast(tuple[str, object], registration)
+    return {
+        "event": name,
+        "callable": _callable_name(handler),
+        "failure_mode": "propagate",
+    }
 
 
 def _exception_name(exception_type: type[BaseException]) -> str:
@@ -198,8 +215,7 @@ def policy_to_dict(policy: Any) -> dict[str, Any]:
         "testing": {"no_real_sleep": bool(getattr(policy, "testing_mode", False))},
         "callbacks": {
             "event_handlers": [
-                {"event": name, "callable": _callable_name(handler)}
-                for name, handler in policy.event_handlers
+                _event_handler_to_dict(registration) for registration in policy.event_handlers
             ]
         },
     }

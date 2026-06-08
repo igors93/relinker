@@ -4,13 +4,58 @@ from __future__ import annotations
 
 import pytest
 
-from relinker import RetryPolicy
+from relinker import RetryPolicy, network
 
 
 def test_warning_many_attempts() -> None:
     policy = RetryPolicy().attempts(11)
     codes = {w.code for w in policy.warnings()}
     assert "many_attempts" in codes
+
+
+def test_warning_implicit_default_policy() -> None:
+    policy = RetryPolicy()
+    warnings = policy.warnings()
+    codes = {warning.code for warning in warnings}
+
+    assert "implicit_default_policy" in codes
+    warning = next(warning for warning in warnings if warning.code == "implicit_default_policy")
+    assert "all Exception subclasses" in warning.message
+    assert warning.hint is not None
+    assert "Specify exception types" in warning.hint
+
+
+def test_warning_implicit_default_policy_is_reported_by_doctor() -> None:
+    report = RetryPolicy().doctor()
+
+    assert "implicit_default_policy" in {warning.code for warning in report.warnings}
+    assert report.ok is False
+
+
+def test_no_implicit_default_warning_for_explicit_exception_and_delay() -> None:
+    policy = RetryPolicy().attempts(3).on(TimeoutError).fixed_delay(0.1)
+
+    assert "implicit_default_policy" not in {warning.code for warning in policy.warnings()}
+
+
+def test_no_implicit_default_warning_for_network_preset() -> None:
+    assert "implicit_default_policy" not in {warning.code for warning in network().warnings()}
+
+
+def test_implicit_default_warning_does_not_change_execution() -> None:
+    calls = 0
+    policy = RetryPolicy().for_testing()
+
+    def operation() -> str:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise ValueError("temporary")
+        return "ok"
+
+    assert "implicit_default_policy" in {warning.code for warning in policy.warnings()}
+    assert policy.run(operation) == "ok"
+    assert calls == 2
 
 
 def test_warning_many_attempts_exactly_10_does_not_warn() -> None:

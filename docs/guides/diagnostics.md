@@ -98,6 +98,7 @@ print(policy.timeline(attempts=5))
 
 | Warning | Meaning |
 |---|---|
+| `implicit_default_policy` | The policy still uses all implicit retry defaults: broad `Exception`, 3 attempts, and no delay |
 | `forever` | The policy can retry forever |
 | `no_delay` | The policy has no sleep between attempts |
 | `tight_loop_risk` | The policy can retry forever without sleeping |

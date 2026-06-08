@@ -14,6 +14,7 @@ from __future__ import annotations
 import copy
 import logging
 from collections.abc import Awaitable, Callable
+from contextlib import suppress
 from dataclasses import dataclass, replace
 from typing import Any, Generic, Literal, cast, overload
 
@@ -40,7 +41,13 @@ from relinker.diagnostics import (
     RetryLoadEstimate,
     RetrySimulation,
 )
-from relinker.event import EventHandler, EventName, RetryEvent
+from relinker.event import (
+    EventFailureMode,
+    EventHandler,
+    EventHandlerRegistration,
+    EventName,
+    RetryEvent,
+)
 from relinker.exceptions import InvalidRetryConfigError
 from relinker.executors.async_ import execute_async
 from relinker.executors.sync import execute_sync
@@ -59,6 +66,8 @@ ResultExhaustedBehavior = Literal["return_last", "raise"]
 ExhaustedCallback = Callable[[RetryResult[Any]], Any]
 ExceptionFactory = Callable[[RetryResult[Any]], BaseException]
 StatefulDelayCallback = Callable[[RetryState], float]
+EventHandlerEntry = EventHandlerRegistration | tuple[EventName, EventHandler]
+_EVENT_FAILURE_LOGGER_NAME = "relinker.events"
 
 
 def _no_sleep(_: float) -> None:
@@ -132,6 +141,21 @@ def _flatten_all_stop_strategies(strategies: tuple[StopStrategy, ...]) -> tuple[
     return tuple(flattened)
 
 
+def _report_isolated_event_failure(event: RetryEvent, error: Exception) -> None:
+    with suppress(Exception):
+        logging.getLogger(_EVENT_FAILURE_LOGGER_NAME).warning(
+            (
+                "Isolated event handler failed event=%s attempt=%d "
+                "function=%s policy=%s error_type=%s"
+            ),
+            event.name,
+            event.attempt_number,
+            event.function_name,
+            event.policy_name or "",
+            error.__class__.__name__,
+        )
+
+
 @dataclass(frozen=True, slots=True)
 class RetryPolicy(Generic[T]):
     """
@@ -149,7 +173,7 @@ class RetryPolicy(Generic[T]):
     result_exhausted_behavior: ResultExhaustedBehavior = "return_last"
     exhausted_callback: ExhaustedCallback | None = None
     exhausted_exception_factory: ExceptionFactory | None = None
-    event_handlers: tuple[tuple[EventName, EventHandler], ...] = ()
+    event_handlers: tuple[EventHandlerEntry, ...] = ()
     sleep: Callable[[float], None] = default_sleep
     async_sleep: Callable[[float], Awaitable[None]] = default_async_sleep
     history_limit: int | None = 1000
@@ -606,13 +630,22 @@ class RetryPolicy(Generic[T]):
 
     # ------------------------------------------------------------ events
 
-    def on_event(self, name: EventName, handler: EventHandler) -> RetryPolicy[T]:
+    def on_event(
+        self,
+        name: EventName,
+        handler: EventHandler,
+        *,
+        failure_mode: EventFailureMode = "propagate",
+    ) -> RetryPolicy[T]:
         """Return a new policy with an additional event handler."""
         if is_async_callable(handler):
             raise InvalidRetryConfigError(
                 "Async event handlers are not supported; use a synchronous handler."
             )
-        return replace(self, event_handlers=(*self.event_handlers, (name, handler)))
+        if failure_mode not in ("propagate", "isolate"):
+            raise InvalidRetryConfigError("failure_mode must be 'propagate' or 'isolate'")
+        registration = EventHandlerRegistration(name, handler, failure_mode)
+        return replace(self, event_handlers=(*self.event_handlers, registration))
 
     def on_before_attempt(self, handler: EventHandler) -> RetryPolicy[T]:
         """Return a new policy that calls handler before each attempt."""
@@ -661,7 +694,7 @@ class RetryPolicy(Generic[T]):
             "after_success",
             "after_giveup",
         ):
-            policy = policy.on_event(event_name, print_event)
+            policy = policy.on_event(event_name, print_event, failure_mode="isolate")
         return policy
 
     def with_logging(
@@ -682,7 +715,7 @@ class RetryPolicy(Generic[T]):
         handler = make_logging_handler(level, _logger)
         policy: RetryPolicy[T] = self
         for event_name in ("before_sleep", "after_giveup"):
-            policy = policy.on_event(event_name, handler)
+            policy = policy.on_event(event_name, handler, failure_mode="isolate")
         return policy
 
     def with_structured_logging(
@@ -708,7 +741,7 @@ class RetryPolicy(Generic[T]):
         )
         policy: RetryPolicy[T] = self
         for event_name in ("before_sleep", "after_giveup"):
-            policy = policy.on_event(event_name, handler)
+            policy = policy.on_event(event_name, handler, failure_mode="isolate")
         return policy
 
     def emit(self, event: RetryEvent) -> None:
@@ -718,9 +751,22 @@ class RetryPolicy(Generic[T]):
             if state is not None and state.policy_name is None:
                 state = replace(state, policy_name=self.name)
             event = replace(event, policy_name=self.name, state=state)
-        for name, handler in self.event_handlers:
+        for registration in self.event_handlers:
+            if isinstance(registration, EventHandlerRegistration):
+                name = registration.name
+                handler = registration.handler
+                failure_mode = registration.failure_mode
+            else:
+                name, handler = registration
+                failure_mode = "propagate"
             if name == event.name:
-                handler(event)
+                try:
+                    handler(event)
+                except Exception as error:
+                    if failure_mode == "isolate":
+                        _report_isolated_event_failure(event, error)
+                        continue
+                    raise
 
     # --------------------------------------------------------- diagnostics
 

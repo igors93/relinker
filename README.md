@@ -216,14 +216,15 @@ print(policy.preview(attempts=5))
 
 ## HTTP retry
 
-Relinker includes dependency-free HTTP helpers. They work with any response object that exposes `.status_code` or a dictionary with a `"status_code"` key.
+Relinker includes dependency-free HTTP helpers. They work with any response object that exposes `.status_code` or a dictionary with a `"status_code"` key. Transport exceptions are opt-in so existing `1.x` result-based HTTP policies keep their behavior.
 
 ```python
-from relinker import http_retry_policy
+from relinker import DEFAULT_RETRYABLE_TRANSPORT_EXCEPTIONS, http_retry_policy
 
 policy = http_retry_policy(
     attempts=5,
     statuses={429, 500, 502, 503, 504},
+    transport_exceptions=DEFAULT_RETRYABLE_TRANSPORT_EXCEPTIONS,
     respect_retry_after=True,
 )
 ```

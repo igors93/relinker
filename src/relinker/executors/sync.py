@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import replace as _dc_replace
 from typing import TYPE_CHECKING, Any
 
 from relinker.event import RetryEvent
 from relinker.exceptions import TryAgain
 from relinker.internal.clock import now
+from relinker.internal.executor_flow import record_failure_and_emit, state_with_wait_plan
 from relinker.internal.executor_helpers import function_name as _function_name
 from relinker.internal.exhaustion import finish_exhausted, should_stop_before_sleep
 from relinker.internal.retry_wait import plan_retry_wait, release_retry_wait
@@ -152,12 +152,7 @@ def execute_sync(
                         function_name=runtime.function_name,
                         delay=plan.total_delay,
                         value=value,
-                        state=_dc_replace(
-                            pre_sleep_state,
-                            next_delay=plan.total_delay,
-                            policy_delay=plan.policy_delay,
-                            budget_delay=plan.budget_delay,
-                        ),
+                        state=state_with_wait_plan(pre_sleep_state, plan),
                     )
                 )
             except BaseException:
@@ -201,27 +196,13 @@ def execute_sync(
             continue
 
         attempt_ended_at = now()
-        runtime.record_failure(
-            started_at=attempt_started_at,
-            ended_at=attempt_ended_at,
+        should_stop = record_failure_and_emit(
+            policy,
+            runtime,
+            attempt_started_at=attempt_started_at,
+            attempt_ended_at=attempt_ended_at,
             error=error,
-        )
-        elapsed = attempt_ended_at - runtime.started_at
-        should_stop = policy.stop_strategy.should_stop(attempt_number, elapsed)
-
-        policy.emit(
-            RetryEvent(
-                name="after_failure",
-                attempt_number=attempt_number,
-                function_name=runtime.function_name,
-                error=error,
-                state=runtime.state(
-                    last_error=error,
-                    retry_cause="exception",
-                    will_retry=should_retry and not should_stop,
-                    will_stop=should_stop,
-                ),
-            )
+            should_retry=should_retry,
         )
 
         if not should_retry:
@@ -307,12 +288,7 @@ def execute_sync(
                     function_name=runtime.function_name,
                     delay=plan.total_delay,
                     error=error,
-                    state=_dc_replace(
-                        pre_sleep_state,
-                        next_delay=plan.total_delay,
-                        policy_delay=plan.policy_delay,
-                        budget_delay=plan.budget_delay,
-                    ),
+                    state=state_with_wait_plan(pre_sleep_state, plan),
                 )
             )
         except BaseException:

@@ -40,6 +40,11 @@ Enable only when safe:
 policy = RetryPolicy().with_structured_logging(include_error_message=True)
 ```
 
+The built-in logging handlers are observational and use isolated event handler
+failure mode. If a logging sink raises a normal `Exception`, Relinker reports
+the handler failure through the `relinker.events` logger and continues the retry
+flow.
+
 ## Event hooks
 
 Use event hooks when you want custom behavior.
@@ -52,6 +57,21 @@ def capture_retry(event: RetryEvent) -> None:
 
 policy = RetryPolicy().attempts(3).on_retry(capture_retry)
 ```
+
+For critical hooks, keep the default propagation behavior. For metrics,
+tracing, or debugging observers, opt in to isolation:
+
+```python
+policy = RetryPolicy().on_event(
+    "before_sleep",
+    capture_retry,
+    failure_mode="isolate",
+)
+```
+
+Isolated failures do not include exception messages in the default report,
+which helps avoid leaking tokens, URLs, or payload fragments from observer
+errors.
 
 ## Event names
 

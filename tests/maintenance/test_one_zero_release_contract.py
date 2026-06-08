@@ -1,4 +1,4 @@
-"""Release contract for Relinker 1.1.0."""
+"""Release contract for the current stable Relinker release."""
 
 from __future__ import annotations
 
@@ -15,12 +15,12 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_version_sources_report_one_zero_one() -> None:
+def test_version_sources_report_current_release() -> None:
     with (ROOT / "pyproject.toml").open("rb") as file:
         project_version = tomllib.load(file)["project"]["version"]
 
-    assert project_version == "1.1.0"
-    assert relinker.__version__ == "1.1.0"
+    assert project_version == "1.2.0"
+    assert relinker.__version__ == "1.2.0"
 
 
 def test_classifier_is_production_stable() -> None:
@@ -32,23 +32,23 @@ def test_classifier_is_production_stable() -> None:
     assert "Development Status :: 3 - Alpha" not in classifier_text
 
 
-def test_changelog_has_dated_one_zero_one_section() -> None:
+def test_changelog_has_dated_current_release_section() -> None:
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    pattern = re.compile(r"^## 1\.1\.0 - \d{4}-\d{2}-\d{2}$", re.MULTILINE)
+    pattern = re.compile(r"^## 1\.2\.0 - \d{4}-\d{2}-\d{2}$", re.MULTILINE)
     matches = pattern.findall(changelog)
 
     assert len(matches) == 1
 
 
-def test_changelog_one_one_records_release_changes() -> None:
+def test_changelog_current_release_records_release_changes() -> None:
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    start = changelog.index("## 1.1.0")
-    end = changelog.index("## 1.0.1")
+    start = changelog.index("## 1.2.0")
+    end = changelog.index("## 1.1.0")
     block = changelog[start:end]
 
-    assert "RetryPolicy.named" in block
-    assert "RetryPolicy.to_dict" in block
-    assert "RetryBudgetSnapshot" in block
+    assert "DEFAULT_RETRYABLE_TRANSPORT_EXCEPTIONS" in block
+    assert "implicit_default_policy" in block
+    assert 'failure_mode="isolate"' in block
 
 
 def test_readme_is_stable() -> None:
@@ -89,8 +89,8 @@ def test_compatibility_doc_is_post_one_zero() -> None:
         assert fragment in compat
 
 
-def test_public_api_size_is_unchanged() -> None:
-    assert len(relinker.__all__) == 32
+def test_public_api_size_matches_documented_minor_release_surface() -> None:
+    assert len(relinker.__all__) == 33
 
 
 def test_readiness_record_is_honest() -> None:
@@ -105,4 +105,4 @@ def test_wheel_validator_checks_version() -> None:
     content = (ROOT / "scripts/validate_installed_wheel.py").read_text(encoding="utf-8")
 
     assert "distribution_version" in content
-    assert "1.1.0" in content
+    assert "1.2.0" in content

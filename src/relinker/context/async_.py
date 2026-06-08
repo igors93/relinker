@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import replace as _dc_replace
 from typing import TYPE_CHECKING
 
 from relinker.context._shared import (
@@ -12,6 +11,7 @@ from relinker.context._shared import (
 )
 from relinker.event import RetryEvent
 from relinker.exceptions import TryAgain
+from relinker.internal.executor_flow import state_with_wait_plan
 from relinker.internal.exhaustion import should_stop_before_sleep
 from relinker.internal.retry_wait import plan_retry_wait, release_retry_wait
 
@@ -139,12 +139,7 @@ class AsyncRetryAttemptContext(_BaseRetryAttemptContext):
                     function_name=self.iterator.name,
                     delay=plan.total_delay,
                     error=error,
-                    state=_dc_replace(
-                        pre_sleep_state,
-                        next_delay=plan.total_delay,
-                        policy_delay=plan.policy_delay,
-                        budget_delay=plan.budget_delay,
-                    ),
+                    state=state_with_wait_plan(pre_sleep_state, plan),
                 )
             )
         except BaseException:
@@ -253,12 +248,7 @@ class AsyncRetryAttemptContext(_BaseRetryAttemptContext):
                     function_name=self.iterator.name,
                     delay=plan.total_delay,
                     value=value,
-                    state=_dc_replace(
-                        pre_sleep_state,
-                        next_delay=plan.total_delay,
-                        policy_delay=plan.policy_delay,
-                        budget_delay=plan.budget_delay,
-                    ),
+                    state=state_with_wait_plan(pre_sleep_state, plan),
                 )
             )
         except BaseException:

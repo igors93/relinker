@@ -159,6 +159,14 @@ def test_readme_does_not_say_alpha() -> None:
     assert "currently in alpha" not in readme
 
 
+def test_introductory_docs_do_not_recommend_implicit_retry_defaults() -> None:
+    for relative_path in ("README.md", "docs/guides/getting-started.md"):
+        content = (ROOT / relative_path).read_text(encoding="utf-8")
+
+        assert "@retry\ndef " not in content
+        assert "RetryPolicy().run(" not in content
+
+
 def test_compatibility_references_one_zero() -> None:
     compat = (ROOT / "docs/reference/compatibility.md").read_text(encoding="utf-8")
 
@@ -168,7 +176,7 @@ def test_compatibility_references_one_zero() -> None:
 def test_release_docs_contain_one_zero_checklist() -> None:
     release = (ROOT / "docs/maintainers/release.md").read_text(encoding="utf-8")
 
-    assert "1.1.0" in release
+    assert "1.2.0" in release
     assert "Checklist" in release
 
 

@@ -55,11 +55,13 @@ A quick reference from need to API. All names listed here are stable exports.
 | Need | API |
 |---|---|
 | Ready-to-use HTTP policy | `http_retry_policy(attempts=5, statuses={429, 503})` |
+| Retry transport failures with HTTP policy | `http_retry_policy(transport_exceptions=DEFAULT_RETRYABLE_TRANSPORT_EXCEPTIONS)` |
 | Retry by status code | `.retry_if_result(retry_if_status({429, 500, 503}))` |
 | Respect `Retry-After` header | `.stateful_delay(retry_after_delay(default=1.0, maximum=60.0))` |
 | Parse `Retry-After` manually | `parse_retry_after(header_value, default=1.0)` |
 | Check one status code | `should_retry_http_status(code)` |
 | Default retryable statuses | `DEFAULT_RETRYABLE_STATUSES` |
+| Default transport exception set | `DEFAULT_RETRYABLE_TRANSPORT_EXCEPTIONS` |
 | Maximum cap for Retry-After | `MAX_RETRY_AFTER_SECONDS` |
 
 ## Exhaustion behavior

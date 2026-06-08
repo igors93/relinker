@@ -8,18 +8,24 @@ They work with:
 - dictionaries with `"status_code"`
 - response objects with `.headers`
 - dictionaries with `"headers"`
+- opt-in transport exceptions such as timeouts and connection failures
 
 ## Ready-to-use HTTP policy
 
 ```python
-from relinker import http_retry_policy
+from relinker import DEFAULT_RETRYABLE_TRANSPORT_EXCEPTIONS, http_retry_policy
 
 policy = http_retry_policy(
     attempts=5,
     statuses={429, 500, 502, 503, 504},
+    transport_exceptions=DEFAULT_RETRYABLE_TRANSPORT_EXCEPTIONS,
     respect_retry_after=True,
 )
 ```
+
+`transport_exceptions` defaults to an empty tuple in the `1.x` series. This
+preserves existing result-based behavior: a `TimeoutError` or `ConnectionError`
+is retried only when you opt in explicitly.
 
 ## Retry by status code
 
@@ -47,6 +53,9 @@ policy = (
 ```
 
 The delay callback reads `state.last_value`, so it works naturally with result-based retry.
+
+For transport exceptions there is no response object, so `http_retry_policy()`
+uses `default_delay` for that retry.
 
 ## Parse Retry-After manually
 

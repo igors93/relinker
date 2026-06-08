@@ -8,6 +8,7 @@ import relinker.context as context
 EXPECTED_ROOT_PUBLIC_API = (
     "AsyncRetryAttemptContext",
     "DEFAULT_RETRYABLE_STATUSES",
+    "DEFAULT_RETRYABLE_TRANSPORT_EXCEPTIONS",
     "MAX_RETRY_AFTER_SECONDS",
     "InvalidRetryConfigError",
     "PolicyHealthReport",

@@ -8,10 +8,28 @@ the compatibility and deprecation policy documented in
 
 ## Unreleased
 
+## 1.2.0 - 2026-06-08
+
+### Added
+
+- Added opt-in HTTP transport exception retries through
+  `http_retry_policy(transport_exceptions=...)` and the
+  `DEFAULT_RETRYABLE_TRANSPORT_EXCEPTIONS` helper constant. The default remains
+  empty for `1.x` compatibility.
+- Added the `implicit_default_policy` advisory warning for policies that still
+  use broad `Exception`, three attempts, and no delay through implicit defaults.
+- Added `failure_mode="isolate"` for event handlers, with built-in logging
+  helpers using isolated observational handlers.
+- Added permanent `RetryBudget` property and concurrency tests plus maintainer
+  documentation for rolling-window, earliest-slot, atomicity, release, and
+  snapshot invariants.
+
 ### Changed
 
 - CI now tests Python 3.14 and Windows in addition to the existing Linux and
   macOS compatibility matrix.
+- Refactored small deterministic executor-flow helpers shared by sync, async,
+  and block paths while keeping their loops, sleeps, and await points explicit.
 
 ### Documentation
 

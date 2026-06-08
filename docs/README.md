@@ -68,6 +68,7 @@ This directory is organized by intent:
 | [Development](maintainers/development.md) | Set up the project and run local checks |
 | [Release process](maintainers/release.md) | Validate and publish a release |
 | [Stability matrix](maintainers/stability-matrix.md) | Map core capabilities to automated contracts |
+| [RetryBudget invariants](maintainers/retry-budget-invariants.md) | Maintain rolling-window capacity and earliest-slot guarantees |
 | [1.0 readiness](maintainers/1.0-readiness.md) | Track pre-1.0 automated, release, and validation requirements |
 | [Architectural decisions](maintainers/decisions/README.md) | Record important decisions and their tradeoffs |
 

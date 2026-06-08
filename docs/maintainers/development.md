@@ -91,7 +91,7 @@ The validator must import the installed distribution, not `src`.
 Maintainers can run a small manual performance smoke check:
 
 ```bash
-python scripts/benchmark_smoke.py --iterations 1000
+python benchmarks/smoke.py --iterations 1000
 ```
 
 This is not a CI gate and does not replace profiling. It is only a quick way to

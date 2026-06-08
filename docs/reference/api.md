@@ -59,6 +59,7 @@ root package exports.
 | Name | Purpose |
 |---|---|
 | `DEFAULT_RETRYABLE_STATUSES` | Default retryable HTTP statuses. |
+| `DEFAULT_RETRYABLE_TRANSPORT_EXCEPTIONS` | Opt-in built-in transport exception classes for HTTP policies. |
 | `MAX_RETRY_AFTER_SECONDS` | Maximum accepted `Retry-After` delay. |
 | `should_retry_http_status` | Check if a status should retry. |
 | `retry_if_status` | Build a result predicate for HTTP responses. |
@@ -187,6 +188,10 @@ result exhaustion separately and includes `history_limit`.
 - `debug()`
 - `with_logging()`
 - `with_structured_logging()`
+
+`on_event()` accepts `failure_mode="propagate"` (default) for critical hooks
+and `failure_mode="isolate"` for observational hooks. Built-in logging helpers
+use isolated handlers.
 
 ### Guidance
 

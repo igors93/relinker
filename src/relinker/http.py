@@ -28,6 +28,11 @@ if TYPE_CHECKING:
     from relinker.policy import RetryPolicy
 
 DEFAULT_RETRYABLE_STATUSES = frozenset({429, 500, 502, 503, 504})
+DEFAULT_RETRYABLE_TRANSPORT_EXCEPTIONS = (
+    TimeoutError,
+    ConnectionError,
+    OSError,
+)
 _MAX_RETRY_AFTER_HEADER_LENGTH = 256
 MAX_RETRY_AFTER_SECONDS = 86400.0
 
@@ -38,6 +43,23 @@ def _normalize_statuses(statuses: Iterable[int]) -> frozenset[int]:
     for status in normalized:
         if not isinstance(status, int) or status < 100 or status > 599:
             raise InvalidRetryConfigError("HTTP status codes must be integers between 100 and 599")
+
+    return normalized
+
+
+def _normalize_transport_exceptions(
+    transport_exceptions: Iterable[type[Exception]],
+) -> tuple[type[Exception], ...]:
+    normalized = tuple(transport_exceptions)
+
+    for exception_type in normalized:
+        if not isinstance(exception_type, type):
+            raise InvalidRetryConfigError("transport_exceptions must contain exception classes")
+        if not issubclass(exception_type, Exception):
+            raise InvalidRetryConfigError(
+                f"{exception_type.__name__} is a BaseException subclass"
+                " that the executor never catches"
+            )
 
     return normalized
 
@@ -104,6 +126,7 @@ def http_retry_policy(
     *,
     attempts: int = 5,
     statuses: Iterable[int] = DEFAULT_RETRYABLE_STATUSES,
+    transport_exceptions: Iterable[type[Exception]] = (),
     default_delay: float = 1.0,
     maximum_delay: float | None = 60.0,
     respect_retry_after: bool = True,
@@ -111,20 +134,25 @@ def http_retry_policy(
     """
     Return a ready-to-use HTTP result-based retry policy.
 
-    This recipe retries responses whose status code is in statuses. When
-    respect_retry_after=True, it uses a stateful delay that honours Retry-After.
+    This recipe retries responses whose status code is in statuses. Transport
+    exceptions are opt-in for 1.x compatibility. When respect_retry_after=True,
+    response retries use a stateful delay that honours Retry-After, while
+    exception retries use default_delay because no HTTP response is available.
     Otherwise it falls back to exponential backoff.
     """
     ensure_positive_int("attempts", attempts)
     ensure_non_negative("default_delay", default_delay)
     if maximum_delay is not None:
         ensure_non_negative("maximum_delay", maximum_delay)
+    transport_exception_types = _normalize_transport_exceptions(transport_exceptions)
 
     from relinker.policy import RetryPolicy
 
     policy: RetryPolicy[Any] = (
         RetryPolicy().attempts(attempts).retry_if_result(retry_if_status(statuses))
     )
+    if transport_exception_types:
+        policy = policy.or_on(*transport_exception_types)
     if respect_retry_after:
         return policy.stateful_delay(
             retry_after_delay(default=default_delay, maximum=maximum_delay)

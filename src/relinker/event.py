@@ -8,7 +8,7 @@ any external dependency.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from typing import Any, Literal, TypeAlias
 
@@ -21,6 +21,7 @@ EventName: TypeAlias = Literal[
     "before_sleep",
     "after_giveup",
 ]
+EventFailureMode: TypeAlias = Literal["propagate", "isolate"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,3 +50,17 @@ class RetryEvent:
 
 
 EventHandler: TypeAlias = Callable[[RetryEvent], None]
+
+
+@dataclass(frozen=True, slots=True)
+class EventHandlerRegistration:
+    """Immutable internal registration for one event handler."""
+
+    name: EventName
+    handler: EventHandler
+    failure_mode: EventFailureMode = "propagate"
+
+    def __iter__(self) -> Iterator[object]:
+        """Preserve tuple-unpacking compatibility for existing internal helpers."""
+        yield self.name
+        yield self.handler

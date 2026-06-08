@@ -11,7 +11,7 @@ IGNORED_SCAN_PARTS = {".venv", ".git", "dist", "build"}
 def _unreleased_block() -> str:
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     start = changelog.index("## Unreleased")
-    end = changelog.index("## 1.1.0")
+    end = changelog.index("## 1.2.0")
     return changelog[start:end]
 
 
@@ -29,10 +29,21 @@ def test_changelog_has_unreleased_before_current_release() -> None:
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
 
     assert "## Unreleased" in changelog
-    assert changelog.index("## Unreleased") < changelog.index("## 1.1.0")
+    assert changelog.index("## Unreleased") < changelog.index("## 1.2.0")
 
 
-def test_changelog_one_one_records_released_changes() -> None:
+def test_changelog_one_two_records_released_changes() -> None:
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    start = changelog.index("## 1.2.0")
+    end = changelog.index("## 1.1.0")
+    block = changelog[start:end]
+
+    assert "DEFAULT_RETRYABLE_TRANSPORT_EXCEPTIONS" in block
+    assert "implicit_default_policy" in block
+    assert 'failure_mode="isolate"' in block
+
+
+def test_changelog_one_one_history_remains_present() -> None:
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     start = changelog.index("## 1.1.0")
     end = changelog.index("## 1.0.1")
@@ -109,7 +120,7 @@ def test_stabilization_documents_exist() -> None:
 
 
 def test_release_readiness_scripts_exist() -> None:
-    for relative_path in ("scripts/validate_installed_wheel.py", "scripts/benchmark_smoke.py"):
+    for relative_path in ("scripts/validate_installed_wheel.py", "benchmarks/smoke.py"):
         assert (ROOT / relative_path).is_file()
 
 
@@ -123,7 +134,7 @@ def test_installed_wheel_validator_uses_only_public_api() -> None:
 
 
 def test_benchmark_smoke_is_not_a_ci_gate() -> None:
-    content = (ROOT / "scripts/benchmark_smoke.py").read_text(encoding="utf-8")
+    content = (ROOT / "benchmarks/smoke.py").read_text(encoding="utf-8")
 
     for fragment in ("pytest", "assert elapsed <", "fail_under"):
         assert fragment not in content

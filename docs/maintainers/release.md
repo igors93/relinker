@@ -89,11 +89,11 @@ Install the wheel in an isolated virtual environment and run the validator:
 python scripts/validate_installed_wheel.py
 ```
 
-## Checklist for 1.1.0
+## Checklist for 1.2.0
 
-- [ ] `pyproject.toml` reports `1.1.0`.
-- [ ] `relinker.__version__` reports `1.1.0`.
-- [ ] `CHANGELOG.md` contains a dated `1.1.0` section.
+- [ ] `pyproject.toml` reports `1.2.0`.
+- [ ] `relinker.__version__` reports `1.2.0`.
+- [ ] `CHANGELOG.md` contains a dated `1.2.0` section.
 - [ ] A new empty `Unreleased` section exists.
 - [ ] Public API snapshots are unchanged.
 - [ ] Ruff, mypy, tests, coverage, build, and Twine pass.

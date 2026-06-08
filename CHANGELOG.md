@@ -51,6 +51,8 @@ the compatibility and deprecation policy documented in
   explanation, and async testing example.
 - Expanded production-checklist guide with explanations for each item.
 - Updated documentation index with new pages and extended learning path.
+- Updated compatibility documentation to state the official Python 3.10 through
+  Python 3.14 support range consistently.
 
 ### Fixed
 
@@ -77,8 +79,7 @@ the compatibility and deprecation policy documented in
   `(first + per) - per < first`. `_first_legal_slot` now re-scans after each
   boundary advance and, when a candidate lands exactly on a boundary that
   rounds back into the window, steps forward by one ULP and re-scans rather
-  than walking ULP-by-ULP (which could require hundreds of thousands of
-  iterations while holding the budget lock).
+  than walking one representable float at a time while holding the budget lock.
 
 ## 1.1.0 - 2026-06-07
 

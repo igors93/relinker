@@ -148,7 +148,8 @@ Relinker emits a `silent_fallback` warning for this case.
 **Better:**
 
 ```python
-from relinker import RetryEvent, RetryPolicy
+from relinker import RetryPolicy
+from relinker.event import RetryEvent
 
 def on_exhausted(event: RetryEvent) -> None:
     logger.error("catalogue service exhausted after %d attempts", event.attempt_number)

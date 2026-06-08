@@ -95,6 +95,7 @@ python scripts/validate_installed_wheel.py
 - [ ] `relinker.__version__` reports `1.2.0`.
 - [ ] `CHANGELOG.md` contains a dated `1.2.0` section.
 - [ ] A new empty `Unreleased` section exists.
-- [ ] Public API snapshots are unchanged.
+- [ ] Public API snapshots match the explicitly approved additions for 1.2.0.
+- [ ] No unplanned public API additions or removals are present.
 - [ ] Ruff, mypy, tests, coverage, build, and Twine pass.
 - [ ] The installed wheel validator passes.

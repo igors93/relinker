@@ -55,8 +55,8 @@ The workflow has four jobs:
 
 1. `quality`: formatting, linting, and type checks.
 2. `documentation`: documentation and public API contracts.
-3. `tests`: test matrix on Python 3.10, 3.11, 3.12, and 3.13 across Ubuntu
-   and macOS.
+3. `tests`: test matrix on Python 3.10, 3.11, 3.12, 3.13, and 3.14 across
+   Ubuntu, macOS, and Windows.
 4. `validate-package`: package build validation.
 
 `quality` runs on Python 3.12. `documentation` runs the documentation tests and

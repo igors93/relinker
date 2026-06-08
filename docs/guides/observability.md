@@ -50,7 +50,8 @@ flow.
 Use event hooks when you want custom behavior.
 
 ```python
-from relinker import RetryEvent, RetryPolicy
+from relinker import RetryPolicy
+from relinker.event import RetryEvent
 
 def capture_retry(event: RetryEvent) -> None:
     print(event.name, event.attempt_number, event.delay)

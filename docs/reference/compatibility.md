@@ -6,7 +6,7 @@ version `1.0.0`.
 ## Supported Python versions
 
 The package metadata and CI matrix define official support. The current declared
-range is Python 3.10 through Python 3.13.
+range is Python 3.10 through Python 3.14.
 
 A newer interpreter may work locally before it becomes officially supported.
 Official support is added only after it is included in CI and package classifiers.
@@ -56,6 +56,11 @@ updated public API contract.
 
 `relinker.__version__` is package metadata and remains available directly. It is
 not part of the star-import API because it is not listed in `relinker.__all__`.
+
+`RetryPolicy.event_handlers` is an implementation detail of policy storage.
+Its concrete registration objects are not a public sequence API. Use
+`RetryPolicy.to_dict()` when application code needs structured inspection of
+configured event handlers.
 
 ### Documented module APIs
 

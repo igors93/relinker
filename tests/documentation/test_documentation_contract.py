@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import re
 from pathlib import Path
 from urllib.parse import unquote
@@ -15,6 +16,8 @@ import relinker
 
 ROOT = Path(__file__).resolve().parents[2]
 MARKDOWN_LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
+PYTHON_BLOCK = re.compile(r"```python\n(.*?)\n```", re.DOTALL)
+SUPPORTED_PYTHON_RANGE = re.compile(r"Python\s+(3\.\d+)\s+through\s+Python\s+(3\.\d+)")
 
 
 def _local_markdown_targets(path: Path) -> list[Path]:
@@ -27,6 +30,55 @@ def _local_markdown_targets(path: Path) -> list[Path]:
         resolved = (ROOT / decoded) if decoded.startswith("/") else (path.parent / decoded)
         targets.append(resolved.resolve())
     return targets
+
+
+def _version_key(version: str) -> tuple[int, int]:
+    major, minor = version.split(".", 1)
+    return int(major), int(minor)
+
+
+def _minor_versions_between(lower: str, upper: str) -> tuple[str, ...]:
+    lower_major, lower_minor = _version_key(lower)
+    upper_major, upper_minor = _version_key(upper)
+    assert lower_major == upper_major == 3
+    return tuple(f"3.{minor}" for minor in range(lower_minor, upper_minor + 1))
+
+
+def _project_python_versions() -> tuple[str, ...]:
+    with (ROOT / "pyproject.toml").open("rb") as file:
+        classifiers = tomllib.load(file)["project"]["classifiers"]
+
+    versions = [
+        classifier.removeprefix("Programming Language :: Python :: ")
+        for classifier in classifiers
+        if re.fullmatch(r"Programming Language :: Python :: 3\.\d+", classifier)
+    ]
+    return tuple(sorted(versions, key=_version_key))
+
+
+def _ci_python_versions() -> tuple[str, ...]:
+    workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    match = re.search(r"python-version:\s*\[([^\]]+)\]", workflow)
+    assert match is not None
+    versions = re.findall(r'"(3\.\d+)"', match.group(1))
+    return tuple(sorted(versions, key=_version_key))
+
+
+def _documented_python_versions(path: Path) -> tuple[str, ...]:
+    content = path.read_text(encoding="utf-8")
+    match = SUPPORTED_PYTHON_RANGE.search(content)
+    assert match is not None, f"{path.relative_to(ROOT)} does not document a Python range"
+    return _minor_versions_between(*match.groups())
+
+
+def _python_import_nodes(path: Path) -> list[tuple[int, int, ast.Import | ast.ImportFrom]]:
+    imports: list[tuple[int, int, ast.Import | ast.ImportFrom]] = []
+    for block_index, block in enumerate(PYTHON_BLOCK.findall(path.read_text(encoding="utf-8")), 1):
+        tree = ast.parse(block, filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import | ast.ImportFrom):
+                imports.append((block_index, node.lineno, node))
+    return imports
 
 
 def test_readme_does_not_duplicate_the_current_package_version() -> None:
@@ -88,6 +140,33 @@ def test_documented_core_imports_are_public() -> None:
         assert hasattr(relinker, name)
 
 
+def test_documented_python_imports_are_executable() -> None:
+    failures: list[str] = []
+    markdown_files = [ROOT / "README.md", *sorted((ROOT / "docs").rglob("*.md"))]
+
+    for markdown_file in markdown_files:
+        for block_index, line_number, node in _python_import_nodes(markdown_file):
+            module = ast.fix_missing_locations(ast.Module(body=[node], type_ignores=[]))
+            try:
+                exec(compile(module, str(markdown_file), "exec"), {})
+            except Exception as error:
+                failures.append(
+                    f"{markdown_file.relative_to(ROOT)} block {block_index} "
+                    f"line {line_number}: {error.__class__.__name__}: {error}"
+                )
+
+    assert failures == []
+
+
+def test_supported_python_versions_match_metadata_ci_and_docs() -> None:
+    expected = _project_python_versions()
+
+    assert expected == ("3.10", "3.11", "3.12", "3.13", "3.14")
+    assert _ci_python_versions() == expected
+    assert _documented_python_versions(ROOT / "docs/reference/compatibility.md") == expected
+    assert _documented_python_versions(ROOT / "README.md") == expected
+
+
 def test_public_api_reference_documents_every_root_export() -> None:
     reference = (ROOT / "docs/reference/api.md").read_text(encoding="utf-8")
     missing = [name for name in relinker.__all__ if f"`{name}`" not in reference]
@@ -101,6 +180,21 @@ def test_public_api_reference_identifies_root_surface() -> None:
     assert "relinker.__all__" in reference
     assert "from relinker.context import" in reference
     assert "relinker.__version__" in reference
+
+
+def test_public_api_reference_does_not_claim_all_exports_existed_in_one_zero() -> None:
+    reference = (ROOT / "docs/reference/api.md").read_text(encoding="utf-8")
+
+    assert "All exports listed here are stable from `1.0.0`" not in reference
+    assert "Individual exports may have been introduced" in reference
+
+
+def test_release_checklist_allows_only_approved_public_api_additions() -> None:
+    release = (ROOT / "docs/maintainers/release.md").read_text(encoding="utf-8")
+
+    assert "Public API snapshots are unchanged." not in release
+    assert "Public API snapshots match the explicitly approved additions for 1.2.0." in release
+    assert "No unplanned public API additions or removals are present." in release
 
 
 def test_retry_after_docs_describe_large_values_as_capped_not_defaulted() -> None:
@@ -136,6 +230,14 @@ def test_compatibility_guide_documents_internal_scope() -> None:
     assert "relinker.__all__" in compatibility
     assert "relinker.internal" in compatibility
     assert "process-local" in compatibility
+
+
+def test_compatibility_guide_documents_event_handlers_inspection_contract() -> None:
+    compatibility = (ROOT / "docs/reference/compatibility.md").read_text(encoding="utf-8")
+
+    assert "RetryPolicy.event_handlers" in compatibility
+    assert "implementation detail" in compatibility
+    assert "to_dict()" in compatibility
 
 
 def test_readiness_record_does_not_invent_external_adoption() -> None:

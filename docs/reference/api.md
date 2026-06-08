@@ -1,7 +1,8 @@
 # API Reference
 
-The stable root import surface is `relinker.__all__`. All exports listed here
-are stable from `1.0.0` and covered by the compatibility and deprecation policy.
+The stable root import surface is `relinker.__all__`. The root exports are
+governed by the compatibility and deprecation policy.
+Individual exports may have been introduced in later compatible releases.
 For compatibility guarantees and API tiers, see the
 [Compatibility policy](compatibility.md). For upgrade guidance, see
 [Migrating to 1.0](../guides/migrating-to-1.0.md).
@@ -176,6 +177,9 @@ part of `relinker.__all__`, so it is not included in the root star-import API.
 
 `to_dict()` returns configuration only. It describes exception exhaustion and
 result exhaustion separately and includes `history_limit`.
+
+`RetryPolicy.event_handlers` is internal policy storage. Use `to_dict()` for
+structured inspection of configured event handlers.
 
 ### Observability
 

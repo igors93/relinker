@@ -21,7 +21,7 @@ def _record_trace(trace: Trace) -> Callable[[RetryEvent], None]:
 
 
 def _trace_policy(trace: Trace) -> RetryPolicy[str]:
-    policy: RetryPolicy[str] = RetryPolicy[str]().attempts(3).on(TimeoutError).no_delay()
+    policy: RetryPolicy[str] = RetryPolicy().attempts(3).on(TimeoutError).no_delay()
     for name in (
         "before_attempt",
         "after_failure",
@@ -140,7 +140,7 @@ async def test_sync_and_async_direct_result_contracts_match(scenario: str) -> No
     async_trace: Trace = []
 
     if scenario == "success_first_try":
-        policy = RetryPolicy[object]().attempts(3).on(TimeoutError).no_delay().return_result()
+        policy = RetryPolicy().attempts(3).on(TimeoutError).no_delay().return_result()
 
         def sync_operation() -> str:
             return "ok"
@@ -149,7 +149,7 @@ async def test_sync_and_async_direct_result_contracts_match(scenario: str) -> No
             return "ok"
 
     elif scenario == "exception_exhaustion":
-        policy = RetryPolicy[object]().attempts(2).on(TimeoutError).no_delay().return_result()
+        policy = RetryPolicy().attempts(2).on(TimeoutError).no_delay().return_result()
 
         def sync_operation() -> str:
             raise TimeoutError("temporary")
@@ -159,7 +159,7 @@ async def test_sync_and_async_direct_result_contracts_match(scenario: str) -> No
 
     elif scenario == "result_exhaustion":
         policy = (
-            RetryPolicy[object]()
+            RetryPolicy()
             .attempts(2)
             .retry_if_result(lambda value: value == "retry")
             .no_delay()
@@ -173,7 +173,7 @@ async def test_sync_and_async_direct_result_contracts_match(scenario: str) -> No
             return "retry"
 
     elif scenario == "try_again_success":
-        policy = RetryPolicy[object]().attempts(3).on(ValueError).no_delay().return_result()
+        policy = RetryPolicy().attempts(3).on(ValueError).no_delay().return_result()
         sync_calls = 0
         async_calls = 0
 
@@ -192,7 +192,7 @@ async def test_sync_and_async_direct_result_contracts_match(scenario: str) -> No
             return "ok"
 
     else:
-        policy = RetryPolicy[object]().attempts(3).on(TimeoutError).no_delay().return_result()
+        policy = RetryPolicy().attempts(3).on(TimeoutError).no_delay().return_result()
 
         def sync_operation() -> None:
             return None
@@ -213,7 +213,7 @@ async def test_sync_and_async_direct_result_contracts_match(scenario: str) -> No
 async def test_sync_and_async_non_retryable_exception_contracts_match() -> None:
     sync_trace: Trace = []
     async_trace: Trace = []
-    policy = RetryPolicy[object]().attempts(3).on(TimeoutError).no_delay()
+    policy = RetryPolicy().attempts(3).on(TimeoutError).no_delay()
 
     def sync_operation() -> None:
         raise ValueError("invalid")
@@ -236,12 +236,9 @@ async def test_sync_and_async_non_retryable_exception_contracts_match() -> None:
 
 @pytest.mark.asyncio
 async def test_sync_and_async_exhaustion_customization_contracts_match() -> None:
-    fallback_policy = RetryPolicy[object]().attempts(1).on(TimeoutError).fallback_value("safe")
+    fallback_policy = RetryPolicy().attempts(1).on(TimeoutError).fallback_value("safe")
     custom_error_policy = (
-        RetryPolicy[object]()
-        .attempts(1)
-        .on(TimeoutError)
-        .on_exhausted_raise(RuntimeError("custom"))
+        RetryPolicy().attempts(1).on(TimeoutError).on_exhausted_raise(RuntimeError("custom"))
     )
 
     def sync_fail() -> None:

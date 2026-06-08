@@ -92,7 +92,7 @@ python -m pip install -e ".[dev]"
 
 ## Stability
 
-Relinker 1.0 provides a stable public API for Python 3.10 through 3.13.
+Relinker 1.0 provides a stable public API for Python 3.10 through Python 3.14.
 Compatibility guarantees cover the documented exports and behaviors described in
 the [compatibility policy](docs/reference/compatibility.md). Release history lives in
 [`CHANGELOG.md`](CHANGELOG.md).
@@ -270,7 +270,8 @@ Structured logs exclude error messages by default because exception messages can
 ### Events
 
 ```python
-from relinker import RetryEvent, RetryPolicy
+from relinker import RetryPolicy
+from relinker.event import RetryEvent
 
 def on_retry(event: RetryEvent) -> None:
     print(f"retrying after attempt {event.attempt_number}, delay={event.delay}")

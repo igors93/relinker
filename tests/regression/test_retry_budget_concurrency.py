@@ -5,6 +5,8 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 
+import pytest
+
 from relinker import RetryBudget
 
 
@@ -72,12 +74,35 @@ def test_concurrent_release_is_idempotent_and_does_not_remove_other_reservations
     assert replacement.scheduled_at == 0.0
 
 
-def test_concurrent_snapshots_are_individually_consistent() -> None:
+def test_concurrent_snapshots_observe_populated_state_with_controlled_clock(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     budget = RetryBudget(max_retries=4, per=2.0)
-    for index in range(10):
-        budget._reserve("api", current_time=0.0, not_before=index * 0.25)
+    controlled_time = 100.0
+    monkeypatch.setattr("relinker.budget._monotonic", lambda: controlled_time)
 
-    workers = 16
+    budget._reserve("api", current_time=controlled_time, not_before=controlled_time)
+    released_future = budget._reserve(
+        "api",
+        current_time=controlled_time,
+        not_before=controlled_time + 0.25,
+    )
+    budget._release(released_future)
+    budget._reserve(
+        "api",
+        current_time=controlled_time,
+        not_before=controlled_time + 0.5,
+    )
+
+    baseline = budget.snapshot("api")
+    assert baseline.active == 1
+    assert baseline.queued == 1
+    assert 0 <= baseline.available <= budget.max_retries
+    assert baseline.next_available_in >= 0.0
+
+    readers = 16
+    writers = 8
+    workers = readers + writers
     barrier = Barrier(workers)
 
     def snapshot(_: int) -> tuple[int, int, int, float]:
@@ -85,11 +110,27 @@ def test_concurrent_snapshots_are_individually_consistent() -> None:
         current = budget.snapshot("api")
         return current.active, current.queued, current.available, current.next_available_in
 
+    def reserve_future(index: int) -> None:
+        barrier.wait(timeout=5)
+        budget._reserve(
+            "api",
+            current_time=controlled_time,
+            not_before=controlled_time + 0.75 + index * 0.01,
+        )
+
     with ThreadPoolExecutor(max_workers=workers) as executor:
-        snapshots = list(executor.map(snapshot, range(workers)))
+        snapshot_futures = [executor.submit(snapshot, index) for index in range(readers)]
+        writer_futures = [executor.submit(reserve_future, index) for index in range(writers)]
+        snapshots = [future.result() for future in snapshot_futures]
+        for future in writer_futures:
+            future.result()
 
     for active, queued, available, next_available_in in snapshots:
-        assert 0 <= active <= budget.max_retries
-        assert queued >= 0
+        assert active == 1
+        assert queued >= 1
         assert 0 <= available <= budget.max_retries
         assert next_available_in >= 0.0
+
+    final_snapshot = budget.snapshot("api")
+    assert final_snapshot.active == 1
+    assert final_snapshot.queued >= 1 + writers

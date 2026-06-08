@@ -26,9 +26,8 @@ def test_local_ci_script_runs_required_quality_package_and_coverage_steps() -> N
 def test_github_workflow_preserves_supported_python_matrix() -> None:
     workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
 
-    for version in ('"3.10"', '"3.11"', '"3.12"', '"3.13"'):
+    for version in ('"3.10"', '"3.11"', '"3.12"', '"3.13"', '"3.14"'):
         assert version in workflow
-    assert "3.14" not in workflow
 
 
 def test_github_workflow_runs_required_quality_package_and_coverage_steps() -> None:

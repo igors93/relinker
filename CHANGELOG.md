@@ -8,6 +8,11 @@ the compatibility and deprecation policy documented in
 
 ## Unreleased
 
+### Changed
+
+- CI now tests Python 3.14 and Windows in addition to the existing Linux and
+  macOS compatibility matrix.
+
 ### Fixed
 
 - `TryAgain` now preserves the real retry cause in result history and final

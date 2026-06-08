@@ -32,6 +32,11 @@ This directory is organized by intent:
 
 | Guide | Purpose |
 |---|---|
+| [Choosing a policy](guides/choosing-a-policy.md) | Decision tree and starting configurations by situation |
+| [Common mistakes](guides/common-mistakes.md) | Risky patterns and safer alternatives |
+| [Troubleshooting](guides/troubleshooting.md) | Symptom-by-symptom diagnosis |
+| [When not to retry](guides/when-not-to-retry.md) | Avoid retrying permanent or unsafe failures |
+| [Safety](guides/safety.md) | Review built-in safety guidance |
 | [Migrating to 1.0](guides/migrating-to-1.0.md) | Review stable APIs, behavior guarantees, and migration checks |
 | [Async execution](guides/async.md) | Retry coroutine functions safely |
 | [Context manager usage](guides/context-manager.md) | Retry inline sync and async blocks |
@@ -40,14 +45,13 @@ This directory is organized by intent:
 | [Diagnostics and guidance](guides/diagnostics.md) | Use warnings, doctor, preview, and explain |
 | [Testing retry code](guides/testing.md) | Keep tests deterministic and avoid real sleeping |
 | [Common patterns](guides/common-patterns.md) | Apply Relinker to recurring application scenarios |
-| [Safety](guides/safety.md) | Review built-in safety guidance |
-| [When not to retry](guides/when-not-to-retry.md) | Avoid retrying permanent or unsafe failures |
 | [Examples](guides/examples.md) | Find runnable example scripts |
 
 ## Reference
 
 | Reference | Purpose |
 |---|---|
+| [Feature map](reference/feature-map.md) | Quick lookup from need to API |
 | [Public API](reference/api.md) | High-level stable import and method overview |
 | [Compatibility policy](reference/compatibility.md) | Supported Python versions and API stability rules |
 | [Delays](reference/delays.md) | Delay strategy details |
@@ -71,6 +75,7 @@ This directory is organized by intent:
 
 1. Read [Getting started](guides/getting-started.md).
 2. Read [Retry lifecycle](concepts/retry-lifecycle.md).
-3. Build a policy with [Policy builder](guides/policy-builder.md).
-4. Review [Exhaustion behavior](concepts/exhaustion.md).
-5. Use [Diagnostics and guidance](guides/diagnostics.md) and the [Production checklist](guides/production-checklist.md) before deployment.
+3. Use [Choosing a policy](guides/choosing-a-policy.md) to pick the right configuration.
+4. Build a policy with [Policy builder](guides/policy-builder.md).
+5. Review [Exhaustion behavior](concepts/exhaustion.md).
+6. Use [Diagnostics and guidance](guides/diagnostics.md) and the [Production checklist](guides/production-checklist.md) before deployment.

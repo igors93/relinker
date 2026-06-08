@@ -9,28 +9,9 @@
 ![Dependencies](https://img.shields.io/badge/dependencies-zero-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-**Simple by default, powerful by composition, safe by guidance.**
-
-Relinker is a clear, modular, and debuggable retry library for Python.  
-It helps you retry temporary failures without hiding what your code is doing.
-
-[Overview](#overview) · [Features](#features) · [Quick Start](#quick-start) · [Guidance](#guidance) · [HTTP](#http-retry) · [Observability](#observability) · [Examples](#examples) · [Documentation](#documentation)
+**A retry library that shows you exactly what it is doing — and warns you when something looks risky.**
 
 </div>
-
----
-
-## Overview
-
-Applications fail for reasons that are often temporary:
-
-- a network timeout
-- a busy API
-- a database connection hiccup
-- a rate limit response
-- a background job that should be tried again
-
-Relinker gives you a clean way to describe what should happen:
 
 ```python
 from relinker import RetryPolicy
@@ -42,73 +23,82 @@ policy = (
     .exponential_delay(base=1, maximum=30)
     .jitter(maximum=0.5)
 )
+
+result = policy.run(fetch_data)
 ```
 
-This reads like a sentence:
+Five total attempts. Retries only on network errors. Exponential backoff capped at 30 s. Jitter prevents synchronized retries under concurrency.
 
-> Try up to 5 times, retry only on timeout or connection errors, wait with exponential backoff, and add jitter.
+Before this runs against a real service, ask Relinker what it thinks:
 
----
-
-## Features
-
-Relinker currently provides:
-
-- simple `@retry` decorator
-- fluent `RetryPolicy` builder
-- shared, process-local `RetryBudget` protection against retry storms
-- sync and async execution
-- retry by exception, returned result, or custom condition
-- fixed, linear, chain, exponential, random, randomized exponential, custom, additive, and state-aware delays
-- composable stop strategies
-- composable retry conditions
-- built-in presets for common situations
-- rich `RetryResult` objects
-- per-function retry statistics
-- `warnings()` for risky policies
-- `doctor()` health reports
-- `simulate()`, `timeline()`, `preview()`, and `explain()`
-- safe structured logging
-- event hooks for observability
-- HTTP retry helpers with `Retry-After` support
-- context manager support for retrying blocks
-- testing support through custom sleep functions
-- zero required runtime dependencies
+```python
+print(policy.explain())     # plain-language description
+print(policy.preview(5))    # estimated timing per attempt
+print(policy.doctor())      # flagged risks, if any
+```
 
 ---
 
-## Current status
-
-Relinker 1.0 provides a stable public API for Python 3.10 through 3.13.
-Compatibility guarantees apply to the documented exports and behaviors described
-in the [compatibility policy](docs/reference/compatibility.md). Release history lives in
-[`CHANGELOG.md`](CHANGELOG.md).
-
-See the [migration guide](docs/guides/migrating-to-1.0.md) if you are upgrading
-from an earlier version.
-
-Install from PyPI:
+## Install
 
 ```bash
 pip install relinker
 ```
 
-For development or to track the latest changes on the main branch:
-
-```bash
-pip install git+https://github.com/igors93/relinker.git
-```
+Requires Python 3.10+. No runtime dependencies.
 
 For local development:
 
 ```bash
 git clone https://github.com/igors93/relinker.git
 cd relinker
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
+python -m venv .venv && source .venv/bin/activate
 python -m pip install -e ".[dev]"
 ```
+
+---
+
+## What it does
+
+**Describe the policy, not the loop.** Relinker separates *what* should retry from *how* it runs. Policies are immutable objects — compose them, share them, inspect them.
+
+**Guidance built in.** `warnings()` and `doctor()` flag risky configurations like infinite retry without delay or retrying all exceptions. You keep full control; Relinker just points things out.
+
+**Full visibility.** `RetryResult` records every attempt, timing, and error type. `simulate()` and `timeline()` estimate behaviour before production. Structured logging excludes exception messages by default to avoid leaking sensitive data.
+
+**Sync and async, same API.** Decorate a regular function or a coroutine function — the same policy works for both.
+
+**Zero required dependencies.** The core package has no runtime requirements. HTTP helpers, presets, and testing utilities are included.
+
+---
+
+## Features at a glance
+
+| Category | What's included |
+|---|---|
+| **Entry points** | `@retry` decorator · fluent `RetryPolicy` builder · presets (`network`, `database`, `fast`, …) |
+| **Stop strategies** | by attempt count · by elapsed time · forever · composable AND / OR |
+| **Retry conditions** | by exception type · by returned value · custom callback · `TryAgain` signal |
+| **Delays** | fixed · linear · exponential · random · chain · state-aware · jitter · custom |
+| **HTTP helpers** | `Retry-After` support · status-code conditions · `http_retry_policy()` |
+| **Shared capacity** | `RetryBudget` — process-local, per-key rolling window |
+| **Results** | `RetryResult` · attempt history · per-function statistics |
+| **Observability** | structured logging · event hooks · `debug()` |
+| **Guidance** | `warnings()` · `doctor()` · `explain()` · `simulate()` · `timeline()` · `preview()` |
+| **Execution** | sync `run()` · async `run_async()` · sync/async context managers |
+| **Testing** | `for_testing()` · custom sleep injection · sleep capture |
+
+---
+
+## Stability
+
+Relinker 1.0 provides a stable public API for Python 3.10 through 3.13.
+Compatibility guarantees cover the documented exports and behaviors described in
+the [compatibility policy](docs/reference/compatibility.md). Release history lives in
+[`CHANGELOG.md`](CHANGELOG.md).
+
+See the [migration guide](docs/guides/migrating-to-1.0.md) when upgrading from
+an earlier version.
 
 ---
 
@@ -335,59 +325,46 @@ See [`examples/README.md`](examples/README.md) for the full list.
 
 ## Documentation
 
-The documentation is organized by topic:
+| | |
+|---|---|
+| [Getting started](docs/guides/getting-started.md) | Install and write your first policy |
+| [Choosing a policy](docs/guides/choosing-a-policy.md) | Decision guide by situation |
+| [Feature map](docs/reference/feature-map.md) | Quick lookup: need → API |
+| [When not to retry](docs/guides/when-not-to-retry.md) | Idempotency, generators, permanent failures |
+| [Common mistakes](docs/guides/common-mistakes.md) | Risky patterns with safer alternatives |
+| [Troubleshooting](docs/guides/troubleshooting.md) | Symptom-by-symptom diagnosis |
+| [Production checklist](docs/guides/production-checklist.md) | Review before deploying |
+| [Retry lifecycle](docs/concepts/retry-lifecycle.md) | How one execution flows |
+| [Retry budgets](docs/concepts/retry-budgets.md) | Shared capacity explained |
+| [HTTP retry](docs/guides/http.md) | Status codes and `Retry-After` |
+| [Testing](docs/guides/testing.md) | Keep tests fast and deterministic |
+| [API reference](docs/reference/api.md) | Full method and export reference |
+| [Compatibility policy](docs/reference/compatibility.md) | Stability guarantees |
 
-- [Documentation index](docs/README.md)
-- [Getting started](docs/guides/getting-started.md)
-- [Retry lifecycle](docs/concepts/retry-lifecycle.md)
-- [Exhaustion behavior](docs/concepts/exhaustion.md)
-- [Policy builder](docs/guides/policy-builder.md)
-- [Retry budgets](docs/concepts/retry-budgets.md)
-- [Diagnostics and guidance](docs/guides/diagnostics.md)
-- [HTTP retry](docs/guides/http.md)
-- [Observability](docs/guides/observability.md)
-- [Results and statistics](docs/concepts/results.md)
-- [Context manager usage](docs/guides/context-manager.md)
-- [Testing retry code](docs/guides/testing.md)
-- [API reference](docs/reference/api.md)
-- [Compatibility policy](docs/reference/compatibility.md)
-- [Architecture](docs/maintainers/architecture.md)
-- [Production checklist](docs/guides/production-checklist.md)
-
----
-
-## Development checks
-
-```bash
-./scripts/ci.sh
-```
-
-Or run each step:
-
-```bash
-python -m ruff format --check .
-python -m ruff check .
-python -m mypy src
-python -m pytest
-python -m build
-```
+Full index: [docs/README.md](docs/README.md)
 
 ---
 
-## Design principles
+## Contributing
 
-Relinker is guided by these principles:
+Bug reports, questions, and pull requests are welcome.
 
-1. Simple things should be simple.
-2. Advanced things should be possible.
-3. Code should be readable and modular.
-4. Names should be intuitive.
-5. Defaults should be safe.
-6. Dangerous policies should produce warnings.
-7. The user stays in control.
-8. Debugging should be built in.
-9. No unnecessary magic.
-10. Production behavior should be explainable.
+- Read [CONTRIBUTING.md](CONTRIBUTING.md) for local setup, code principles, and the pull request process.
+- Open an issue to report a bug or propose a feature before writing code.
+- Keep changes small and focused — one behaviour change per pull request.
+- Every bug fix needs a regression test. Coverage must not decrease.
+
+---
+
+## Security
+
+Relinker validates all numeric inputs at construction time and caps
+`Retry-After` header values to prevent unexpectedly long sleeps.
+
+To report a vulnerability, open a private security advisory on GitHub.
+Do not publish sensitive details publicly before the issue is reviewed.
+
+See [SECURITY.md](SECURITY.md) for the full security policy.
 
 ---
 

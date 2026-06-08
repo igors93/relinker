@@ -1,39 +1,60 @@
 # Security Policy
 
-Relinker is a retry library and does not process secrets by itself.
+Relinker is a retry library. It does not process secrets, credentials, or
+user-submitted data by itself. Security concerns are most likely to involve
+unintended long sleeps, memory growth in unbounded retry loops, or sensitive
+data leaking into logs.
+
+---
 
 ## Reporting a vulnerability
 
-Please open a private security advisory on GitHub if you discover a security
-issue.
+**Please use GitHub's private security advisory feature** to report security
+issues. Do not publish sensitive details in a public issue before the report
+has been reviewed and a fix is available.
 
-Do not publish sensitive details publicly before the issue is reviewed.
+To open a private advisory: go to the repository → **Security** tab →
+**Advisories** → **Report a vulnerability**.
 
-## Security philosophy
+---
 
-Relinker should not hide application failures or silently change application
-data. When possible, Relinker exposes behavior through explicit results,
-events, statistics, and diagnostics.
+## What Relinker protects against
 
-## Input validation
+### Input validation
 
-Relinker validates all numeric configuration values at construction time.
-`NaN`, `inf`, and boolean arguments are rejected for any field that expects a
-real number (delays, time limits, Retry-After values). Empty composite
-strategies and conditions are rejected immediately rather than failing silently
-at runtime.
+All numeric configuration values (`delays`, `time limits`, `attempt counts`,
+`Retry-After` values) are validated at construction time. `NaN`, `inf`, and
+boolean arguments are rejected immediately with `InvalidRetryConfigError`.
+Empty composite strategies and conditions are also rejected at build time
+rather than failing silently at runtime.
 
-## HTTP Retry-After header safety
+### Retry-After header safety
 
 `parse_retry_after()` caps parsed delay values at `MAX_RETRY_AFTER_SECONDS`
 (86 400 s / 24 hours) by default. This prevents a malformed or adversarial
-`Retry-After` header from causing an arbitrarily long sleep. Pass a custom
-`maximum` argument to tighten the cap for your use case.
+`Retry-After` header from causing an unexpectedly long sleep. Pass a `maximum`
+argument to tighten the cap for your use case.
 
-## History and memory
+### Structured logging
+
+`.with_structured_logging()` excludes exception messages by default. Exception
+messages from external services can contain API keys, tokens, user identifiers,
+or other sensitive data. Enable `include_error_message=True` only in
+environments where log output is controlled.
+
+### Memory in long-running loops
 
 Policies created with `.forever()` or very high attempt limits accumulate
 `AttemptRecord` objects over time. The default `history_limit` of 1000 bounds
-this growth. Call `.keep_history(n)` to lower it or `.keep_history(None)` to
-disable the limit explicitly. Disabling the limit in a truly unbounded retry
-loop will grow memory without bound.
+this growth. Call `.keep_history(n)` to lower it, or `.keep_history(None)` to
+disable the limit explicitly. Disabling the limit in an unbounded retry loop
+will grow memory without bound.
+
+---
+
+## Out of scope
+
+- Distributed coordination between processes or machines — `RetryBudget` is
+  process-local and does not synchronise across hosts.
+- Hard timeouts for running operations — `max_time()` controls when a new retry
+  is allowed; it does not interrupt a blocking call already in progress.

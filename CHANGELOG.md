@@ -13,6 +13,27 @@ the compatibility and deprecation policy documented in
 - CI now tests Python 3.14 and Windows in addition to the existing Linux and
   macOS compatibility matrix.
 
+### Documentation
+
+- Added troubleshooting guide organized by symptom: function did not retry,
+  retried too many times, slow execution, synchronized retries, unexpected final
+  error, async handler rejected, generator rejected.
+- Added choosing-a-policy guide with a decision tree and starting configurations
+  for external APIs, rate-limited APIs, databases, background jobs, and polling.
+- Added common-mistakes guide with wrong/better patterns for broad exception
+  retry, infinite retry without delay, missing jitter, many attempts without a
+  budget, silent fallback, non-idempotent operations, and tests with real sleep.
+- Added feature-map reference page for quick lookup from need to API.
+- Expanded when-not-to-retry guide with idempotency explanation, idempotency
+  table by operation, generator rejection, async handler rejection, permanent
+  failure examples, and max_time clarification.
+- Expanded getting-started guide with a conceptual introduction to temporary
+  versus permanent failures before the first code example.
+- Expanded async guide with CancelledError behavior, async handler rejection
+  explanation, and async testing example.
+- Expanded production-checklist guide with explanations for each item.
+- Updated documentation index with new pages and extended learning path.
+
 ### Fixed
 
 - `TryAgain` now preserves the real retry cause in result history and final

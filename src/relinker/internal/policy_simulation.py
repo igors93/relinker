@@ -31,11 +31,14 @@ def _class_name(value: object) -> str:
 
 def _has_user_callback(strategy: Any) -> bool:
     """Return True when any delay strategy node contains a user callback."""
-    if _class_name(strategy) in {"CustomDelay", "StatefulCustomDelay"}:
-        return True
-    strategies = getattr(strategy, "strategies", None)
-    if strategies:
-        return any(_has_user_callback(item) for item in strategies)
+    stack = [strategy]
+    while stack:
+        current = stack.pop()
+        if _class_name(current) in {"CustomDelay", "StatefulCustomDelay"}:
+            return True
+        strategies = getattr(current, "strategies", None)
+        if strategies:
+            stack.extend(strategies)
     return False
 
 

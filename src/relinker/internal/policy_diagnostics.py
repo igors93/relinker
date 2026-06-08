@@ -37,29 +37,47 @@ def _has_result_condition(condition: Any) -> bool:
 
 def _delay_is_always_zero(strategy: Any) -> bool:
     """Return True when a known delay strategy always produces zero."""
+    stack = [strategy]
+    while stack:
+        current = stack.pop()
 
-    if isinstance(strategy, FixedDelay):
-        return strategy.seconds == 0
+        if isinstance(current, AdditiveDelay):
+            stack.extend(current.strategies)
+            continue
 
-    if isinstance(strategy, LinearDelay):
-        return strategy.maximum == 0 or (strategy.start == 0 and strategy.step == 0)
+        if isinstance(current, FixedDelay):
+            if current.seconds != 0:
+                return False
+            continue
 
-    if isinstance(strategy, ExponentialDelay):
-        return strategy.base == 0 or strategy.maximum == 0
+        if isinstance(current, LinearDelay):
+            if not (current.maximum == 0 or (current.start == 0 and current.step == 0)):
+                return False
+            continue
 
-    if isinstance(strategy, ChainDelay):
-        return all(delay == 0 for delay in strategy.delays)
+        if isinstance(current, ExponentialDelay):
+            if not (current.base == 0 or current.maximum == 0):
+                return False
+            continue
 
-    if isinstance(strategy, RandomDelay):
-        return strategy.minimum == 0 and strategy.maximum == 0
+        if isinstance(current, ChainDelay):
+            if not all(delay == 0 for delay in current.delays):
+                return False
+            continue
 
-    if isinstance(strategy, RandomExponentialDelay):
-        return strategy.minimum == 0 and (strategy.base == 0 or strategy.maximum == 0)
+        if isinstance(current, RandomDelay):
+            if not (current.minimum == 0 and current.maximum == 0):
+                return False
+            continue
 
-    if isinstance(strategy, AdditiveDelay):
-        return all(_delay_is_always_zero(item) for item in strategy.strategies)
+        if isinstance(current, RandomExponentialDelay):
+            if not (current.minimum == 0 and (current.base == 0 or current.maximum == 0)):
+                return False
+            continue
 
-    return False
+        return False
+
+    return True
 
 
 def _is_no_delay(policy: Any) -> bool:
@@ -67,24 +85,36 @@ def _is_no_delay(policy: Any) -> bool:
 
 
 def _has_random_delay(strategy: Any) -> bool:
-    if isinstance(strategy, (RandomDelay, RandomExponentialDelay)):
-        return True
-    if isinstance(strategy, AdditiveDelay):
-        return any(_has_random_delay(item) for item in strategy.strategies)
+    stack = [strategy]
+    while stack:
+        current = stack.pop()
+        if isinstance(current, (RandomDelay, RandomExponentialDelay)):
+            return True
+        if isinstance(current, AdditiveDelay):
+            stack.extend(current.strategies)
     return False
 
 
 def _has_positive_deterministic_delay(strategy: Any) -> bool:
-    if isinstance(strategy, FixedDelay):
-        return strategy.seconds > 0
-    if isinstance(strategy, LinearDelay):
-        maximum = float("inf") if strategy.maximum is None else strategy.maximum
-        return maximum > 0 and (strategy.start > 0 or strategy.step > 0)
-    if isinstance(strategy, ExponentialDelay):
-        maximum = float("inf") if strategy.maximum is None else strategy.maximum
-        return maximum > 0 and strategy.base > 0
-    if isinstance(strategy, AdditiveDelay):
-        return any(_has_positive_deterministic_delay(item) for item in strategy.strategies)
+    stack = [strategy]
+    while stack:
+        current = stack.pop()
+        if isinstance(current, FixedDelay):
+            if current.seconds > 0:
+                return True
+            continue
+        if isinstance(current, LinearDelay):
+            maximum = float("inf") if current.maximum is None else current.maximum
+            if maximum > 0 and (current.start > 0 or current.step > 0):
+                return True
+            continue
+        if isinstance(current, ExponentialDelay):
+            maximum = float("inf") if current.maximum is None else current.maximum
+            if maximum > 0 and current.base > 0:
+                return True
+            continue
+        if isinstance(current, AdditiveDelay):
+            stack.extend(current.strategies)
     return False
 
 

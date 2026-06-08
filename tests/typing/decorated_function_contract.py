@@ -1,4 +1,7 @@
 from collections.abc import Awaitable
+from typing import Any
+
+from typing_extensions import assert_type
 
 from relinker import RetryPolicy, RetryResult, retry
 from relinker.stats import RetryStatsSnapshot
@@ -63,30 +66,57 @@ async_method_value: Awaitable[str] = Worker().async_method(1)
 snapshot: RetryStatsSnapshot = sync_task.retry_stats.snapshot()
 policy_reference: RetryPolicy[object] = sync_task.retry_policy
 reconfigured = sync_task.with_policy(RetryPolicy[str]().attempts(1))
-reconfigured_value: str | RetryResult[str] = reconfigured(1, enabled=True)
+assert_type(reconfigured(1, enabled=True), Any)
 reconfigured_bad_arg = reconfigured("bad", enabled=True)  # type: ignore[arg-type]
 reconfigured_bad_kwarg = reconfigured(1, enabled=1)  # type: ignore[arg-type]
 
 normal_reconfigured = simple_retry.with_policy(RetryPolicy[str]().attempts(1))
-normal_reconfigured_value: str | RetryResult[str] = normal_reconfigured(1)
+assert_type(normal_reconfigured(1), Any)
+
+sync_wrong_policy: RetryPolicy[int] = RetryPolicy[int]().attempts(2)
+sync_changed_with_wrong_policy = simple_retry.with_policy(sync_wrong_policy)
+assert_type(sync_changed_with_wrong_policy(1), Any)
+sync_changed_with_wrong_policy_bad_arg = sync_changed_with_wrong_policy("bad")  # type: ignore[arg-type]
 
 normal_to_result = simple_retry.with_policy(RetryPolicy[str]().return_result())
-normal_to_result_value: str | RetryResult[str] = normal_to_result(1)
-normal_to_result_incorrect: str = normal_to_result(1)  # type: ignore[assignment]
+assert_type(normal_to_result(1), Any)
+
+normal_to_result_wrong_policy = simple_retry.with_policy(RetryPolicy[int]().return_result())
+assert_type(normal_to_result_wrong_policy(1), Any)
 
 result_to_normal = result_retry.with_policy(RetryPolicy[str]().attempts(1))
-result_to_normal_value: str | RetryResult[str] = result_to_normal(1)
-result_to_normal_incorrect: RetryResult[str] = result_to_normal(1)  # type: ignore[assignment]
+assert_type(result_to_normal(1), Any)
+
+result_to_normal_wrong_policy = result_retry.with_policy(RetryPolicy[int]().attempts(1))
+assert_type(result_to_normal_wrong_policy(1), Any)
+
+normal_to_fallback_wrong_policy = simple_retry.with_policy(RetryPolicy[int]().fallback_value(123))
+assert_type(normal_to_fallback_wrong_policy(1), Any)
+
+normal_to_custom_raise_wrong_policy = simple_retry.with_policy(
+    RetryPolicy[int]().on_exhausted_raise(RuntimeError)
+)
+assert_type(normal_to_custom_raise_wrong_policy(1), Any)
 
 async_normal_to_result = simple_async_retry.with_policy(RetryPolicy[str]().return_result())
-async_normal_to_result_value: Awaitable[str | RetryResult[str]] = async_normal_to_result(1)
-async_normal_to_result_incorrect: Awaitable[str] = async_normal_to_result(1)  # type: ignore[assignment]
+assert_type(async_normal_to_result(1), Awaitable[Any])
+
+async_wrong_policy: RetryPolicy[int] = RetryPolicy[int]().attempts(2)
+async_changed_with_wrong_policy = simple_async_retry.with_policy(async_wrong_policy)
+assert_type(async_changed_with_wrong_policy(1), Awaitable[Any])
+async_changed_with_wrong_policy_bad_arg = async_changed_with_wrong_policy("bad")  # type: ignore[arg-type]
 
 async_result_to_normal = result_async_retry.with_policy(RetryPolicy[str]().attempts(1))
-async_result_to_normal_value: Awaitable[str | RetryResult[str]] = async_result_to_normal(1)
-async_result_to_normal_incorrect: Awaitable[RetryResult[str]] = async_result_to_normal(1)  # type: ignore[assignment]
+assert_type(async_result_to_normal(1), Awaitable[Any])
 
 method_to_result = Worker.sync_method.with_policy(RetryPolicy[str]().return_result())
-method_to_result_value: str | RetryResult[str] = method_to_result(Worker(), 1)
+assert_type(method_to_result(Worker(), 1), Any)
 method_to_result_bad_arg = method_to_result(Worker(), "bad")  # type: ignore[arg-type]
-method_to_result_incorrect: str = method_to_result(Worker(), 1)  # type: ignore[assignment]
+
+method_wrong_policy = Worker.sync_method.with_policy(RetryPolicy[int]().attempts(1))
+assert_type(method_wrong_policy(Worker(), 1), Any)
+method_wrong_policy_bad_arg = method_wrong_policy(Worker(), "bad")  # type: ignore[arg-type]
+
+async_method_wrong_policy = Worker.async_method.with_policy(RetryPolicy[int]().attempts(1))
+assert_type(async_method_wrong_policy(Worker(), 1), Awaitable[Any])
+async_method_wrong_policy_bad_arg = async_method_wrong_policy(Worker(), "bad")  # type: ignore[arg-type]

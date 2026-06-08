@@ -1,3 +1,5 @@
+from typing import Any
+
 from relinker import (
     RetryBudget,
     RetryPolicy,
@@ -38,7 +40,7 @@ def accept_snapshot(snapshot: RetryStatsSnapshot) -> float:
 
 def accept_wrapped(
     function: RetryWrappedFunction[..., object],
-) -> RetryWrappedFunction[..., object]:
+) -> RetryWrappedFunction[..., Any]:
     return function.with_policy(RetryPolicy[object]().attempts(1))
 
 

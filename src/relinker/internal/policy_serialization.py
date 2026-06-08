@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from relinker.conditions.composite import AllCondition, AnyCondition
 from relinker.conditions.custom import CustomCondition
@@ -75,7 +75,7 @@ def _condition_to_dict(condition: object) -> dict[str, Any]:
     return {"type": "custom", "class": condition.__class__.__name__}
 
 
-def _delay_to_dict(strategy: object) -> dict[str, Any]:
+def _delay_to_shallow_dict(strategy: object) -> dict[str, Any]:
     if isinstance(strategy, FixedDelay):
         return {"type": "fixed", "seconds": strategy.seconds}
     if isinstance(strategy, LinearDelay):
@@ -111,15 +111,29 @@ def _delay_to_dict(strategy: object) -> dict[str, Any]:
     if isinstance(strategy, ChainDelay):
         return {"type": "chain", "delays": list(strategy.delays)}
     if isinstance(strategy, AdditiveDelay):
-        return {
-            "type": "additive",
-            "strategies": [_delay_to_dict(item) for item in strategy.strategies],
-        }
+        return {"type": "additive", "strategies": []}
     if isinstance(strategy, CustomDelay):
         return {"type": "custom", "callable": _callable_name(strategy.callback)}
     if isinstance(strategy, StatefulCustomDelay):
         return {"type": "stateful_custom", "callable": _callable_name(strategy.callback)}
     return {"type": "custom", "class": strategy.__class__.__name__}
+
+
+def _delay_to_dict(strategy: object) -> dict[str, Any]:
+    root = _delay_to_shallow_dict(strategy)
+    if not isinstance(strategy, AdditiveDelay):
+        return root
+
+    stack: list[tuple[AdditiveDelay, dict[str, Any]]] = [(strategy, root)]
+    while stack:
+        current, current_data = stack.pop()
+        child_data_list = cast(list[dict[str, Any]], current_data["strategies"])
+        for child in current.strategies:
+            child_data = _delay_to_shallow_dict(child)
+            child_data_list.append(child_data)
+            if isinstance(child, AdditiveDelay):
+                stack.append((child, child_data))
+    return root
 
 
 def _exception_exhaustion_to_dict(policy: Any) -> dict[str, Any]:

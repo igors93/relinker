@@ -22,13 +22,12 @@ the compatibility and deprecation policy documented in
   objects, so async `__call__` targets are decorated as async wrappers while
   sync, generator, async-generator, nested partial, and callable-class cases keep
   their safe contracts.
-- Improved `with_policy()` typing so reconfigured wrappers preserve their
-  original parameters and sync/async shape without promising a false return
-  type when the replacement policy may return `RetryResult`.
+- Corrected `with_policy()` typing so replacement policies no longer imply
+  that the wrapped function changes its underlying return type.
 - `add_delay()` and `jitter()` now preserve `AdditiveDelay` grouping so
-  floating-point addition order is not changed silently. Deep additive delay
-  trees are evaluated iteratively to avoid recursion errors without flattening
-  the arithmetic structure.
+  floating-point addition order is not changed silently. Deep additive-delay
+  trees are evaluated, inspected, and serialized iteratively to prevent
+  recursion errors without flattening the arithmetic structure.
 - `RetryBudget` no longer places a reservation inside a full window when
   `per` is a decimal value whose floating-point arithmetic causes
   `(first + per) - per < first`. `_first_legal_slot` now re-scans after each

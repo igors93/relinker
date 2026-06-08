@@ -92,7 +92,7 @@ python -m pip install -e ".[dev]"
 
 ## Stability
 
-Relinker 1.0 provides a stable public API for Python 3.10 through Python 3.14.
+Relinker 1.x provides a stable public API and currently supports Python 3.10 through Python 3.14.
 Compatibility guarantees cover the documented exports and behaviors described in
 the [compatibility policy](docs/reference/compatibility.md). Release history lives in
 [`CHANGELOG.md`](CHANGELOG.md).

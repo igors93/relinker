@@ -48,6 +48,13 @@ the compatibility and deprecation policy documented in
 
 ### Changed
 
+- Preserved `forever()` health reports as `risky` after warning severity became
+  explicit: `forever` is now classified as `critical` because indefinite retry
+  requires external cancellation or shutdown control. The warning remains
+  non-blocking.
+- Incomplete diagnostic reports (`complete=False`) no longer report `ok=True` or
+  `risk_level="ok"`. An incomplete report returns `ok=False` and at minimum
+  `risk_level="warning"` to indicate that not all checks were executed.
 - Pinned GitHub Actions to full commit SHAs, disabled persisted checkout
   credentials, and added explicit job timeouts for CI and PyPI publishing.
 

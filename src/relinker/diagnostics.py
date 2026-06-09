@@ -53,8 +53,8 @@ class PolicyHealthReport:
 
     @property
     def ok(self) -> bool:
-        """Return True when the policy has no warnings."""
-        return not self.warnings
+        """Return True when the report is complete and has no warnings."""
+        return self.complete and not self.warnings
 
     @property
     def has_warnings(self) -> bool:
@@ -73,10 +73,10 @@ class PolicyHealthReport:
 
     @property
     def risk_level(self) -> Literal["ok", "warning", "risky"]:
-        """Return a compact risk level derived from warning severity."""
+        """Return a compact risk level derived from warning severity and completeness."""
         if self.has_critical:
             return "risky"
-        if self.warnings:
+        if self.warnings or not self.complete:
             return "warning"
         return "ok"
 

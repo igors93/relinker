@@ -28,9 +28,9 @@ print(report.describe())
 
 Risk levels:
 
-- `ok`: no warnings
-- `warning`: something deserves review
-- `risky`: the policy may cause serious operational problems
+- `ok`: the report is complete and has no warnings
+- `warning`: warnings are present, or the report is incomplete
+- `risky`: at least one critical warning is present
 
 ## Explain
 
@@ -109,7 +109,7 @@ Each warning has a severity that reflects its operational impact:
 | `missing_jitter` | advisory | Many deterministic delayed attempts may synchronize under concurrency |
 | `seeded_random_delay` | advisory | A fixed seed repeats the same per-attempt random delays across executions that reuse it |
 | `for_testing_with_max_time` | advisory | `for_testing()` does not advance time for `max_time()` |
-| `forever` | warning | The policy can retry forever |
+| `forever` | critical | The policy can retry forever |
 | `no_delay` | warning | The policy has no sleep between attempts |
 | `broad_exception` | warning | The policy retries all `Exception` subclasses |
 | `broad_os_error` | warning | The policy explicitly retries `OSError`, which can include non-transport operating-system failures |
@@ -121,6 +121,10 @@ Each warning has a severity that reflects its operational impact:
 | `tight_loop_risk` | critical | The policy can retry forever without sleeping |
 | `unbounded_history` | critical | An effectively infinite policy retains every attempt record |
 | `background_broad_exception` | critical | Broad exception handling is combined with many attempts or forever retry |
+
+`forever` is `critical` because an infinite retry requires external cancellation
+or shutdown control to be safe. `forever()` remains fully supported; the
+classification reflects operational risk, not a policy block.
 
 `background_broad_exception` is raised when `broad_exception` is paired with
 many attempts or indefinite retry. Background jobs that catch all exceptions can

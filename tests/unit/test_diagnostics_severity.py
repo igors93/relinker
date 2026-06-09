@@ -136,11 +136,13 @@ def test_broad_exception_is_warning_level() -> None:
     assert by_code["broad_exception"].severity == "warning"
 
 
-def test_forever_is_warning_level() -> None:
+def test_forever_is_critical_level() -> None:
+    # `forever` was incorrectly classified as "warning" — it is "critical" because
+    # an infinite retry requires external cancellation control to be safe.
     policy = RetryPolicy().forever().on(TimeoutError).fixed_delay(1)
     by_code = {w.code: w for w in policy.warnings()}
     assert "forever" in by_code
-    assert by_code["forever"].severity == "warning"
+    assert by_code["forever"].severity == "critical"
 
 
 # ---------------------------------------------------------------------------
@@ -407,3 +409,96 @@ def test_warnings_returns_tuple_of_policy_warnings() -> None:
 def test_doctor_returns_policy_health_report() -> None:
     report = RetryPolicy().doctor()
     assert isinstance(report, PolicyHealthReport)
+
+
+# ---------------------------------------------------------------------------
+# Fix 1: forever() preserves risky risk_level
+# ---------------------------------------------------------------------------
+
+
+def test_forever_preserves_risky_risk_level() -> None:
+    report = RetryPolicy().forever().on(TimeoutError).fixed_delay(1).doctor()
+    warning = next(item for item in report.warnings if item.code == "forever")
+    assert warning.severity == "critical"
+    assert report.has_critical is True
+    assert report.risk_level == "risky"
+
+
+# ---------------------------------------------------------------------------
+# Fix 2: incomplete report is not ok
+# ---------------------------------------------------------------------------
+
+
+def test_incomplete_report_is_not_ok() -> None:
+    # stateful_delay prevents high_total_sleep simulation → complete=False
+    report = (
+        RetryPolicy()
+        .attempts(2)
+        .on(TimeoutError)
+        .stateful_delay(lambda state: state.attempt_number)
+        .doctor()
+    )
+    assert report.complete is False
+    assert "high_total_sleep" in report.skipped_checks
+    assert report.ok is False
+    assert report.risk_level == "warning"
+
+
+def test_complete_clean_report_remains_ok() -> None:
+    report = RetryPolicy().attempts(3).on(TimeoutError).fixed_delay(1).doctor()
+    assert report.complete is True
+    assert report.warnings == ()
+    assert report.ok is True
+    assert report.risk_level == "ok"
+
+
+def test_incomplete_report_with_critical_warning_is_risky() -> None:
+    report = PolicyHealthReport(
+        warnings=(PolicyWarning("critical_code", "critical message", severity="critical"),),
+        complete=False,
+        skipped_checks=("high_total_sleep",),
+    )
+    assert report.ok is False
+    assert report.has_critical is True
+    assert report.risk_level == "risky"
+
+
+def test_policy_health_report_positional_construction_remains_compatible() -> None:
+    warnings = (PolicyWarning("code", "message"),)
+    report = PolicyHealthReport(warnings)
+    assert report.warnings == warnings
+    assert report.complete is True
+    assert report.skipped_checks == ()
+
+
+def test_incomplete_report_serialization_is_coherent() -> None:
+    report = (
+        RetryPolicy()
+        .attempts(2)
+        .on(TimeoutError)
+        .stateful_delay(lambda state: state.attempt_number)
+        .doctor()
+    )
+    d = report.to_dict()
+    assert d["ok"] is False
+    assert d["risk_level"] == "warning"
+    assert d["complete"] is False
+    assert "high_total_sleep" in d["skipped_checks"]  # type: ignore[operator]
+
+    data = json.loads(report.to_json())
+    assert data["ok"] is False
+    assert data["risk_level"] == "warning"
+
+
+def test_incomplete_report_describe_shows_correct_risk_level() -> None:
+    report = (
+        RetryPolicy()
+        .attempts(2)
+        .on(TimeoutError)
+        .stateful_delay(lambda state: state.attempt_number)
+        .doctor()
+    )
+    text = report.describe()
+    assert "Risk level: warning" in text
+    assert "Diagnostics complete: no" in text
+    assert "high_total_sleep" in text

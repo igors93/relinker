@@ -326,7 +326,7 @@ def _compute_diagnostics(
                 code="forever",
                 message="This policy can retry forever.",
                 hint="Use forever() only when the caller controls cancellation or shutdown.",
-                severity="warning",
+                severity="critical",
             )
         )
 

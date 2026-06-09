@@ -23,6 +23,11 @@ the compatibility and deprecation policy documented in
 - Added an `unbounded_history` advisory warning when an effectively infinite
   policy retains every attempt record.
 
+### Changed
+
+- Pinned GitHub Actions to full commit SHAs, disabled persisted checkout
+  credentials, and added explicit job timeouts for CI and PyPI publishing.
+
 ### Fixed
 
 - `RetryPolicy.run()` now rejects coroutine functions and async callable objects

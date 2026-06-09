@@ -64,6 +64,29 @@ the public API snapshot. `validate-package` depends on both `tests` and
 `documentation`, builds the package, validates metadata with Twine, runs the
 installed wheel validator, and verifies the `py.typed` marker.
 
+### Maintaining GitHub Action pins
+
+Remote GitHub Actions must use a full 40-character commit SHA rather than a
+mutable tag. Keep the reviewed upstream version in an adjacent comment:
+
+```yaml
+uses: actions/checkout@<full-commit-sha> # v6.0.3
+```
+
+When updating an action:
+
+1. Review the upstream release in the action's official repository.
+2. Verify the selected commit belongs to that repository.
+3. Replace every occurrence with the same full SHA.
+4. Update the adjacent version comment.
+5. Run `python -m pytest tests/maintenance/test_ci_contract.py -v`.
+
+Dependabot is configured to propose GitHub Actions updates. Review those pull
+requests rather than replacing SHA pins with tags. Every workflow job must keep
+an explicit `timeout-minutes` value, and checkout steps must use
+`persist-credentials: false` unless a future workflow has a reviewed need to
+perform an authenticated Git write.
+
 ## Public typing examples
 
 Public typing examples are checked with:

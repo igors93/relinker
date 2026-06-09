@@ -68,6 +68,17 @@ disable the limit explicitly. Disabling the limit in an unbounded retry loop
 will grow memory without bound. `doctor()` reports `unbounded_history` when an
 effectively infinite policy has no history limit.
 
+### GitHub Actions supply chain
+
+GitHub Actions used by CI and PyPI publishing are pinned to full commit SHAs.
+Adjacent comments preserve the human-readable upstream version, and Dependabot
+keeps the pinned references updateable through reviewed pull requests. Checkout
+steps disable persisted Git credentials, and every job has an explicit timeout.
+
+The PyPI trusted-publishing permission (`id-token: write`) is isolated to the
+publish job. Build and validation jobs keep read-only repository permissions and
+cannot request a publishing identity token.
+
 ---
 
 ## Out of scope

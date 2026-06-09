@@ -177,6 +177,30 @@ processes or machines.
 
 ---
 
+## Keeping unlimited history in an infinite retry loop
+
+**Risky:**
+
+```python
+RetryPolicy().forever().keep_history(None)
+```
+
+`keep_history(None)` retains every `AttemptRecord`. In an effectively infinite
+retry loop, retained exceptions and related objects can make memory usage grow
+without bound. Relinker emits `unbounded_history` for this combination.
+
+**Better:**
+
+```python
+RetryPolicy().forever().keep_history(100)
+```
+
+Aggregate counters still describe all attempts even when older records are
+discarded, so bounded history preserves operational visibility without retaining
+every exception object.
+
+---
+
 ## Silent fallback
 
 **Risky:**

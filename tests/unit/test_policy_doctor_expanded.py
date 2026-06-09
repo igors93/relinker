@@ -429,3 +429,86 @@ def test_seeded_random_warning_has_stable_order_without_duplicate_jitter_warning
     assert "missing_jitter" not in codes
     assert codes.count("seeded_random_delay") == 1
     assert codes.index("seeded_random_delay") < codes.index("missing_retry_budget")
+
+
+def test_seeded_random_delay_does_not_warn_when_max_time_prevents_retry() -> None:
+    policy = RetryPolicy().max_time(0).on(TimeoutError).random_delay(seed=7)
+
+    assert "seeded_random_delay" not in _codes(policy)
+
+
+def test_seeded_random_delay_does_not_warn_when_any_stop_prevents_retry() -> None:
+    policy = RetryPolicy().attempts(10).or_stop_after_time(0).on(TimeoutError).jitter(seed=7)
+
+    assert "seeded_random_delay" not in _codes(policy)
+
+
+def test_seeded_random_delay_does_not_warn_when_all_stops_prevent_retry() -> None:
+    policy = RetryPolicy().attempts(1).and_stop_after_time(0).on(TimeoutError).jitter(seed=7)
+
+    assert "seeded_random_delay" not in _codes(policy)
+
+
+def test_seeded_random_delay_warns_when_all_stop_still_allows_retry() -> None:
+    policy = RetryPolicy().attempts(1).and_stop_after_time(10).on(TimeoutError).jitter(seed=7)
+
+    assert "seeded_random_delay" in _codes(policy)
+
+
+def test_forever_with_unlimited_history_warns() -> None:
+    policy = RetryPolicy().forever().on(TimeoutError).fixed_delay(1).keep_history(None)
+
+    warnings = policy.warnings()
+    warning = next(item for item in warnings if item.code == "unbounded_history")
+
+    assert "every attempt record" in warning.message
+    assert warning.hint is not None
+    assert "keep_history(n)" in warning.hint
+    assert policy.doctor().warnings == warnings
+    assert policy.doctor().risk_level == "risky"
+    assert policy.to_dict()["history_limit"] is None
+
+
+def test_forever_with_default_or_explicit_history_limit_does_not_warn() -> None:
+    default_limit = RetryPolicy().forever().on(TimeoutError).fixed_delay(1)
+    explicit_limit = default_limit.keep_history(100)
+
+    assert default_limit.history_limit == 1000
+    assert "unbounded_history" not in _codes(default_limit)
+    assert "unbounded_history" not in _codes(explicit_limit)
+
+
+@pytest.mark.parametrize(
+    "policy",
+    [
+        RetryPolicy().attempts(100).on(TimeoutError).keep_history(None),
+        RetryPolicy().max_time(60).on(TimeoutError).keep_history(None),
+        RetryPolicy().forever().or_stop_after_attempts(5).on(TimeoutError).keep_history(None),
+    ],
+)
+def test_bounded_policy_with_unlimited_history_does_not_warn(
+    policy: RetryPolicy[object],
+) -> None:
+    assert "unbounded_history" not in _codes(policy)
+
+
+def test_effectively_infinite_composition_with_unlimited_history_warns() -> None:
+    policy = RetryPolicy().forever().and_stop_after_attempts(5).on(TimeoutError).keep_history(None)
+
+    assert "unbounded_history" in _codes(policy)
+
+
+def test_unbounded_history_warning_has_stable_order_without_duplicates() -> None:
+    policy = RetryPolicy().forever().on(TimeoutError).no_delay().keep_history(None)
+
+    codes = _codes(policy)
+
+    assert codes == [
+        "forever",
+        "no_delay",
+        "tight_loop_risk",
+        "unbounded_history",
+        "missing_retry_budget",
+    ]
+    assert len(codes) == len(set(codes))
+    assert [warning.code for warning in policy.doctor().warnings] == codes

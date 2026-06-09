@@ -102,6 +102,7 @@ print(policy.timeline(attempts=5))
 | `forever` | The policy can retry forever |
 | `no_delay` | The policy has no sleep between attempts |
 | `tight_loop_risk` | The policy can retry forever without sleeping |
+| `unbounded_history` | An effectively infinite policy retains every attempt record |
 | `broad_exception` | The policy retries all `Exception` subclasses |
 | `broad_os_error` | The policy explicitly retries `OSError`, which can include non-transport operating-system failures |
 | `many_attempts` | The policy uses many attempts |
@@ -113,6 +114,9 @@ print(policy.timeline(attempts=5))
 | `silent_fallback` | A fallback may hide repeated failures without a give-up observer |
 | `infinite_retry_with_budget` | A Retry Budget controls rate, not total duration |
 | `for_testing_with_max_time` | `for_testing()` does not advance time for `max_time()` |
+
+Warnings about delay configuration are omitted when the stop strategy guarantees
+that no retry can occur, such as `max_time(0)`.
 
 ## Structured policy view
 

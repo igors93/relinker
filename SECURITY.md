@@ -65,7 +65,8 @@ Policies created with `.forever()` or very high attempt limits accumulate
 `AttemptRecord` objects over time. The default `history_limit` of 1000 bounds
 this growth. Call `.keep_history(n)` to lower it, or `.keep_history(None)` to
 disable the limit explicitly. Disabling the limit in an unbounded retry loop
-will grow memory without bound.
+will grow memory without bound. `doctor()` reports `unbounded_history` when an
+effectively infinite policy has no history limit.
 
 ---
 

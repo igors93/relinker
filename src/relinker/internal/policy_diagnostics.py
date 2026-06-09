@@ -191,6 +191,21 @@ def _is_forever(policy: Any) -> bool:
     return _stop_is_infinite(policy.stop_strategy)
 
 
+def _stops_after_first_attempt(strategy: Any) -> bool:
+    """Return True when a known stop strategy guarantees no retry."""
+    if isinstance(strategy, StopAfterAttempt):
+        return strategy.maximum <= 1
+    if isinstance(strategy, StopAfterDelay):
+        return strategy.seconds <= 0
+    if isinstance(strategy, StopForever):
+        return False
+    if isinstance(strategy, AnyStopStrategy):
+        return any(_stops_after_first_attempt(item) for item in strategy.strategies)
+    if isinstance(strategy, AllStopStrategy):
+        return all(_stops_after_first_attempt(item) for item in strategy.strategies)
+    return False
+
+
 def _known_attempt_limit(strategy: Any) -> int | None:
     if isinstance(strategy, StopAfterAttempt):
         return strategy.maximum
@@ -266,9 +281,12 @@ def compute_warnings(policy: Any) -> tuple[PolicyWarning, ...]:
     is_forever = _is_forever(policy)
     is_no_delay = _is_no_delay(policy)
     known_attempt_limit = _known_attempt_limit(policy.stop_strategy)
-    maximum_delay_attempts = (
-        None if known_attempt_limit is None else max(0, known_attempt_limit - 1)
-    )
+    if _stops_after_first_attempt(policy.stop_strategy):
+        maximum_delay_attempts = 0
+    elif known_attempt_limit is None:
+        maximum_delay_attempts = None
+    else:
+        maximum_delay_attempts = max(0, known_attempt_limit - 1)
     has_effective_random = _has_effective_random_delay(
         policy.delay_strategy,
         maximum_delay_attempts=maximum_delay_attempts,
@@ -322,6 +340,20 @@ def compute_warnings(policy: Any) -> tuple[PolicyWarning, ...]:
                 hint=(
                     "A tight retry loop can consume CPU and overload downstream services. "
                     "Add a delay, max_time(), or a cancellation-aware caller."
+                ),
+            )
+        )
+
+    if is_forever and policy.history_limit is None:
+        warnings.append(
+            PolicyWarning(
+                code="unbounded_history",
+                message=(
+                    "This policy can retry indefinitely while retaining every attempt record."
+                ),
+                hint=(
+                    "Use keep_history(n) to bound memory, or keep unlimited history only "
+                    "when the caller guarantees prompt cancellation."
                 ),
             )
         )

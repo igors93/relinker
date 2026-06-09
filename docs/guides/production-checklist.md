@@ -111,6 +111,12 @@ If `risk_level` is `risky`, review the policy before proceeding.
   Exception messages from external services can contain API keys, user
   identifiers, or PII. Do not log them to shared or uncontrolled destinations.
 
+- [ ] **Is retry history bounded?**
+
+  The default retains at most 1000 attempt records. Review `keep_history(None)`
+  carefully for workers and effectively infinite retry loops, because retained
+  exception objects can make memory usage grow without bound.
+
 - [ ] **Are retry metrics needed?**
 
   Consider emitting counters on `on_retry` and `on_giveup` events. Per-function

@@ -20,6 +20,8 @@ the compatibility and deprecation policy documented in
 - Added a `seeded_random_delay` advisory warning when a production policy relies
   exclusively on seeded random delays. Fixed seeds remain supported for
   reproducible tests and simulations.
+- Added an `unbounded_history` advisory warning when an effectively infinite
+  policy retains every attempt record.
 
 ### Fixed
 
@@ -31,6 +33,8 @@ the compatibility and deprecation policy documented in
 - Retry-budget wait planning now preserves the configured policy delay exactly
   when the budget adds no extra wait, avoiding floating-point artifacts in
   structured delay breakdowns.
+- `seeded_random_delay` is no longer reported when the stop strategy guarantees
+  that no retry can occur, including `max_time(0)`.
 
 ## 1.2.0 - 2026-06-08
 

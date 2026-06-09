@@ -41,3 +41,21 @@ def test_random_exponential_delay_zero_base_honors_minimum_with_seed_and_without
 
     assert seeded.next_delay(3) == 5
     assert unseeded.next_delay(3) == 5
+
+
+def test_random_exponential_seed_preserves_reproducible_sequence() -> None:
+    first = RandomExponentialDelay(base=1, factor=2, maximum=10, seed=7)
+    second = RandomExponentialDelay(base=1, factor=2, maximum=10, seed=7)
+
+    assert [first.next_delay(attempt) for attempt in range(1, 5)] == [
+        second.next_delay(attempt) for attempt in range(1, 5)
+    ]
+
+
+def test_random_exponential_different_seeds_produce_different_sequences() -> None:
+    first = RandomExponentialDelay(base=1, factor=2, maximum=10, seed=1)
+    second = RandomExponentialDelay(base=1, factor=2, maximum=10, seed=2)
+
+    assert [first.next_delay(attempt) for attempt in range(1, 9)] != [
+        second.next_delay(attempt) for attempt in range(1, 9)
+    ]

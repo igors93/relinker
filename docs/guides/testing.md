@@ -31,6 +31,24 @@ if you want to return to Relinker's no-op sleep mode.
 `doctor()` reports this combination explicitly when a policy created with
 `for_testing()` also uses `max_time()`.
 
+## Reproducible random delays
+
+A fixed seed makes random delays deterministic. Combine it with `for_testing()`
+when tests need stable delay values without real sleeping:
+
+```python
+policy = (
+    RetryPolicy()
+    .attempts(3)
+    .random_exponential_delay(seed=1)
+    .for_testing()
+)
+```
+
+The seed controls calculated delay values. `for_testing()` independently replaces
+the sleep functions with no-ops. In production, leave `seed=None` when jitter is
+intended to spread concurrent retries.
+
 For lower-level control, you can inject custom sleep functions directly:
 
 ```python

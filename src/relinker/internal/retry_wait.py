@@ -48,13 +48,14 @@ def plan_retry_wait(
         raise RuntimeError("retry budget configured without a key")
 
     current_time = now()
+    not_before = current_time + policy_delay
     reservation = budget._reserve(
         key,
         current_time=current_time,
-        not_before=current_time + policy_delay,
+        not_before=not_before,
     )
-    total_delay = ensure_resolved_delay(max(0.0, reservation.scheduled_at - current_time))
-    budget_delay = max(0.0, total_delay - policy_delay)
+    budget_delay = ensure_resolved_delay(max(0.0, reservation.scheduled_at - not_before))
+    total_delay = ensure_resolved_delay(policy_delay + budget_delay)
     return RetryWaitPlan(
         policy_delay=policy_delay,
         budget_delay=budget_delay,

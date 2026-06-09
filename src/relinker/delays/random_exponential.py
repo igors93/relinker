@@ -18,7 +18,9 @@ class RandomExponentialDelay(DelayMixin):
     This uses a "full jitter" style strategy:
         delay = random(minimum, exponential_cap)
 
-    It is useful when many clients may retry at the same time.
+    It is useful when many clients may retry at the same time. Fixed seeds keep
+    tests reproducible, but also repeat per-attempt delays across executions that
+    reuse the same seed.
     """
 
     base: float = 1.0

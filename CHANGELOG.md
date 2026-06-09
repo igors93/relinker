@@ -17,6 +17,9 @@ the compatibility and deprecation policy documented in
 - Added a `broad_os_error` advisory warning for policies that explicitly retry
   `OSError`, including the existing broad transport presets. Retry behavior
   remains unchanged.
+- Added a `seeded_random_delay` advisory warning when a production policy relies
+  exclusively on seeded random delays. Fixed seeds remain supported for
+  reproducible tests and simulations.
 
 ### Fixed
 
@@ -25,6 +28,9 @@ the compatibility and deprecation policy documented in
 - `RetryPolicy.run_async()` now rejects non-awaitable callable results without
   retrying the resulting `TypeError`. Synchronous factories that return
   awaitables remain supported.
+- Retry-budget wait planning now preserves the configured policy delay exactly
+  when the budget adds no extra wait, avoiding floating-point artifacts in
+  structured delay breakdowns.
 
 ## 1.2.0 - 2026-06-08
 

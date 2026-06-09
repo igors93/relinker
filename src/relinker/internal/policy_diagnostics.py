@@ -95,14 +95,60 @@ def _uses_implicit_default_policy(policy: Any) -> bool:
     )
 
 
-def _has_random_delay(strategy: Any) -> bool:
+def _random_exponential_can_vary(
+    strategy: RandomExponentialDelay,
+    maximum_delay_attempts: int | None,
+) -> bool:
+    """Return True when a reachable retry can draw from a non-empty range."""
+    if maximum_delay_attempts == 0 or strategy.base <= 0:
+        return False
+    if strategy.maximum is not None and strategy.maximum <= strategy.minimum:
+        return False
+
+    if strategy.factor <= 1 or maximum_delay_attempts == 1:
+        largest_cap = strategy.base
+    elif maximum_delay_attempts is None:
+        largest_cap = float("inf")
+    else:
+        try:
+            largest_cap = strategy.base * (strategy.factor ** (maximum_delay_attempts - 1))
+        except OverflowError:
+            largest_cap = float("inf")
+
+    if strategy.maximum is not None:
+        largest_cap = min(largest_cap, strategy.maximum)
+    return largest_cap > strategy.minimum
+
+
+def _has_effective_random_delay(
+    strategy: Any,
+    *,
+    maximum_delay_attempts: int | None,
+    seeded: bool | None = None,
+) -> bool:
+    """Return True when the delay tree has reachable, variable randomness."""
+    if maximum_delay_attempts == 0:
+        return False
+
     stack = [strategy]
     while stack:
         current = stack.pop()
-        if isinstance(current, (RandomDelay, RandomExponentialDelay)):
-            return True
-        if isinstance(current, AdditiveDelay):
+        can_vary = False
+        current_seed: int | None = None
+
+        if isinstance(current, RandomDelay):
+            can_vary = current.maximum > current.minimum
+            current_seed = current.seed
+        elif isinstance(current, RandomExponentialDelay):
+            can_vary = _random_exponential_can_vary(current, maximum_delay_attempts)
+            current_seed = current.seed
+        elif isinstance(current, AdditiveDelay):
             stack.extend(current.strategies)
+            continue
+
+        if can_vary and (seeded is None or (current_seed is not None) is seeded):
+            return True
+
     return False
 
 
@@ -219,6 +265,24 @@ def compute_warnings(policy: Any) -> tuple[PolicyWarning, ...]:
 
     is_forever = _is_forever(policy)
     is_no_delay = _is_no_delay(policy)
+    known_attempt_limit = _known_attempt_limit(policy.stop_strategy)
+    maximum_delay_attempts = (
+        None if known_attempt_limit is None else max(0, known_attempt_limit - 1)
+    )
+    has_effective_random = _has_effective_random_delay(
+        policy.delay_strategy,
+        maximum_delay_attempts=maximum_delay_attempts,
+    )
+    has_seeded_random = _has_effective_random_delay(
+        policy.delay_strategy,
+        maximum_delay_attempts=maximum_delay_attempts,
+        seeded=True,
+    )
+    has_unseeded_random = _has_effective_random_delay(
+        policy.delay_strategy,
+        maximum_delay_attempts=maximum_delay_attempts,
+        seeded=False,
+    )
 
     if _uses_implicit_default_policy(policy):
         warnings.append(
@@ -299,7 +363,6 @@ def compute_warnings(policy: Any) -> tuple[PolicyWarning, ...]:
 
     if not is_forever:
         try:
-            known_attempt_limit = _known_attempt_limit(policy.stop_strategy)
             sim_count = known_attempt_limit if known_attempt_limit is not None else 10
             simulation = policy.simulate(attempts=sim_count)
             if simulation.total_sleep > 300:
@@ -344,13 +407,28 @@ def compute_warnings(policy: Any) -> tuple[PolicyWarning, ...]:
     if (
         _high_attempt_count(policy)
         and _has_positive_deterministic_delay(policy.delay_strategy)
-        and not _has_random_delay(policy.delay_strategy)
+        and not has_effective_random
     ):
         warnings.append(
             PolicyWarning(
                 code="missing_jitter",
                 message="This policy may synchronize retries across concurrent executions.",
                 hint="Consider adding jitter.",
+            )
+        )
+
+    if not getattr(policy, "testing_mode", False) and has_seeded_random and not has_unseeded_random:
+        warnings.append(
+            PolicyWarning(
+                code="seeded_random_delay",
+                message=(
+                    "This policy uses a seeded random delay, so executions that reuse "
+                    "the same seed receive the same per-attempt delays."
+                ),
+                hint=(
+                    "Use seed=None when randomness should spread production retries; "
+                    "keep fixed seeds for reproducible tests and simulations."
+                ),
             )
         )
 

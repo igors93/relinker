@@ -63,7 +63,9 @@ policy = RetryPolicy().random_exponential_delay(
 )
 ```
 
-This is useful when many clients may retry at the same time.
+This is useful when many clients may retry at the same time. Leave `seed=None`
+for production spreading. A fixed seed makes the sequence reproducible, but
+executions that reuse it receive the same per-attempt delays.
 
 ## Chain delay
 
@@ -92,6 +94,22 @@ This means:
 ```text
 exponential delay + random delay between 0 and 0.5 seconds
 ```
+
+For production retry spreading, keep the default `seed=None`:
+
+```python
+policy = RetryPolicy().fixed_delay(2).jitter(maximum=0.5)
+```
+
+Use a fixed seed only when reproducibility is intentional, such as tests or
+simulations:
+
+```python
+policy = RetryPolicy().fixed_delay(2).jitter(maximum=0.5, seed=1).for_testing()
+```
+
+`doctor()` reports `seeded_random_delay` when a non-testing policy relies only
+on seeded random delays.
 
 ## Custom delay
 

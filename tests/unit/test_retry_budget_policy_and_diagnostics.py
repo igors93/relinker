@@ -70,3 +70,36 @@ def test_structured_logging_has_delay_breakdown_without_key(
     assert payload["budget_delay"] == 0
     assert payload["total_delay"] == 2
     assert "private-tenant-key" not in caplog.text
+
+
+def test_structured_logging_preserves_decimal_policy_delay_without_budget_wait(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    logger = logging.getLogger("retry-budget-decimal-delay-test")
+    caplog.set_level(logging.INFO, logger=logger.name)
+    budget = RetryBudget(1, per=10)
+    calls = 0
+
+    def task() -> str:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise TimeoutError("temporary")
+        return "ok"
+
+    policy = (
+        RetryPolicy()
+        .attempts(2)
+        .on(TimeoutError)
+        .fixed_delay(0.1)
+        .with_retry_budget(budget, key="tenant")
+        .with_structured_logging(logger=logger)
+        .with_sleep(lambda _: None)
+    )
+
+    assert policy.run(task) == "ok"
+
+    payload = json.loads(caplog.records[0].message)
+    assert payload["policy_delay"] == 0.1
+    assert payload["budget_delay"] == 0
+    assert payload["total_delay"] == 0.1

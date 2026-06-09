@@ -5,7 +5,9 @@ import pytest
 from relinker import RetryBudget, RetryPolicy
 from relinker.conditions.composite import AnyCondition
 from relinker.conditions.exception import ExceptionCondition
+from relinker.delays.composite import AdditiveDelay
 from relinker.delays.fixed import FixedDelay
+from relinker.delays.random_delay import RandomDelay
 
 
 def _codes(policy: RetryPolicy[object]) -> list[str]:
@@ -299,3 +301,131 @@ def test_os_error_warning_has_stable_order_without_duplicates() -> None:
     ]
     assert len(codes) == len(set(codes))
     assert [warning.code for warning in policy.doctor().warnings] == codes
+
+
+def test_seeded_jitter_warns_about_cross_execution_determinism() -> None:
+    policy = RetryPolicy().attempts(5).on(TimeoutError).fixed_delay(1).jitter(maximum=0.5, seed=7)
+
+    warning = next(item for item in policy.warnings() if item.code == "seeded_random_delay")
+
+    assert "same per-attempt delays" in warning.message
+    assert warning.hint is not None
+    assert "seed=None" in warning.hint
+    assert policy.doctor().risk_level == "warning"
+
+
+def test_seeded_random_delay_warns() -> None:
+    policy = RetryPolicy().attempts(3).on(TimeoutError).random_delay(minimum=0, maximum=1, seed=7)
+
+    assert "seeded_random_delay" in _codes(policy)
+
+
+def test_seeded_random_exponential_delay_warns() -> None:
+    policy = (
+        RetryPolicy()
+        .attempts(3)
+        .on(TimeoutError)
+        .random_exponential_delay(base=1, maximum=10, seed=7)
+    )
+
+    assert "seeded_random_delay" in _codes(policy)
+
+
+@pytest.mark.parametrize(
+    "policy",
+    [
+        RetryPolicy().attempts(3).on(TimeoutError).random_delay(),
+        RetryPolicy().attempts(3).on(TimeoutError).random_exponential_delay(),
+        RetryPolicy().attempts(3).on(TimeoutError).fixed_delay(1).jitter(),
+    ],
+)
+def test_unseeded_random_delays_do_not_warn(policy: RetryPolicy[object]) -> None:
+    assert "seeded_random_delay" not in _codes(policy)
+
+
+def test_testing_mode_suppresses_seeded_random_delay_warning() -> None:
+    production = RetryPolicy().attempts(3).on(TimeoutError).random_delay(seed=7)
+    testing = production.for_testing()
+
+    assert "seeded_random_delay" in _codes(production)
+    assert "seeded_random_delay" not in _codes(testing)
+
+
+def test_fixed_random_delay_range_does_not_warn() -> None:
+    policy = RetryPolicy().attempts(3).on(TimeoutError).random_delay(minimum=1, maximum=1, seed=7)
+
+    assert "seeded_random_delay" not in _codes(policy)
+
+
+@pytest.mark.parametrize(
+    "policy",
+    [
+        RetryPolicy()
+        .attempts(3)
+        .on(TimeoutError)
+        .random_exponential_delay(base=0, minimum=5, seed=7),
+        RetryPolicy()
+        .attempts(3)
+        .on(TimeoutError)
+        .random_exponential_delay(base=1, minimum=5, maximum=5, seed=7),
+    ],
+)
+def test_degenerate_random_exponential_delay_does_not_warn(
+    policy: RetryPolicy[object],
+) -> None:
+    assert "seeded_random_delay" not in _codes(policy)
+
+
+def test_unseeded_random_component_prevents_seeded_warning() -> None:
+    delay = AdditiveDelay(
+        (
+            RandomDelay(minimum=0, maximum=1, seed=7),
+            RandomDelay(minimum=0, maximum=1),
+        )
+    )
+    policy = RetryPolicy().attempts(3).on(TimeoutError).add_delay(delay)
+
+    assert "seeded_random_delay" not in _codes(policy)
+
+
+def test_nested_seeded_random_component_is_detected() -> None:
+    nested = AdditiveDelay(
+        (
+            FixedDelay(1),
+            AdditiveDelay((RandomDelay(minimum=0, maximum=1, seed=7),)),
+        )
+    )
+    policy = RetryPolicy().attempts(3).on(TimeoutError).add_delay(nested)
+
+    assert "seeded_random_delay" in _codes(policy)
+
+
+def test_single_attempt_policy_does_not_warn_about_seeded_random_delay() -> None:
+    policy = RetryPolicy().attempts(1).on(TimeoutError).jitter(seed=7)
+
+    assert "seeded_random_delay" not in _codes(policy)
+
+
+def test_fixed_jitter_range_is_not_treated_as_effective_randomness() -> None:
+    policy = (
+        RetryPolicy()
+        .attempts(10)
+        .on(TimeoutError)
+        .fixed_delay(2)
+        .jitter(minimum=0.5, maximum=0.5, seed=7)
+    )
+
+    codes = _codes(policy)
+
+    assert "missing_jitter" in codes
+    assert "seeded_random_delay" not in codes
+
+
+def test_seeded_random_warning_has_stable_order_without_duplicate_jitter_warning() -> None:
+    policy = RetryPolicy().attempts(10).on(TimeoutError).fixed_delay(2).jitter(seed=7)
+
+    codes = _codes(policy)
+
+    assert "missing_jitter" not in codes
+    assert codes.count("seeded_random_delay") == 1
+    assert codes.index("seeded_random_delay") < codes.index("missing_retry_budget")

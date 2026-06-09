@@ -29,7 +29,8 @@ class RandomDelay(DelayMixin):
         Return a random delay.
 
         When a seed is provided, each attempt gets a deterministic random stream.
-        This keeps tests reproducible while preserving random behavior per attempt.
+        This keeps tests reproducible, but executions that reuse the same seed also
+        receive the same delay for each matching attempt number.
         """
         random = Random(self.seed + attempt_number if self.seed is not None else None)
         return random.uniform(self.minimum, self.maximum)

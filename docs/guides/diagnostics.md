@@ -108,6 +108,7 @@ print(policy.timeline(attempts=5))
 | `high_total_sleep` | The simulated sleep time is high |
 | `result_retry_without_observation` | Result-based retry may exhaust silently |
 | `missing_jitter` | Many deterministic delayed attempts may synchronize under concurrency |
+| `seeded_random_delay` | A fixed seed repeats the same per-attempt random delays across executions that reuse it |
 | `missing_retry_budget` | Many attempts or infinite retry may multiply load without a budget |
 | `silent_fallback` | A fallback may hide repeated failures without a give-up observer |
 | `infinite_retry_with_budget` | A Retry Budget controls rate, not total duration |

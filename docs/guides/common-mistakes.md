@@ -115,6 +115,27 @@ different times, spreading the load.
 Jitter matters when more than a handful of processes or goroutines may fail
 together.
 
+## Using a fixed jitter seed in production
+
+**Risky for production spreading:**
+
+```python
+RetryPolicy().fixed_delay(2).jitter(maximum=0.5, seed=1)
+```
+
+A fixed seed is reproducible, but executions that reuse it receive the same
+per-attempt jitter. This can preserve synchronization between workers. Relinker
+emits `seeded_random_delay` for production policies that rely exclusively on
+seeded random delays.
+
+**Better for production:**
+
+```python
+RetryPolicy().fixed_delay(2).jitter(maximum=0.5)
+```
+
+Keep fixed seeds for tests and simulations, preferably with `for_testing()`.
+
 ---
 
 ## Many attempts without a shared budget

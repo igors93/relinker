@@ -226,3 +226,20 @@ def test_to_dict_returns_independent_deterministic_data() -> None:
 
     assert second == policy.to_dict()
     assert second["stop"] == {"type": "attempts", "maximum": 3}
+
+
+def test_to_dict_preserves_seeded_jitter_structure() -> None:
+    data = RetryPolicy().fixed_delay(1).jitter(maximum=0.5, seed=7).to_dict()["delay"]
+
+    assert data == {
+        "type": "additive",
+        "strategies": [
+            {"type": "fixed", "seconds": 1},
+            {
+                "type": "random",
+                "minimum": 0.0,
+                "maximum": 0.5,
+                "seed": 7,
+            },
+        ],
+    }

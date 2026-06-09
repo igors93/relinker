@@ -92,7 +92,11 @@ class RetryAttemptContext(_BaseRetryAttemptContext):
             self.iterator.result = self.iterator._runtime.result(
                 ended_at=_context_now(), error=error
             )
-            self._giveup(error=error, retry_cause="exception")
+            self._giveup(
+                error=error,
+                retry_cause="exception",
+                will_stop=False,
+            )
             return False
 
         if should_stop:

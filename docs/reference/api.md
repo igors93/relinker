@@ -116,6 +116,22 @@ Underscore-prefixed modules and helpers are internal. In particular,
 `relinker.__version__` is available as package metadata. It is intentionally not
 part of `relinker.__all__`, so it is not included in the root star-import API.
 
+## RetryResult representations
+
+- `summary()` returns a compact dictionary without application values or exception
+  messages.
+- `to_dict(include_value=False, include_error_message=True)` returns a detailed
+  JSON-friendly dictionary. Pass `include_error_message=False` to preserve error
+  types while setting message fields to `None`.
+- `to_json(include_value=False, indent=None, include_error_message=True)` exposes
+  the same options in JSON form.
+- `story(include_error_message=True)` returns a human-readable execution story.
+  Pass `include_error_message=False` to omit exception message text.
+
+Detailed representations keep exception messages by default for compatibility.
+Applications should disable message rendering when output may reach untrusted
+logs or telemetry.
+
 ## RetryPolicy method groups
 
 ### Stop

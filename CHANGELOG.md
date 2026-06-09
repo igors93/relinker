@@ -8,6 +8,13 @@ the compatibility and deprecation policy documented in
 
 ## Unreleased
 
+### Added
+
+- Added explicit error-message redaction to `RetryResult.to_dict()`,
+  `RetryResult.to_json()`, and `RetryResult.story()`. Existing output remains
+  unchanged by default; pass `include_error_message=False` for detailed output
+  that preserves exception types without rendering exception messages.
+
 ### Fixed
 
 - `RetryPolicy.run()` now rejects coroutine functions and async callable objects

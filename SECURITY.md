@@ -42,6 +42,23 @@ messages from external services can contain API keys, tokens, user identifiers,
 or other sensitive data. Enable `include_error_message=True` only in
 environments where log output is controlled.
 
+### RetryResult output
+
+`RetryResult.summary()` excludes exception messages and is the preferred compact
+representation for logs. Detailed representations preserve exception messages by
+default for compatibility. When output may reach an untrusted log or telemetry
+sink, disable message rendering explicitly:
+
+```python
+result.to_dict(include_error_message=False)
+result.to_json(include_error_message=False)
+result.story(include_error_message=False)
+```
+
+Redaction affects only the generated representation. The original exception
+objects remain available through `RetryResult` and retained `AttemptRecord`
+objects for explicit inspection.
+
 ### Memory in long-running loops
 
 Policies created with `.forever()` or very high attempt limits accumulate

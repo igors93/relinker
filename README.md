@@ -292,6 +292,14 @@ print(result.summary())
 print(result.story())
 ```
 
+Detailed result output preserves exception messages by default for compatibility.
+When the output may be stored in logs or telemetry, exclude those messages
+explicitly:
+
+```python
+print(result.story(include_error_message=False))
+```
+
 Decorated functions also receive retry statistics:
 
 ```python

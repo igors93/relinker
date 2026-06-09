@@ -45,6 +45,30 @@ failure mode. If a logging sink raises a normal `Exception`, Relinker reports
 the handler failure through the `relinker.events` logger and continues the retry
 flow.
 
+## RetryResult output
+
+`RetryResult.summary()` excludes exception messages and is suitable for compact
+logging. Detailed output preserves messages by default for compatibility. When a
+result may be written to logs or telemetry, exclude messages explicitly:
+
+```python
+logger.info(
+    "retry_result=%s",
+    result.to_json(include_error_message=False),
+)
+```
+
+The same option is available for dictionary and human-readable output:
+
+```python
+data = result.to_dict(include_error_message=False)
+text = result.story(include_error_message=False)
+```
+
+Exception types and attempt metadata remain available. Redaction changes only the
+generated representation; it does not remove the original exception objects from
+the result.
+
 ## Event hooks
 
 Use event hooks when you want custom behavior.

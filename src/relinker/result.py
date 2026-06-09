@@ -183,13 +183,22 @@ class RetryResult(Generic[T]):
             "error_types": [error_type.__name__ for error_type in self.error_types],
         }
 
-    def to_dict(self, *, include_value: bool = False) -> dict[str, Any]:
+    def to_dict(
+        self,
+        *,
+        include_value: bool = False,
+        include_error_message: bool = True,
+    ) -> dict[str, Any]:
         """
         Return a JSON-friendly dictionary.
 
         By default the returned value is not included because application values
         may be large, private, or not JSON-serializable. Set `include_value=True`
         when you explicitly want it.
+
+        Error messages remain included by default for compatibility. Set
+        `include_error_message=False` when the representation may be written to an
+        untrusted log or telemetry sink. Exception types remain available.
 
         The `attempts` list contains retained history. Aggregate counters describe
         the complete execution even when older records were discarded.
@@ -220,7 +229,11 @@ class RetryResult(Generic[T]):
                     "error_type": (
                         attempt.error.__class__.__name__ if attempt.error is not None else None
                     ),
-                    "error_message": str(attempt.error) if attempt.error is not None else None,
+                    "error_message": (
+                        str(attempt.error)
+                        if attempt.error is not None and include_error_message
+                        else None
+                    ),
                 }
                 for attempt in self.attempts
             ],
@@ -229,7 +242,7 @@ class RetryResult(Generic[T]):
         if self.error is not None:
             data["error"] = {
                 "type": self.error.__class__.__name__,
-                "message": str(self.error),
+                "message": str(self.error) if include_error_message else None,
             }
 
         if include_value:
@@ -237,22 +250,40 @@ class RetryResult(Generic[T]):
 
         return data
 
-    def to_json(self, *, include_value: bool = False, indent: int | None = None) -> str:
+    def to_json(
+        self,
+        *,
+        include_value: bool = False,
+        indent: int | None = None,
+        include_error_message: bool = True,
+    ) -> str:
         """
         Return this result as JSON.
+
+        Error messages remain included by default for compatibility. Set
+        `include_error_message=False` for a detailed representation that preserves
+        exception types without rendering exception messages.
 
         If `include_value=True` and the value is not JSON-serializable,
         `json.dumps()` raises `TypeError`. That is intentional because Relinker
         should not silently alter application data.
         """
-        return json.dumps(self.to_dict(include_value=include_value), indent=indent)
+        return json.dumps(
+            self.to_dict(
+                include_value=include_value,
+                include_error_message=include_error_message,
+            ),
+            indent=indent,
+        )
 
-    def story(self) -> str:
+    def story(self, *, include_error_message: bool = True) -> str:
         """
         Return a readable execution story.
 
         This is intentionally plain text because it is useful in logs, test
-        failures, terminal output, and debugging sessions. When history is
+        failures, terminal output, and debugging sessions. Error messages remain
+        included by default for compatibility. Set `include_error_message=False`
+        when the story may be written to an untrusted log. When history is
         truncated, the story says how many records were retained.
         """
         if self.succeeded:
@@ -288,7 +319,10 @@ class RetryResult(Generic[T]):
             attempt_status = "succeeded" if attempt.succeeded else "failed"
             lines.append(f"Attempt {attempt.number}: {attempt_status} in {attempt.duration:.4f}s")
             if attempt.error is not None:
-                lines.append(f"  Error: {attempt.error.__class__.__name__}: {attempt.error}")
+                error_line = f"  Error: {attempt.error.__class__.__name__}"
+                if include_error_message:
+                    error_line += f": {attempt.error}"
+                lines.append(error_line)
             elif self.exhausted_by_result and attempt is self.attempts[-1]:
                 lines.append("  Result was returned but rejected by retry condition.")
 

@@ -14,28 +14,17 @@
 </div>
 
 ```python
-from relinker import RetryPolicy
+from relinker import retry
 
-policy = (
-    RetryPolicy()
-    .attempts(5)
-    .on(TimeoutError, ConnectionError)
-    .exponential_delay(base=1, maximum=30)
-    .jitter(maximum=0.5)
-)
-
-result = policy.run(fetch_data)
+@retry(attempts=3, delay=1, on=(TimeoutError,))
+def fetch_data() -> str:
+    return call_external_service()
 ```
 
-Five total attempts. Retries only on network errors. Exponential backoff capped at 30 s. Jitter prevents synchronized retries under concurrency.
+Three total calls. Waits 1 second between attempts. Retries only `TimeoutError`.
+When all attempts fail, the last exception propagates normally.
 
-Before this runs against a real service, ask Relinker what it thinks:
-
-```python
-print(policy.explain())     # plain-language description
-print(policy.preview(5))    # estimated timing per attempt
-print(policy.doctor())      # flagged risks, if any
-```
+The same policy scales to a full production configuration — see [Quick Start](#quick-start) below.
 
 ---
 
@@ -104,6 +93,10 @@ an earlier version.
 
 ## Quick Start
 
+The same retry idea scales from a one-line decorator to a complete production policy.
+`retry()`, presets, and `RetryPolicy` are three entry points to the same runtime — not
+separate tiers.
+
 ### The smallest useful retry
 
 ```python
@@ -155,7 +148,10 @@ policy = (
 capacity. Normal policy delays and `max_time()` continue to apply. See
 [Retry budgets](docs/concepts/retry-budgets.md) for the complete behavior and scope.
 
-### Use the full builder
+### Grow into a production policy
+
+When the configuration outgrows one line, build it explicitly.
+Each method adds one constraint; the result is a reusable, inspectable object:
 
 ```python
 from relinker import RetryPolicy

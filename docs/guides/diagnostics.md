@@ -162,3 +162,11 @@ print(policy.explain())
 print(policy.preview(attempts=5))
 print(policy.doctor().describe())
 ```
+
+---
+
+## Next steps
+
+- [Production checklist](production-checklist.md) — structured review before deployment
+- [Choosing a policy](choosing-a-policy.md) — decision guide if the report flags risks
+- [Common mistakes](common-mistakes.md) — patterns that frequently trigger warnings

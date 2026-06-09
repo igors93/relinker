@@ -2,6 +2,21 @@
 
 A quick reference from need to API. All names listed here are stable exports.
 
+## Finding by intent
+
+| I need to… | Where to start |
+|---|---|
+| Retry a function | `@retry(attempts=3, on=(TimeoutError,))` · [Getting started](../guides/getting-started.md) |
+| Choose the right configuration | [Choosing a policy](../guides/choosing-a-policy.md) |
+| Stop after 30 seconds | `.max_time(30)` · see Stop strategies below |
+| Add exponential backoff | `.exponential_delay(base=1, maximum=30)` · see Delays below |
+| See every retry attempt | `.with_logging()` or `.with_structured_logging()` · see Observability below |
+| Prevent retry storms under concurrency | `.jitter(maximum=0.5)` and `RetryBudget` · see Shared retry capacity below |
+| Keep tests fast | `.for_testing()` · see Testing below |
+| Inspect a policy before deploying | `policy.doctor()` · see Diagnostics and guidance below |
+
+---
+
 ## Core execution
 
 | Need | API |

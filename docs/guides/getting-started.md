@@ -75,9 +75,11 @@ policy = network().attempts(8).fallback_value({"status": "offline"})
 
 ---
 
-## Fluent policy
+## Use a reusable policy
 
-For full control, use the builder directly:
+When a policy needs to be shared, extended, or configured beyond a single decorator call,
+build it explicitly with `RetryPolicy()`. This is the same object `retry()` and presets
+build under the hood — just with full control over every setting:
 
 ```python
 from relinker import RetryPolicy
@@ -93,11 +95,27 @@ policy = (
 value = policy.run(fetch_data)
 ```
 
-Each line adds one constraint:
+Each method adds one constraint:
 - `.attempts(5)` — allow up to 5 total calls;
 - `.on(TimeoutError, ConnectionError)` — retry only these exceptions;
 - `.exponential_delay(base=1, maximum=30)` — wait 1, 2, 4, 8 … seconds, capped at 30;
 - `.jitter(maximum=0.5)` — add up to 0.5s random variation to prevent synchronized retries.
+
+---
+
+## Grow the same policy
+
+Add a time limit, structured logging, or shared capacity by chaining more methods.
+Each call returns a new immutable policy — the original is unchanged:
+
+```python
+production_policy = (
+    policy
+    .max_time(60)                    # give up after 60 seconds total
+    .with_structured_logging()       # emit structured retry events
+    .named("payments-api")           # tag logs and diagnostics
+)
+```
 
 ---
 
@@ -118,8 +136,9 @@ helps you understand what will happen before it happens.
 
 ## Next steps
 
-- [Choosing a policy](choosing-a-policy.md) — decision guide by situation
-- [Policy builder](policy-builder.md) — full method reference
-- [Retry lifecycle](../concepts/retry-lifecycle.md) — how one execution flows
-- [Production checklist](production-checklist.md) — review before deploying
-- [When not to retry](when-not-to-retry.md) — when retry causes more harm
+- [Choosing a policy](choosing-a-policy.md) — when to use `retry()`, a preset, or `RetryPolicy()`
+- [Policy builder](policy-builder.md) — full method reference for every configuration option
+- [Retry lifecycle](../concepts/retry-lifecycle.md) — how one execution flows from start to finish
+- [Diagnostics and guidance](diagnostics.md) — detect risky configurations before deploying
+- [Testing retry code](testing.md) — keep tests fast and deterministic
+- [Production checklist](production-checklist.md) — final review before deploying

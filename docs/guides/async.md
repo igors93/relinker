@@ -45,6 +45,21 @@ result = await (
 with `async __call__` to `run()` raises `InvalidRetryConfigError` before an
 attempt starts. Use `await policy.run_async(...)` for asynchronous callables.
 
+`run_async()` accepts any callable that returns an awaitable. This includes a
+regular function used as an async factory:
+
+```python
+def fetch_user_factory():
+    return fetch_user()
+
+result = await policy.run_async(fetch_user_factory)
+```
+
+If the callable returns a regular value instead, `run_async()` raises
+`InvalidRetryConfigError` after that first call. The usage error is not retried
+and does not trigger delays, fallbacks, or retry-budget reservations. Use
+`policy.run(...)` for a synchronous callable.
+
 ## Async context manager
 
 Use `async_iter()` to retry a block of async code:

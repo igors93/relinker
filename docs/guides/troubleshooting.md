@@ -95,6 +95,34 @@ API usage error.
 
 ---
 
+## "run_async() says my callable did not return an awaitable"
+
+`run_async()` requires the callable to return a coroutine, future, or another
+awaitable object. Use `run()` when the callable returns a regular value:
+
+```python
+# Wrong: fetch_user_sync returns a dictionary.
+result = await policy.run_async(fetch_user_sync)
+
+# Correct.
+result = policy.run(fetch_user_sync)
+```
+
+A regular function that returns an awaitable is supported:
+
+```python
+def fetch_user_factory():
+    return fetch_user_async()
+
+result = await policy.run_async(fetch_user_factory)
+```
+
+Relinker must call the function once to inspect its result. If that result is
+not awaitable, it raises `InvalidRetryConfigError` without retrying, sleeping,
+applying a fallback, or reserving retry-budget capacity.
+
+---
+
 ## "The function retried more times than I expected"
 
 **1. Attempts counts total calls, not retries.**

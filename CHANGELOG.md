@@ -12,6 +12,9 @@ the compatibility and deprecation policy documented in
 
 - `RetryPolicy.run()` now rejects coroutine functions and async callable objects
   before execution instead of returning an unexecuted coroutine.
+- `RetryPolicy.run_async()` now rejects non-awaitable callable results without
+  retrying the resulting `TypeError`. Synchronous factories that return
+  awaitables remain supported.
 
 ## 1.2.0 - 2026-06-08
 

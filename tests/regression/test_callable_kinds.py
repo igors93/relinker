@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from relinker import InvalidRetryConfigError, RetryPolicy, retry
+from relinker import InvalidRetryConfigError, RetryBudget, RetryPolicy, retry
 
 
 def generator_task():
@@ -97,6 +97,108 @@ def test_run_rejects_partial_async_callable_object() -> None:
         result = RetryPolicy().run(operation)
         if inspect.iscoroutine(result):
             result.close()
+
+
+@pytest.mark.asyncio
+async def test_run_async_rejects_non_awaitable_result_without_retrying() -> None:
+    calls = 0
+    events: list[str] = []
+    sleeps: list[float] = []
+
+    def sync_task() -> str:
+        nonlocal calls
+        calls += 1
+        return "ok"
+
+    async def capture_sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+
+    policy = (
+        RetryPolicy()
+        .attempts(5)
+        .on(Exception)
+        .with_sleep(
+            lambda seconds: sleeps.append(seconds),
+            async_sleep=capture_sleep,
+        )
+    )
+    for event_name in (
+        "before_attempt",
+        "after_failure",
+        "before_sleep",
+        "after_giveup",
+    ):
+        policy = policy.on_event(event_name, lambda event: events.append(event.name))
+
+    with pytest.raises(
+        InvalidRetryConfigError,
+        match=r"run_async\(\).*return an awaitable.*run\(\)",
+    ):
+        await policy.run_async(sync_task)
+
+    assert calls == 1
+    assert events == ["before_attempt"]
+    assert sleeps == []
+
+
+@pytest.mark.asyncio
+async def test_run_async_non_awaitable_result_bypasses_fallback_and_retry_budget() -> None:
+    calls = 0
+    budget = RetryBudget(max_retries=2, per=60)
+
+    def sync_task() -> str:
+        nonlocal calls
+        calls += 1
+        return "ok"
+
+    policy = (
+        RetryPolicy()
+        .attempts(3)
+        .on(Exception)
+        .fallback_value("fallback")
+        .with_retry_budget(budget, key="non-awaitable")
+        .for_testing()
+    )
+
+    with pytest.raises(InvalidRetryConfigError, match=r"run_async\(\).*awaitable"):
+        await policy.run_async(sync_task)
+
+    assert calls == 1
+    snapshot = budget.snapshot("non-awaitable")
+    assert snapshot.active == 0
+    assert snapshot.queued == 0
+    assert snapshot.available_now == 2
+
+
+@pytest.mark.asyncio
+async def test_run_async_accepts_sync_factory_returning_coroutine() -> None:
+    async def async_task() -> str:
+        return "ok"
+
+    def factory():
+        return async_task()
+
+    assert await RetryPolicy().run_async(factory) == "ok"
+
+
+@pytest.mark.asyncio
+async def test_run_async_retries_sync_factory_exception_before_awaitable_creation() -> None:
+    calls = 0
+
+    async def async_task() -> str:
+        return "ok"
+
+    def factory():
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise TimeoutError("temporary")
+        return async_task()
+
+    result = await RetryPolicy().attempts(2).on(TimeoutError).for_testing().run_async(factory)
+
+    assert result == "ok"
+    assert calls == 2
 
 
 def test_sync_callable_object_executes_as_sync_wrapper() -> None:

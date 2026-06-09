@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import inspect
+from collections.abc import Awaitable
 from functools import partial
 from typing import Any
 
@@ -73,3 +74,13 @@ def ensure_sync_retryable_callable(function: Any) -> None:
         raise InvalidRetryConfigError(
             "run() does not accept async callables; use await policy.run_async(...) instead"
         )
+
+
+def ensure_awaitable_result(value: object) -> Awaitable[Any]:
+    """Return an awaitable result or reject an invalid async execution contract."""
+    if not inspect.isawaitable(value):
+        raise InvalidRetryConfigError(
+            "run_async() requires the callable to return an awaitable; "
+            "use policy.run() for synchronous callables"
+        )
+    return value

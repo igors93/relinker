@@ -14,6 +14,9 @@ the compatibility and deprecation policy documented in
   `RetryResult.to_json()`, and `RetryResult.story()`. Existing output remains
   unchanged by default; pass `include_error_message=False` for detailed output
   that preserves exception types without rendering exception messages.
+- Added a `broad_os_error` advisory warning for policies that explicitly retry
+  `OSError`, including the existing broad transport presets. Retry behavior
+  remains unchanged.
 
 ### Fixed
 

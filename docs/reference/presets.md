@@ -105,6 +105,22 @@ This preset intentionally retries broad exceptions because background jobs often
 centralize error handling. Relinker will still expose this through
 `policy.warnings()`.
 
+## Broad OSError diagnostics
+
+The `network()`, `database()`, and `patient()` defaults retain `OSError` for
+`1.x` compatibility. `OSError` can include local file, permission, process, and
+resource failures in addition to transport failures, so these policies expose a
+`broad_os_error` advisory warning through `warnings()` and `doctor()`.
+
+When the dependency's retryable exceptions are known, pass them explicitly:
+
+```python
+policy = network(TimeoutError, ConnectionError)
+```
+
+Specific subclasses of `OSError` do not trigger the warning. The diagnostic does
+not alter attempts, delays, or exception matching.
+
 ## Custom exception types
 
 All presets accept exception types:

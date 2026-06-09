@@ -183,6 +183,20 @@ def _has_broad_exception(condition: Any) -> bool:
     return False
 
 
+def _has_broad_os_error(condition: Any) -> bool:
+    """Return True when the effective condition retries a plain OSError."""
+    if isinstance(condition, ExceptionCondition):
+        return any(
+            exception_type is OSError or exception_type is Exception
+            for exception_type in condition.exception_types
+        )
+    if isinstance(condition, AnyCondition):
+        return any(_has_broad_os_error(item) for item in condition.conditions)
+    if isinstance(condition, AllCondition):
+        return all(_has_broad_os_error(item) for item in condition.conditions)
+    return False
+
+
 def _has_max_time(strategy: Any) -> bool:
     if isinstance(strategy, StopAfterDelay):
         return True
@@ -255,6 +269,21 @@ def compute_warnings(policy: Any) -> tuple[PolicyWarning, ...]:
                 code="broad_exception",
                 message="This policy retries all Exception subclasses.",
                 hint="Prefer specific exception types when possible.",
+            )
+        )
+
+    elif _has_broad_os_error(policy.condition):
+        warnings.append(
+            PolicyWarning(
+                code="broad_os_error",
+                message=(
+                    "This policy explicitly retries OSError, which includes "
+                    "non-transport operating-system failures."
+                ),
+                hint=(
+                    "Prefer the dependency's documented transient exceptions, or use "
+                    "TimeoutError and ConnectionError when appropriate."
+                ),
             )
         )
 

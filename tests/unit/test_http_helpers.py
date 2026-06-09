@@ -5,7 +5,9 @@ from __future__ import annotations
 import pytest
 
 from relinker.http import (
+    DEFAULT_RETRYABLE_TRANSPORT_EXCEPTIONS,
     _extract_retry_after_header,
+    http_retry_policy,
     parse_retry_after,
     retry_after_delay,
     retry_if_status,
@@ -295,3 +297,22 @@ def test_retry_after_delay_integration_with_policy() -> None:
     assert result.succeeded
     assert result.attempt_count == 3
     assert result.value == {"status_code": 200}
+
+
+# ------------------------------------------- transport exception diagnostics
+
+
+def test_default_transport_exception_bundle_warns_about_broad_os_error() -> None:
+    policy = http_retry_policy(
+        transport_exceptions=DEFAULT_RETRYABLE_TRANSPORT_EXCEPTIONS,
+    )
+
+    assert "broad_os_error" in {warning.code for warning in policy.warnings()}
+
+
+def test_restricted_transport_exception_scope_does_not_warn_about_os_error() -> None:
+    policy = http_retry_policy(
+        transport_exceptions=(TimeoutError, ConnectionError),
+    )
+
+    assert "broad_os_error" not in {warning.code for warning in policy.warnings()}

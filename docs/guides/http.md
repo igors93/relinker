@@ -27,6 +27,19 @@ policy = http_retry_policy(
 preserves existing result-based behavior: a `TimeoutError` or `ConnectionError`
 is retried only when you opt in explicitly.
 
+`DEFAULT_RETRYABLE_TRANSPORT_EXCEPTIONS` includes `OSError` for compatibility
+with the existing broad transport recipe. Because `OSError` also covers local
+operating-system failures, `doctor()` reports `broad_os_error` when that bundle
+is used. Prefer a narrower tuple when the client exposes specific exceptions:
+
+```python
+policy = http_retry_policy(
+    transport_exceptions=(TimeoutError, ConnectionError),
+)
+```
+
+The warning is advisory. It does not change which failures are retried.
+
 ## Retry by status code
 
 ```python

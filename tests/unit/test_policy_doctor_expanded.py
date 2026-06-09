@@ -229,3 +229,73 @@ def test_delays_that_can_be_positive_are_not_reported_as_no_delay(
 
     assert "no_delay" not in codes
     assert "tight_loop_risk" not in codes
+
+
+def test_os_error_scope_warns_without_changing_doctor_severity() -> None:
+    policy = RetryPolicy().attempts(3).on(OSError).fixed_delay(1)
+
+    warnings = policy.warnings()
+    warning = next(item for item in warnings if item.code == "broad_os_error")
+
+    assert "non-transport" in warning.message
+    assert warning.hint is not None
+    assert "documented transient exceptions" in warning.hint
+    assert policy.doctor().warnings == warnings
+    assert policy.doctor().risk_level == "warning"
+
+
+def test_specific_os_error_related_types_do_not_trigger_broad_warning() -> None:
+    class TransientSocketError(OSError):
+        pass
+
+    policy = RetryPolicy().on(TimeoutError, ConnectionError, TransientSocketError)
+
+    assert "broad_os_error" not in _codes(policy)
+
+
+def test_broad_exception_suppresses_redundant_os_error_warning() -> None:
+    policy = RetryPolicy().on(Exception, OSError)
+    codes = _codes(policy)
+
+    assert "broad_exception" in codes
+    assert "broad_os_error" not in codes
+
+
+def test_os_error_inside_any_condition_warns() -> None:
+    policy = RetryPolicy().on(TimeoutError).or_on(OSError)
+
+    assert "broad_os_error" in _codes(policy)
+
+
+def test_os_error_inside_all_condition_with_restriction_does_not_warn() -> None:
+    policy = RetryPolicy().all_conditions(
+        ExceptionCondition((OSError,)),
+        ExceptionCondition((TimeoutError,)),
+    )
+
+    assert "broad_os_error" not in _codes(policy)
+
+
+def test_os_error_inside_all_condition_with_broad_supertype_warns() -> None:
+    policy = RetryPolicy().all_conditions(
+        ExceptionCondition((Exception,)),
+        ExceptionCondition((OSError,)),
+    )
+
+    assert "broad_os_error" in _codes(policy)
+
+
+def test_os_error_warning_has_stable_order_without_duplicates() -> None:
+    policy = RetryPolicy().forever().on(OSError).no_delay()
+
+    codes = _codes(policy)
+
+    assert codes == [
+        "forever",
+        "no_delay",
+        "tight_loop_risk",
+        "broad_os_error",
+        "missing_retry_budget",
+    ]
+    assert len(codes) == len(set(codes))
+    assert [warning.code for warning in policy.doctor().warnings] == codes

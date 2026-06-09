@@ -103,6 +103,7 @@ print(policy.timeline(attempts=5))
 | `no_delay` | The policy has no sleep between attempts |
 | `tight_loop_risk` | The policy can retry forever without sleeping |
 | `broad_exception` | The policy retries all `Exception` subclasses |
+| `broad_os_error` | The policy explicitly retries `OSError`, which can include non-transport operating-system failures |
 | `many_attempts` | The policy uses many attempts |
 | `high_total_sleep` | The simulated sleep time is high |
 | `result_retry_without_observation` | Result-based retry may exhaust silently |

@@ -31,6 +31,37 @@ deciding.
 
 ---
 
+## Retrying every OSError as a transport failure
+
+**Risky:**
+
+```python
+RetryPolicy().attempts(5).on(OSError)
+```
+
+`OSError` includes more than network failures. It can also represent local file,
+permission, process, device, and resource errors. A large retried function may
+repeat unrelated side effects when one of those failures occurs. Relinker emits
+a `broad_os_error` warning for the exact `OSError` type.
+
+**Better:**
+
+```python
+RetryPolicy().attempts(5).on(TimeoutError, ConnectionError)
+```
+
+Prefer the dependency's documented transient exceptions when they are available:
+
+```python
+RetryPolicy().attempts(5).on(HttpClientTimeout, HttpClientConnectionError)
+```
+
+Keep the retried function focused on the operation that can safely be repeated.
+Specific subclasses of `OSError` do not trigger this warning because they may
+represent a deliberate, well-defined transient failure.
+
+---
+
 ## Infinite retry without a delay
 
 **Risky:**

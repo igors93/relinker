@@ -1,3 +1,5 @@
+import pytest
+
 from relinker import background_job, database, fast, network, patient
 from relinker.presets import network as network_from_module
 
@@ -45,3 +47,11 @@ def test_presets_accept_custom_exception_types() -> None:
 
     assert policy.condition.should_retry_exception(TimeoutError())
     assert not policy.condition.should_retry_exception(ConnectionError())
+
+
+@pytest.mark.parametrize("factory", [network, database, patient])
+def test_broad_transport_presets_preserve_os_error_retry_and_warn(factory) -> None:
+    policy = factory()
+
+    assert policy.condition.should_retry_exception(OSError("temporary"))
+    assert "broad_os_error" in {warning.code for warning in policy.warnings()}

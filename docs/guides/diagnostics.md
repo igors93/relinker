@@ -96,27 +96,42 @@ print(policy.timeline(attempts=5))
 
 ## Common warnings
 
-| Warning | Meaning |
-|---|---|
-| `implicit_default_policy` | The policy still uses all implicit retry defaults: broad `Exception`, 3 attempts, and no delay |
-| `forever` | The policy can retry forever |
-| `no_delay` | The policy has no sleep between attempts |
-| `tight_loop_risk` | The policy can retry forever without sleeping |
-| `unbounded_history` | An effectively infinite policy retains every attempt record |
-| `broad_exception` | The policy retries all `Exception` subclasses |
-| `broad_os_error` | The policy explicitly retries `OSError`, which can include non-transport operating-system failures |
-| `many_attempts` | The policy uses many attempts |
-| `high_total_sleep` | The simulated sleep time is high |
-| `result_retry_without_observation` | Result-based retry may exhaust silently |
-| `missing_jitter` | Many deterministic delayed attempts may synchronize under concurrency |
-| `seeded_random_delay` | A fixed seed repeats the same per-attempt random delays across executions that reuse it |
-| `missing_retry_budget` | Many attempts or infinite retry may multiply load without a budget |
-| `silent_fallback` | A fallback may hide repeated failures without a give-up observer |
-| `infinite_retry_with_budget` | A Retry Budget controls rate, not total duration |
-| `for_testing_with_max_time` | `for_testing()` does not advance time for `max_time()` |
+Each warning has a severity that reflects its operational impact:
 
-Warnings about delay configuration are omitted when the stop strategy guarantees
-that no retry can occur, such as `max_time(0)`.
+- `advisory` — guidance for production readiness or predictability
+- `warning` — configuration that deserves operational review
+- `critical` — high risk of serious operational harm when the configuration is reachable
+
+| Warning | Severity | Meaning |
+|---|---|---|
+| `implicit_default_policy` | advisory | The policy still uses all implicit retry defaults: broad `Exception`, 3 attempts, and no delay |
+| `high_total_sleep` | advisory | The simulated sleep time is high |
+| `missing_jitter` | advisory | Many deterministic delayed attempts may synchronize under concurrency |
+| `seeded_random_delay` | advisory | A fixed seed repeats the same per-attempt random delays across executions that reuse it |
+| `for_testing_with_max_time` | advisory | `for_testing()` does not advance time for `max_time()` |
+| `forever` | warning | The policy can retry forever |
+| `no_delay` | warning | The policy has no sleep between attempts |
+| `broad_exception` | warning | The policy retries all `Exception` subclasses |
+| `broad_os_error` | warning | The policy explicitly retries `OSError`, which can include non-transport operating-system failures |
+| `many_attempts` | warning | The policy uses many attempts |
+| `result_retry_without_observation` | warning | Result-based retry may exhaust silently |
+| `missing_retry_budget` | warning | Many attempts or infinite retry may multiply load without a budget |
+| `silent_fallback` | warning | A fallback may hide repeated failures without a give-up observer |
+| `infinite_retry_with_budget` | warning | A Retry Budget controls rate, not total duration |
+| `tight_loop_risk` | critical | The policy can retry forever without sleeping |
+| `unbounded_history` | critical | An effectively infinite policy retains every attempt record |
+| `background_broad_exception` | critical | Broad exception handling is combined with many attempts or forever retry |
+
+`background_broad_exception` is raised when `broad_exception` is paired with
+many attempts or indefinite retry. Background jobs that catch all exceptions can
+silently mask bugs and amplify load on a degraded service. The warning is
+non-blocking. To reduce the risk: narrow the exception types, limit attempts or
+add `max_time()`, configure a Retry Budget, or add a give-up observer. A circuit
+breaker external to the library is appropriate when the operation must shed load
+independently of the retry count.
+
+Warnings about retry behaviour are omitted when the stop strategy guarantees
+that no retry can occur, such as `max_time(0)` or `attempts(1)`.
 
 ## Structured policy view
 

@@ -11,6 +11,8 @@ import json
 from dataclasses import dataclass
 from typing import Literal
 
+Severity = Literal["advisory", "warning", "critical"]
+
 
 @dataclass(frozen=True, slots=True)
 class PolicyWarning:
@@ -24,10 +26,16 @@ class PolicyWarning:
     code: str
     message: str
     hint: str | None = None
+    severity: Severity = "warning"
 
     def to_dict(self) -> dict[str, str | None]:
         """Return this warning as a JSON-friendly dictionary."""
-        return {"code": self.code, "message": self.message, "hint": self.hint}
+        return {
+            "code": self.code,
+            "message": self.message,
+            "hint": self.hint,
+            "severity": self.severity,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,6 +48,8 @@ class PolicyHealthReport:
     """
 
     warnings: tuple[PolicyWarning, ...]
+    complete: bool = True
+    skipped_checks: tuple[str, ...] = ()
 
     @property
     def ok(self) -> bool:
@@ -52,14 +62,19 @@ class PolicyHealthReport:
         return bool(self.warnings)
 
     @property
+    def has_critical(self) -> bool:
+        """Return True when at least one warning has critical severity."""
+        return any(w.severity == "critical" for w in self.warnings)
+
+    @property
+    def critical_count(self) -> int:
+        """Return the number of warnings with critical severity."""
+        return sum(1 for w in self.warnings if w.severity == "critical")
+
+    @property
     def risk_level(self) -> Literal["ok", "warning", "risky"]:
-        """Return a compact risk level derived from warning codes."""
-        risky_codes = {
-            "forever",
-            "tight_loop_risk",
-            "background_broad_exception",
-        }
-        if any(warning.code in risky_codes for warning in self.warnings):
+        """Return a compact risk level derived from warning severity."""
+        if self.has_critical:
             return "risky"
         if self.warnings:
             return "warning"
@@ -72,6 +87,8 @@ class PolicyHealthReport:
             "risk_level": self.risk_level,
             "warning_count": len(self.warnings),
             "warnings": [warning.to_dict() for warning in self.warnings],
+            "complete": self.complete,
+            "skipped_checks": list(self.skipped_checks),
         }
 
     def to_json(self, indent: int | None = None) -> str:
@@ -83,13 +100,18 @@ class PolicyHealthReport:
         lines = ["Relinker policy health", "", f"Risk level: {self.risk_level}"]
         if not self.warnings:
             lines.extend(["", "No warnings found."])
-            return "\n".join(lines)
+        else:
+            lines.extend(["", "Warnings:"])
+            for warning in self.warnings:
+                lines.append(f"- {warning.code}: {warning.message}")
+                if warning.hint:
+                    lines.append(f"  Hint: {warning.hint}")
 
-        lines.extend(["", "Warnings:"])
-        for warning in self.warnings:
-            lines.append(f"- {warning.code}: {warning.message}")
-            if warning.hint:
-                lines.append(f"  Hint: {warning.hint}")
+        if not self.complete:
+            lines.extend(["", "Diagnostics complete: no", "Skipped checks:"])
+            for check in self.skipped_checks:
+                lines.append(f"- {check}")
+
         return "\n".join(lines)
 
 

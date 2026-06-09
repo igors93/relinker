@@ -22,6 +22,29 @@ the compatibility and deprecation policy documented in
   reproducible tests and simulations.
 - Added an `unbounded_history` advisory warning when an effectively infinite
   policy retains every attempt record.
+- Added `severity` field (`"advisory"`, `"warning"`, or `"critical"`) to
+  `PolicyWarning`. Existing positional construction `PolicyWarning(code, message,
+  hint)` remains valid; `severity` defaults to `"warning"`. The field is
+  included in `to_dict()` output.
+- Added `has_critical` and `critical_count` properties to `PolicyHealthReport`.
+  `has_critical` is `True` when at least one warning has `critical` severity.
+  `risk_level` is now derived from severity rather than a separate code list:
+  `"risky"` when any critical warning is present, `"warning"` for any
+  non-critical warnings, `"ok"` when there are none.
+- Added `complete` and `skipped_checks` fields to `PolicyHealthReport`. When
+  a diagnostic check cannot run (for example, `high_total_sleep` simulation for
+  a policy with a custom delay callback), the check name appears in
+  `skipped_checks` and `complete` is `False`. `doctor()` and `warnings()` remain
+  non-blocking. Both fields are included in `to_dict()` output.
+- Diagnostic warnings that describe retry behaviour are now suppressed when the
+  stop strategy guarantees that no retry can occur (e.g. `attempts(1)`,
+  `max_time(0)`, or an `AnyStopStrategy` that includes an immediate stop
+  condition). Affected warnings: `no_delay`, `broad_exception`, `broad_os_error`,
+  `many_attempts`, `high_total_sleep`, `result_retry_without_observation`,
+  `missing_jitter`, `missing_retry_budget`, `silent_fallback`, and
+  `background_broad_exception`.
+- Documented `background_broad_exception` in `docs/guides/diagnostics.md` with
+  context, risk explanation, and mitigation alternatives.
 
 ### Changed
 

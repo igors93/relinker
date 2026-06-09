@@ -270,18 +270,23 @@ def _has_giveup_observer(policy: Any) -> bool:
     return any(name == "after_giveup" for name, _handler in policy.event_handlers)
 
 
-def compute_warnings(policy: Any) -> tuple[PolicyWarning, ...]:
+def _compute_diagnostics(
+    policy: Any,
+) -> tuple[tuple[PolicyWarning, ...], tuple[str, ...]]:
     """
-    Compute advisory warnings for the given policy.
+    Compute all advisory warnings and the names of any checks that could not run.
 
-    Accepts Any to avoid a circular import; the caller is always RetryPolicy.
+    Returns (warnings, skipped_checks). Internal; callers are compute_warnings
+    and doctor_policy.
     """
     warnings: list[PolicyWarning] = []
+    skipped: list[str] = []
 
     is_forever = _is_forever(policy)
     is_no_delay = _is_no_delay(policy)
     known_attempt_limit = _known_attempt_limit(policy.stop_strategy)
-    if _stops_after_first_attempt(policy.stop_strategy):
+    can_retry = not _stops_after_first_attempt(policy.stop_strategy)
+    if not can_retry:
         maximum_delay_attempts = 0
     elif known_attempt_limit is None:
         maximum_delay_attempts = None
@@ -311,6 +316,7 @@ def compute_warnings(policy: Any) -> tuple[PolicyWarning, ...]:
                     "three attempts, and no delay."
                 ),
                 hint="Specify exception types and a delay explicitly, or use a preset.",
+                severity="advisory",
             )
         )
 
@@ -320,15 +326,17 @@ def compute_warnings(policy: Any) -> tuple[PolicyWarning, ...]:
                 code="forever",
                 message="This policy can retry forever.",
                 hint="Use forever() only when the caller controls cancellation or shutdown.",
+                severity="warning",
             )
         )
 
-    if is_no_delay:
+    if can_retry and is_no_delay:
         warnings.append(
             PolicyWarning(
                 code="no_delay",
                 message="This policy has no delay between attempts.",
                 hint="Consider jitter or backoff for external services.",
+                severity="warning",
             )
         )
 
@@ -341,6 +349,7 @@ def compute_warnings(policy: Any) -> tuple[PolicyWarning, ...]:
                     "A tight retry loop can consume CPU and overload downstream services. "
                     "Add a delay, max_time(), or a cancellation-aware caller."
                 ),
+                severity="critical",
             )
         )
 
@@ -355,20 +364,22 @@ def compute_warnings(policy: Any) -> tuple[PolicyWarning, ...]:
                     "Use keep_history(n) to bound memory, or keep unlimited history only "
                     "when the caller guarantees prompt cancellation."
                 ),
+                severity="critical",
             )
         )
 
     is_broad_exception = _has_broad_exception(policy.condition)
-    if is_broad_exception:
+    if can_retry and is_broad_exception:
         warnings.append(
             PolicyWarning(
                 code="broad_exception",
                 message="This policy retries all Exception subclasses.",
                 hint="Prefer specific exception types when possible.",
+                severity="warning",
             )
         )
 
-    elif _has_broad_os_error(policy.condition):
+    elif can_retry and _has_broad_os_error(policy.condition):
         warnings.append(
             PolicyWarning(
                 code="broad_os_error",
@@ -380,20 +391,22 @@ def compute_warnings(policy: Any) -> tuple[PolicyWarning, ...]:
                     "Prefer the dependency's documented transient exceptions, or use "
                     "TimeoutError and ConnectionError when appropriate."
                 ),
+                severity="warning",
             )
         )
 
-    if _many_attempts(policy):
+    if can_retry and _many_attempts(policy):
         attempt_limit = _known_attempt_limit(policy.stop_strategy)
         warnings.append(
             PolicyWarning(
                 code="many_attempts",
                 message=f"This policy uses {attempt_limit} attempts.",
                 hint="High attempt counts increase load on downstream services during incidents.",
+                severity="warning",
             )
         )
 
-    if not is_forever:
+    if can_retry and not is_forever:
         try:
             sim_count = known_attempt_limit if known_attempt_limit is not None else 10
             simulation = policy.simulate(attempts=sim_count)
@@ -409,13 +422,15 @@ def compute_warnings(policy: Any) -> tuple[PolicyWarning, ...]:
                             "Verify that upstream services and callers can wait this long "
                             "before adding a stricter time limit."
                         ),
+                        severity="advisory",
                     )
                 )
         except Exception:  # noqa: BLE001
-            pass
+            skipped.append("high_total_sleep")
 
     if (
-        _has_result_condition(policy.condition)
+        can_retry
+        and _has_result_condition(policy.condition)
         and not policy.should_return_result
         and policy.exhausted_callback is None
         and policy.exhausted_exception_factory is None
@@ -433,11 +448,13 @@ def compute_warnings(policy: Any) -> tuple[PolicyWarning, ...]:
                     ".raise_on_result_exhausted() to observe when "
                     "result retry is exhausted."
                 ),
+                severity="warning",
             )
         )
 
     if (
-        _high_attempt_count(policy)
+        can_retry
+        and _high_attempt_count(policy)
         and _has_positive_deterministic_delay(policy.delay_strategy)
         and not has_effective_random
     ):
@@ -446,6 +463,7 @@ def compute_warnings(policy: Any) -> tuple[PolicyWarning, ...]:
                 code="missing_jitter",
                 message="This policy may synchronize retries across concurrent executions.",
                 hint="Consider adding jitter.",
+                severity="advisory",
             )
         )
 
@@ -461,10 +479,11 @@ def compute_warnings(policy: Any) -> tuple[PolicyWarning, ...]:
                     "Use seed=None when randomness should spread production retries; "
                     "keep fixed seeds for reproducible tests and simulations."
                 ),
+                severity="advisory",
             )
         )
 
-    if (is_forever or _high_attempt_count(policy)) and policy.retry_budget is None:
+    if can_retry and (is_forever or _high_attempt_count(policy)) and policy.retry_budget is None:
         warnings.append(
             PolicyWarning(
                 code="missing_retry_budget",
@@ -472,11 +491,13 @@ def compute_warnings(policy: Any) -> tuple[PolicyWarning, ...]:
                     "Under high concurrency, this policy may multiply load on a degraded service."
                 ),
                 hint="Consider a Retry Budget.",
+                severity="warning",
             )
         )
 
     if (
-        policy.exhausted_callback is not None
+        can_retry
+        and policy.exhausted_callback is not None
         and not _has_giveup_observer(policy)
         and not policy.should_return_result
     ):
@@ -488,6 +509,7 @@ def compute_warnings(policy: Any) -> tuple[PolicyWarning, ...]:
                     "is configured."
                 ),
                 hint="Add on_giveup(), logging, or return_result() when you need visibility.",
+                severity="warning",
             )
         )
 
@@ -499,6 +521,7 @@ def compute_warnings(policy: Any) -> tuple[PolicyWarning, ...]:
                     "Retry Budget controls retry rate, but does not limit total operation duration."
                 ),
                 hint="Add a time or attempt limit if the operation must eventually stop.",
+                severity="warning",
             )
         )
 
@@ -508,11 +531,12 @@ def compute_warnings(policy: Any) -> tuple[PolicyWarning, ...]:
                 code="for_testing_with_max_time",
                 message="for_testing() removes real sleeps but does not advance time.",
                 hint="max_time() behavior may differ from production.",
+                severity="advisory",
             )
         )
 
     is_high_attempt = _high_attempt_count(policy)
-    if is_broad_exception and (is_forever or is_high_attempt):
+    if can_retry and is_broad_exception and (is_forever or is_high_attempt):
         warnings.append(
             PolicyWarning(
                 code="background_broad_exception",
@@ -521,12 +545,28 @@ def compute_warnings(policy: Any) -> tuple[PolicyWarning, ...]:
                     "Background jobs catching all exceptions can mask bugs and amplify load. "
                     "Consider narrowing the exception types or adding a circuit breaker."
                 ),
+                severity="critical",
             )
         )
 
-    return tuple(warnings)
+    return tuple(warnings), tuple(skipped)
+
+
+def compute_warnings(policy: Any) -> tuple[PolicyWarning, ...]:
+    """
+    Compute advisory warnings for the given policy.
+
+    Accepts Any to avoid a circular import; the caller is always RetryPolicy.
+    """
+    warnings, _ = _compute_diagnostics(policy)
+    return warnings
 
 
 def doctor_policy(policy: Any) -> PolicyHealthReport:
     """Return a human-friendly policy health report."""
-    return PolicyHealthReport(compute_warnings(policy))
+    warnings, skipped_checks = _compute_diagnostics(policy)
+    return PolicyHealthReport(
+        warnings=warnings,
+        complete=len(skipped_checks) == 0,
+        skipped_checks=skipped_checks,
+    )

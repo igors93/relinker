@@ -109,9 +109,7 @@ def test_http_transport_exception_retries_when_configured() -> None:
 
 def test_http_retry_after_is_capped_by_policy_maximum_delay() -> None:
     sleeps: list[float] = []
-    responses = iter(
-        [Response(429, {"Retry-After": "100"}), Response(200, {})]
-    )
+    responses = iter([Response(429, {"Retry-After": "100"}), Response(200, {})])
     policy = http_retry_policy(
         attempts=2,
         default_delay=1,

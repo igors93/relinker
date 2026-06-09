@@ -79,9 +79,7 @@ def test_multiple_configured_exception_types_are_independently_matched() -> None
             raise next(errors)
         return "ok"
 
-    policy = policy_without_sleep(
-        RetryPolicy().attempts(3).on(TimeoutError, ConnectionError)
-    )
+    policy = policy_without_sleep(RetryPolicy().attempts(3).on(TimeoutError, ConnectionError))
     assert policy.run(operation) == "ok"
     assert calls == 3
 

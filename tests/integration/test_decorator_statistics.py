@@ -56,9 +56,7 @@ def test_with_policy_creates_new_wrapper_without_mutating_original() -> None:
 
     original_policy = _without_sleep(RetryPolicy().attempts(1).on(TimeoutError))
     wrapped = original_policy(operation)
-    replacement = wrapped.with_policy(
-        _without_sleep(RetryPolicy().attempts(2).on(TimeoutError))
-    )
+    replacement = wrapped.with_policy(_without_sleep(RetryPolicy().attempts(2).on(TimeoutError)))
 
     assert replacement() == "ok"
     assert wrapped.retry_policy is original_policy
@@ -95,9 +93,9 @@ def test_retry_stats_record_success_and_attempt_count() -> None:
 
 
 def test_retry_stats_record_exhausted_failure() -> None:
-    wrapped = _without_sleep(
-        RetryPolicy().attempts(2).on(TimeoutError).return_result()
-    )(lambda: (_ for _ in ()).throw(TimeoutError("down")))
+    wrapped = _without_sleep(RetryPolicy().attempts(2).on(TimeoutError).return_result())(
+        lambda: (_ for _ in ()).throw(TimeoutError("down"))
+    )
 
     result = wrapped()
     assert result.exhausted is True

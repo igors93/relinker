@@ -51,13 +51,7 @@ def test_narrow_fixed_policy_can_receive_clean_complete_report() -> None:
 def test_seeded_random_delay_warning_is_exposed_for_production_policy() -> None:
     codes = {
         warning.code
-        for warning in (
-            RetryPolicy()
-            .attempts(3)
-            .on(TimeoutError)
-            .random_delay(seed=7)
-            .warnings()
-        )
+        for warning in (RetryPolicy().attempts(3).on(TimeoutError).random_delay(seed=7).warnings())
     }
     assert "seeded_random_delay" in codes
 
@@ -73,14 +67,7 @@ def test_testing_mode_suppresses_seeded_random_delay_warning() -> None:
 
 
 def test_unbounded_history_warning_is_critical_for_forever_policy() -> None:
-    warnings = (
-        RetryPolicy()
-        .forever()
-        .on(TimeoutError)
-        .fixed_delay(1)
-        .keep_history(None)
-        .warnings()
-    )
+    warnings = RetryPolicy().forever().on(TimeoutError).fixed_delay(1).keep_history(None).warnings()
     by_code = {warning.code: warning for warning in warnings}
     assert by_code["unbounded_history"].severity == "critical"
 

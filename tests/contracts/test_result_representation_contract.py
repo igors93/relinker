@@ -96,9 +96,8 @@ def test_error_types_preserve_first_seen_distinct_order() -> None:
 
 def test_summary_excludes_exception_messages_and_values() -> None:
     secret = "token=super-secret"
-    result = (
-        policy_without_sleep(RetryPolicy().attempts(1).return_result())
-        .run(lambda: (_ for _ in ()).throw(RuntimeError(secret)))
+    result = policy_without_sleep(RetryPolicy().attempts(1).return_result()).run(
+        lambda: (_ for _ in ()).throw(RuntimeError(secret))
     )
     summary = result.summary()
     assert secret not in repr(summary)
@@ -108,8 +107,11 @@ def test_summary_excludes_exception_messages_and_values() -> None:
 
 def test_to_dict_redacts_top_level_and_attempt_error_messages() -> None:
     secret = "private-payload"
-    result = RetryPolicy().attempts(1).return_result().run(
-        lambda: (_ for _ in ()).throw(RuntimeError(secret))
+    result = (
+        RetryPolicy()
+        .attempts(1)
+        .return_result()
+        .run(lambda: (_ for _ in ()).throw(RuntimeError(secret)))
     )
     data = result.to_dict(include_error_message=False)
     assert data["error"] == {"type": "RuntimeError", "message": None}
@@ -118,8 +120,11 @@ def test_to_dict_redacts_top_level_and_attempt_error_messages() -> None:
 
 
 def test_to_json_is_valid_json_with_redaction() -> None:
-    result = RetryPolicy().attempts(1).return_result().run(
-        lambda: (_ for _ in ()).throw(RuntimeError("secret"))
+    result = (
+        RetryPolicy()
+        .attempts(1)
+        .return_result()
+        .run(lambda: (_ for _ in ()).throw(RuntimeError("secret")))
     )
     data = json.loads(result.to_json(include_error_message=False))
     assert data["failed"] is True
@@ -141,8 +146,11 @@ def test_to_dict_includes_value_only_when_requested() -> None:
 
 def test_story_can_redact_exception_message() -> None:
     secret = "password=123"
-    result = RetryPolicy().attempts(1).return_result().run(
-        lambda: (_ for _ in ()).throw(RuntimeError(secret))
+    result = (
+        RetryPolicy()
+        .attempts(1)
+        .return_result()
+        .run(lambda: (_ for _ in ()).throw(RuntimeError(secret)))
     )
     story = result.story(include_error_message=False)
     assert "RuntimeError" in story

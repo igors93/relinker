@@ -85,9 +85,7 @@ def test_or_condition_can_retry_exception_then_rejected_result() -> None:
 
 def test_rejected_result_exhaustion_returns_last_value_by_default() -> None:
     values = iter(["a", "b", "c"])
-    policy = policy_without_sleep(
-        RetryPolicy().attempts(3).retry_if_result(lambda _: True)
-    )
+    policy = policy_without_sleep(RetryPolicy().attempts(3).retry_if_result(lambda _: True))
     assert policy.run(lambda: next(values)) == "c"
 
 
@@ -109,11 +107,7 @@ def test_rejected_result_exhaustion_error_contains_retry_result() -> None:
 
 def test_return_result_exposes_result_exhaustion_flags() -> None:
     result = (
-        policy_without_sleep(
-            RetryPolicy()
-            .attempts(2)
-            .retry_if_result(lambda value: value < 10)
-        )
+        policy_without_sleep(RetryPolicy().attempts(2).retry_if_result(lambda value: value < 10))
         .return_result()
         .run(lambda: 1)
     )

@@ -108,29 +108,15 @@ def test_stateful_delay_receives_last_exception_and_retry_cause() -> None:
         return "ok"
 
     policy = (
-        RetryPolicy()
-        .attempts(2)
-        .on(TimeoutError)
-        .stateful_delay(delay)
-        .with_sleep(lambda _: None)
+        RetryPolicy().attempts(2).on(TimeoutError).stateful_delay(delay).with_sleep(lambda _: None)
     )
     assert policy.run(operation) == "ok"
     assert observed == [(TimeoutError, "exception")]
 
 
 def test_seeded_random_delay_is_repeatable_across_equivalent_policies() -> None:
-    first = (
-        RetryPolicy()
-        .attempts(4)
-        .random_delay(minimum=1, maximum=2, seed=42)
-        .simulate(4)
-    )
-    second = (
-        RetryPolicy()
-        .attempts(4)
-        .random_delay(minimum=1, maximum=2, seed=42)
-        .simulate(4)
-    )
+    first = RetryPolicy().attempts(4).random_delay(minimum=1, maximum=2, seed=42).simulate(4)
+    second = RetryPolicy().attempts(4).random_delay(minimum=1, maximum=2, seed=42).simulate(4)
     assert [item.delay_before_next_attempt for item in first.attempts] == [
         item.delay_before_next_attempt for item in second.attempts
     ]

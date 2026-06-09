@@ -10,9 +10,7 @@ from ._support import policy_without_sleep
 
 
 def test_fallback_is_not_applied_to_non_retryable_exception() -> None:
-    policy = policy_without_sleep(
-        RetryPolicy().attempts(3).on(TimeoutError).fallback_value("safe")
-    )
+    policy = policy_without_sleep(RetryPolicy().attempts(3).on(TimeoutError).fallback_value("safe"))
 
     with pytest.raises(ValueError, match="permanent"):
         policy.run(lambda: (_ for _ in ()).throw(ValueError("permanent")))
@@ -25,9 +23,7 @@ def test_fallback_callback_receives_complete_retry_result() -> None:
         received.append(result)
         return "safe"
 
-    policy = policy_without_sleep(
-        RetryPolicy().attempts(2).on(TimeoutError).fallback(fallback)
-    )
+    policy = policy_without_sleep(RetryPolicy().attempts(2).on(TimeoutError).fallback(fallback))
     assert policy.run(lambda: (_ for _ in ()).throw(TimeoutError("down"))) == "safe"
     assert len(received) == 1
     assert received[0].exhausted_by_exception is True
@@ -36,9 +32,7 @@ def test_fallback_callback_receives_complete_retry_result() -> None:
 
 
 def test_fallback_value_can_explicitly_be_none() -> None:
-    policy = policy_without_sleep(
-        RetryPolicy().attempts(1).on(TimeoutError).fallback_value(None)
-    )
+    policy = policy_without_sleep(RetryPolicy().attempts(1).on(TimeoutError).fallback_value(None))
     assert policy.run(lambda: (_ for _ in ()).throw(TimeoutError("down"))) is None
 
 
@@ -85,10 +79,7 @@ def test_custom_exception_factory_receives_exhausted_result() -> None:
 
 def test_invalid_exception_factory_result_is_rejected() -> None:
     policy = policy_without_sleep(
-        RetryPolicy()
-        .attempts(1)
-        .on(TimeoutError)
-        .on_exhausted_raise(lambda _: "not an exception")  # type: ignore[arg-type]
+        RetryPolicy().attempts(1).on(TimeoutError).on_exhausted_raise(lambda _: "not an exception")  # type: ignore[arg-type]
     )
     with pytest.raises(InvalidRetryConfigError, match="BaseException"):
         policy.run(lambda: (_ for _ in ()).throw(TimeoutError("down")))
@@ -114,9 +105,7 @@ async def test_async_fallback_receives_exhausted_result() -> None:
     async def operation() -> None:
         raise TimeoutError("down")
 
-    policy = policy_without_sleep(
-        RetryPolicy().attempts(2).on(TimeoutError).fallback(fallback)
-    )
+    policy = policy_without_sleep(RetryPolicy().attempts(2).on(TimeoutError).fallback(fallback))
     assert await policy.run_async(operation) == "safe"
     assert received[0].attempt_count == 2
 

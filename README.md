@@ -125,6 +125,34 @@ Presets are regular policies. You can keep customizing them:
 policy = network().attempts(8).fallback_value({"status": "offline"})
 ```
 
+### Grow into a production policy
+
+When the configuration outgrows one line, build it explicitly.
+Each method adds one constraint; the result is a reusable, inspectable object:
+
+```python
+from relinker import RetryPolicy
+
+policy = (
+    RetryPolicy()
+    .attempts(5)
+    .on(TimeoutError, ConnectionError)
+    .exponential_delay(base=1, maximum=30)
+    .jitter(maximum=0.5)
+    .fallback_value({"status": "unavailable"})
+)
+
+result = policy.run(fetch_data)
+```
+
+Before this reaches production, ask Relinker what it will do:
+
+```python
+print(policy.explain())           # plain-language description
+print(policy.preview(attempts=5)) # estimated timing per attempt
+print(policy.doctor().describe()) # flagged risks, if any
+```
+
 ### Share a retry budget
 
 A retry budget limits additional attempts across executions that share the same
@@ -147,26 +175,6 @@ policy = (
 `RetryBudget` is in-memory and process-local. Separate processes do not share
 capacity. Normal policy delays and `max_time()` continue to apply. See
 [Retry budgets](docs/concepts/retry-budgets.md) for the complete behavior and scope.
-
-### Grow into a production policy
-
-When the configuration outgrows one line, build it explicitly.
-Each method adds one constraint; the result is a reusable, inspectable object:
-
-```python
-from relinker import RetryPolicy
-
-policy = (
-    RetryPolicy()
-    .attempts(5)
-    .on(TimeoutError, ConnectionError)
-    .exponential_delay(base=1, maximum=30)
-    .jitter(maximum=0.5)
-    .fallback_value({"status": "unavailable"})
-)
-
-result = policy.run(fetch_data)
-```
 
 ---
 

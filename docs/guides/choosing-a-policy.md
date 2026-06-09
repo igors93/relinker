@@ -6,28 +6,36 @@ A quick reference to help you decide what to use.
 
 ## Entry point by configuration size
 
-`retry()`, presets, and `RetryPolicy()` are three ways to build the same object.
-The choice is about how much configuration you need, not about which tier of the library you are using.
+All three entry points use `RetryPolicy` under the hood and share the same runtime
+semantics. The choice is about how much configuration you need, not about which tier
+of the library you are using.
 
 Use `retry()` when the configuration fits on one line:
 
 ```python
+from relinker import retry
+
 @retry(attempts=3, delay=1, on=(TimeoutError,))
-def fetch_data() -> str: ...
+def fetch_data() -> str:
+    ...
 ```
 
 Use a preset when the operation matches a common scenario:
 
 ```python
-policy = network()          # 5 attempts, exponential backoff, network error types
-policy = database()         # 4 attempts, short delays, same error types
-policy = background_job()   # 10 attempts, longer delays
+from relinker import background_job, database, network
+
+network_policy = network()       # 5 attempts, exponential backoff, network error types
+database_policy = database()     # 4 attempts, short delays, same error types
+worker_policy = background_job() # 10 attempts, longer delays
 ```
 
 Use `RetryPolicy()` when the configuration is reused, grows beyond one line, or needs
 production observability:
 
 ```python
+from relinker import RetryPolicy
+
 policy = (
     RetryPolicy()
     .attempts(5)
@@ -41,7 +49,7 @@ policy = (
 Presets return `RetryPolicy` objects. You can extend any preset with any method:
 
 ```python
-policy = network().attempts(10).max_time(60).with_structured_logging()
+api_policy = network().attempts(10).max_time(60).with_structured_logging()
 ```
 
 ---

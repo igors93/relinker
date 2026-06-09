@@ -78,8 +78,9 @@ policy = network().attempts(8).fallback_value({"status": "offline"})
 ## Use a reusable policy
 
 When a policy needs to be shared, extended, or configured beyond a single decorator call,
-build it explicitly with `RetryPolicy()`. This is the same object `retry()` and presets
-build under the hood — just with full control over every setting:
+build it explicitly with `RetryPolicy()`. All three entry points use `RetryPolicy` under
+the hood and share the same runtime semantics — the difference is only how much
+configuration is written explicitly:
 
 ```python
 from relinker import RetryPolicy
@@ -121,12 +122,12 @@ production_policy = (
 
 ## Before production
 
-Always inspect policies before they affect real services:
+Always inspect the policy that will actually run in production:
 
 ```python
-print(policy.explain())         # plain-language description
-print(policy.preview(attempts=5))  # estimated timing
-print(policy.doctor().describe())  # known risks
+print(production_policy.explain())            # plain-language description
+print(production_policy.preview(attempts=5))  # estimated timing
+print(production_policy.doctor().describe())  # known risks
 ```
 
 This is the main difference between Relinker and a hidden retry loop: Relinker

@@ -231,9 +231,7 @@ async def execute_async(
             )
             if policy.should_return_result:
                 return result
-            if policy.should_raise_last:
-                raise error
-            return None
+            raise error
 
         if should_stop:
             result = runtime.result(

@@ -51,7 +51,11 @@ from relinker.event import (
 from relinker.exceptions import InvalidRetryConfigError
 from relinker.executors.async_ import execute_async
 from relinker.executors.sync import execute_sync
-from relinker.internal.callables import ensure_retryable_callable, is_async_callable
+from relinker.internal.callables import (
+    ensure_retryable_callable,
+    ensure_sync_retryable_callable,
+    is_async_callable,
+)
 from relinker.internal.sleep import async_sleep as default_async_sleep
 from relinker.internal.sleep import sleep as default_sleep
 from relinker.result import RetryResult
@@ -858,7 +862,7 @@ class RetryPolicy(Generic[T]):
 
     def run(self, function: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> Any:
         """Run a synchronous function with this policy."""
-        ensure_retryable_callable(function)
+        ensure_sync_retryable_callable(function)
         return execute_sync(self, function, *args, **kwargs)
 
     async def run_async(

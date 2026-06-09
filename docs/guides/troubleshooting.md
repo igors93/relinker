@@ -80,6 +80,21 @@ for it.
 
 ---
 
+## "run() rejected my async function"
+
+`run()` executes synchronous callables. Coroutine functions and objects with
+`async __call__` must use `run_async()`:
+
+```python
+result = await policy.run_async(fetch_user)
+```
+
+Relinker rejects an async callable before an attempt starts so the coroutine is
+not returned unexecuted and retry events or statistics are not recorded for an
+API usage error.
+
+---
+
 ## "The function retried more times than I expected"
 
 **1. Attempts counts total calls, not retries.**

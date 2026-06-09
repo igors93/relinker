@@ -41,6 +41,10 @@ result = await (
 )
 ```
 
+`run()` is the synchronous entrypoint. Passing a coroutine function or an object
+with `async __call__` to `run()` raises `InvalidRetryConfigError` before an
+attempt starts. Use `await policy.run_async(...)` for asynchronous callables.
+
 ## Async context manager
 
 Use `async_iter()` to retry a block of async code:

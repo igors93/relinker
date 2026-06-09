@@ -64,3 +64,12 @@ def ensure_retryable_callable(function: Any) -> None:
             "Async generator functions are not supported; use a factory that returns a fresh "
             "async generator inside a retried function."
         )
+
+
+def ensure_sync_retryable_callable(function: Any) -> None:
+    """Reject callable kinds that cannot run through the synchronous entrypoint."""
+    ensure_retryable_callable(function)
+    if is_async_callable(function):
+        raise InvalidRetryConfigError(
+            "run() does not accept async callables; use await policy.run_async(...) instead"
+        )

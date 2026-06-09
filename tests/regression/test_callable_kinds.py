@@ -50,6 +50,55 @@ def test_run_rejects_generator_function_before_returning_unprotected_generator()
         policy.run(generator_task)
 
 
+def test_run_rejects_async_function_before_starting_execution() -> None:
+    events: list[str] = []
+
+    async def async_task() -> str:
+        return "ok"
+
+    policy = RetryPolicy().on_before_attempt(lambda event: events.append(event.name))
+
+    with pytest.raises(
+        InvalidRetryConfigError,
+        match=r"run\(\) does not accept async callables.*run_async",
+    ):
+        result = policy.run(async_task)
+        if inspect.iscoroutine(result):
+            result.close()
+
+    assert events == []
+
+
+def test_run_rejects_async_callable_object() -> None:
+    class AsyncCallable:
+        async def __call__(self) -> str:
+            return "ok"
+
+    with pytest.raises(
+        InvalidRetryConfigError,
+        match=r"run\(\) does not accept async callables.*run_async",
+    ):
+        result = RetryPolicy().run(AsyncCallable())
+        if inspect.iscoroutine(result):
+            result.close()
+
+
+def test_run_rejects_partial_async_callable_object() -> None:
+    class AsyncOperation:
+        async def __call__(self, value: int) -> int:
+            return value + 1
+
+    operation = partial(AsyncOperation(), 1)
+
+    with pytest.raises(
+        InvalidRetryConfigError,
+        match=r"run\(\) does not accept async callables.*run_async",
+    ):
+        result = RetryPolicy().run(operation)
+        if inspect.iscoroutine(result):
+            result.close()
+
+
 def test_sync_callable_object_executes_as_sync_wrapper() -> None:
     class SyncCallable:
         def __call__(self, value: int) -> int:

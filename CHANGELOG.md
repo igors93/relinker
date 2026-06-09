@@ -8,6 +8,11 @@ the compatibility and deprecation policy documented in
 
 ## Unreleased
 
+### Fixed
+
+- `RetryPolicy.run()` now rejects coroutine functions and async callable objects
+  before execution instead of returning an unexecuted coroutine.
+
 ## 1.2.0 - 2026-06-08
 
 ### Added

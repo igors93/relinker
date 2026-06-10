@@ -52,6 +52,7 @@ from relinker.exceptions import InvalidRetryConfigError
 from relinker.executors.async_ import execute_async
 from relinker.executors.sync import execute_sync
 from relinker.internal.callables import (
+    ensure_callable,
     ensure_retryable_callable,
     ensure_sync_retryable_callable,
     is_async_callable,
@@ -303,6 +304,7 @@ class RetryPolicy(Generic[T]):
 
     def retry_if_result(self, predicate: Callable[[Any], bool]) -> RetryPolicy[T]:
         """Return a new policy that retries when a result predicate is true."""
+        ensure_callable("predicate", predicate)
         return replace(self, condition=ResultCondition(predicate))
 
     def retry_if(self, callback: Callable[[BaseException | None, Any], bool]) -> RetryPolicy[T]:
@@ -314,6 +316,7 @@ class RetryPolicy(Generic[T]):
         error is None and value is the returned value; value may be None when
         the wrapped function returned None.
         """
+        ensure_callable("callback", callback)
         return replace(self, condition=CustomCondition(callback))
 
     def any_condition(self, *conditions: RetryCondition) -> RetryPolicy[T]:
@@ -445,6 +448,7 @@ class RetryPolicy(Generic[T]):
 
     def custom_delay(self, callback: Callable[[int], float]) -> RetryPolicy[T]:
         """Return a new policy with a custom delay callback (receives attempt number)."""
+        ensure_callable("callback", callback)
         return replace(self, delay_strategy=CustomDelay(callback))
 
     def stateful_delay(self, callback: StatefulDelayCallback) -> RetryPolicy[T]:
@@ -455,6 +459,7 @@ class RetryPolicy(Generic[T]):
         return a non-negative float (seconds). This enables delays that adapt
         based on the last error, last value, elapsed time, or response headers.
         """
+        ensure_callable("callback", callback)
         return replace(self, delay_strategy=StatefulCustomDelay(callback))
 
     # -------------------------------------------------- exhausted behavior
@@ -508,6 +513,7 @@ class RetryPolicy(Generic[T]):
         The callback receives RetryResult and its return value becomes the final
         return value.
         """
+        ensure_callable("callback", callback)
         return self._replace_exhaustion(
             exhausted_callback=callback,
         )
@@ -607,6 +613,9 @@ class RetryPolicy(Generic[T]):
 
         Useful for tests (with no_sleep()) and advanced integrations.
         """
+        ensure_callable("sleep", sleep)
+        if async_sleep is not None:
+            ensure_callable("async_sleep", async_sleep)
         resolved_async_sleep = async_sleep
         if resolved_async_sleep is None:
             resolved_async_sleep = default_async_sleep if self.testing_mode else self.async_sleep
@@ -642,6 +651,7 @@ class RetryPolicy(Generic[T]):
         failure_mode: EventFailureMode = "propagate",
     ) -> RetryPolicy[T]:
         """Return a new policy with an additional event handler."""
+        ensure_callable("handler", handler)
         if is_async_callable(handler):
             raise InvalidRetryConfigError(
                 "Async event handlers are not supported; use a synchronous handler."
@@ -671,17 +681,26 @@ class RetryPolicy(Generic[T]):
         """Return a new policy that calls handler when Relinker gives up."""
         return self.on_event("after_giveup", handler)
 
-    def debug(self) -> RetryPolicy[T]:
-        """Return a new policy with simple console debug events enabled."""
+    def debug(self, *, include_error_message: bool = False) -> RetryPolicy[T]:
+        """
+        Return a new policy with simple console debug events enabled.
+
+        Error messages are excluded by default because they may contain secrets,
+        tokens, URLs, or payload fragments. Set ``include_error_message=True``
+        when you explicitly need the message text and have verified it is safe.
+        """
 
         def print_event(event: RetryEvent) -> None:
             if event.name == "before_attempt":
                 print(f"[relinker] attempt {event.attempt_number} started: {event.function_name}")
             elif event.name == "after_failure" and event.error is not None:
-                message = (
-                    f"[relinker] attempt {event.attempt_number} failed: "
-                    f"{event.error.__class__.__name__}: {event.error}"
-                )
+                error_part = event.error.__class__.__name__
+                if include_error_message:
+                    try:
+                        error_part += f": {event.error}"
+                    except Exception:  # noqa: BLE001
+                        error_part += ": <error rendering message>"
+                message = f"[relinker] attempt {event.attempt_number} failed: {error_part}"
                 print(message)
             elif event.name == "before_sleep" and event.delay is not None:
                 print(f"[relinker] sleeping {event.delay:.4f}s before next attempt")
@@ -706,17 +725,22 @@ class RetryPolicy(Generic[T]):
         *,
         level: int = logging.WARNING,
         logger: logging.Logger | None = None,
+        include_error_message: bool = False,
     ) -> RetryPolicy[T]:
         """
         Return a new policy that logs retry activity using the standard library.
 
         Logs before each sleep and after giving up. Successful first attempts are
         not logged to avoid noise.
+
+        Error messages are excluded by default because they may contain secrets,
+        tokens, URLs, or payload fragments. Set ``include_error_message=True``
+        when you explicitly need the message text and have verified it is safe to log.
         """
         from relinker.internal.policy_logging import make_logging_handler
 
         _logger = logger if logger is not None else logging.getLogger("relinker")
-        handler = make_logging_handler(level, _logger)
+        handler = make_logging_handler(level, _logger, include_error_message=include_error_message)
         policy: RetryPolicy[T] = self
         for event_name in ("before_sleep", "after_giveup"):
             policy = policy.on_event(event_name, handler, failure_mode="isolate")
@@ -747,6 +771,18 @@ class RetryPolicy(Generic[T]):
         for event_name in ("before_sleep", "after_giveup"):
             policy = policy.on_event(event_name, handler, failure_mode="isolate")
         return policy
+
+    def _has_handler(self, name: EventName) -> bool:
+        """Return True when at least one handler is registered for the given event name."""
+        for registration in self.event_handlers:
+            if isinstance(registration, EventHandlerRegistration):
+                if registration.name == name:
+                    return True
+            else:
+                reg_name, _ = registration
+                if reg_name == name:
+                    return True
+        return False
 
     def emit(self, event: RetryEvent) -> None:
         """Emit an event to all matching handlers."""

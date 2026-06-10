@@ -33,6 +33,12 @@ def is_async_callable(function: Any) -> bool:
     return inspect.iscoroutinefunction(_unwrap_partial(call))
 
 
+def ensure_callable(name: str, value: Any) -> None:
+    """Raise when value is not callable."""
+    if not callable(value):
+        raise InvalidRetryConfigError(f"{name} must be callable, got {type(value).__name__}")
+
+
 def ensure_retryable_callable(function: Any) -> None:
     """Reject callable kinds that Relinker cannot retry safely."""
     target = _unwrap_partial(function)
@@ -51,7 +57,7 @@ def ensure_retryable_callable(function: Any) -> None:
         return
 
     if not callable(target):
-        return
+        raise InvalidRetryConfigError(f"function must be callable, got {type(target).__name__}")
 
     call = type(target).__call__
     call_target = _unwrap_partial(call)

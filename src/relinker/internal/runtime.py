@@ -100,6 +100,9 @@ class RetryRuntime:
             policy_delay=policy_delay,
             budget_delay=budget_delay,
             policy_name=self.policy_name,
+            total_attempts=self.attempt_number,
+            total_failed_attempts=self.failed_count,
+            total_successful_attempts=self.success_count,
         )
 
     def result(

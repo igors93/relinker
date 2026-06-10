@@ -41,7 +41,7 @@ async def execute_async(
                 name="before_attempt",
                 attempt_number=attempt_number,
                 function_name=runtime.function_name,
-                state=runtime.state(),
+                state=runtime.state() if policy._has_handler("before_attempt") else None,
             )
         )
         attempt_started_at = now()

@@ -5,7 +5,7 @@ Result objects for retry executions.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Generic, Literal, cast
 
 from relinker.attempt import AttemptRecord
@@ -29,11 +29,17 @@ class RetryResult(Generic[T]):
 
         When a policy uses bounded history, `attempts` contains only the retained
         records. Aggregate counters still describe the complete execution.
+
+    Security note:
+        ``value`` and ``error`` are excluded from ``repr()`` because they may
+        contain secrets, tokens, or sensitive user data. Use ``to_dict()``,
+        ``to_json()``, or ``story()`` for controlled serialisation with explicit
+        ``include_error_message`` and ``include_value`` options.
     """
 
     attempts: tuple[AttemptRecord, ...]
-    value: T | None = None
-    error: BaseException | None = None
+    value: T | None = field(default=None, repr=False)
+    error: BaseException | None = field(default=None, repr=False)
     started_at: float = 0.0
     ended_at: float = 0.0
     exhausted: bool = False

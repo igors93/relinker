@@ -17,6 +17,9 @@ from time import monotonic as _monotonic
 from relinker.exceptions import InvalidRetryConfigError
 from relinker.internal.validation import ensure_positive, ensure_positive_int
 
+# Amortized cleanup: scan for expired keys every N lock-guarded operations.
+_CLEANUP_INTERVAL = 100
+
 
 @dataclass(frozen=True, slots=True)
 class RetryBudgetSnapshot:
@@ -60,6 +63,7 @@ class RetryBudget:
         self._lock = Lock()
         self._reservations: dict[str, deque[_RetryReservation]] = {}
         self._next_token = 1
+        self._op_count = 0
 
     @property
     def max_retries(self) -> int:
@@ -76,6 +80,7 @@ class RetryBudget:
         self._validate_key(key)
         current = _monotonic()
         with self._lock:
+            self._maybe_cleanup(current)
             reservations = self._reservations.get(key)
             if reservations is None:
                 active = 0
@@ -118,6 +123,7 @@ class RetryBudget:
             reservations = self._reservations.setdefault(key, deque())
             current = float(current_time)
             candidate = max(current, float(not_before))
+            self._maybe_cleanup(current)
             self._prune(reservations, current)
             scheduled_times = sorted(item.scheduled_at for item in reservations)
             candidate = self._first_legal_slot(candidate, scheduled_times)
@@ -133,13 +139,15 @@ class RetryBudget:
 
     def _release(self, reservation: _RetryReservation) -> None:
         """Release one unused reservation; repeated cleanup is harmless."""
+        current_time = _monotonic()
         with self._lock:
+            self._maybe_cleanup(current_time)
             reservations = self._reservations.get(reservation.key)
             if not reservations:
                 return
 
-            for index, current in enumerate(reservations):
-                if current.token == reservation.token:
+            for index, item in enumerate(reservations):
+                if item.token == reservation.token:
                     del reservations[index]
                     break
 
@@ -156,6 +164,39 @@ class RetryBudget:
         keep = [r for r in reservations if r.scheduled_at > boundary]
         reservations.clear()
         reservations.extend(keep)
+
+    def cleanup(self) -> None:
+        """Remove all keys with no active or future reservations.
+
+        Relinker performs incremental cleanup automatically. Call this when you
+        want to release memory immediately, for example at the end of a request
+        or a maintenance job.
+        """
+        current = _monotonic()
+        with self._lock:
+            self._cleanup_expired_keys(current)
+
+    def _cleanup_expired_keys(self, current: float) -> None:
+        """Remove keys whose every reservation has expired. Must be called under the lock."""
+        boundary = current - self._per
+        expired_keys = [
+            key
+            for key, reservations in self._reservations.items()
+            if not reservations or all(r.scheduled_at <= boundary for r in reservations)
+        ]
+        for key in expired_keys:
+            del self._reservations[key]
+
+    def _maybe_cleanup(self, current: float) -> None:
+        """Amortized cleanup: remove fully-expired keys every _CLEANUP_INTERVAL operations.
+
+        Must be called under the lock. Does not hold the lock during any external code
+        or I/O — only pure dictionary iteration is performed.
+        """
+        self._op_count += 1
+        if self._op_count >= _CLEANUP_INTERVAL:
+            self._op_count = 0
+            self._cleanup_expired_keys(current)
 
     def _validate_key(self, key: str) -> None:
         if not isinstance(key, str) or not key.strip():

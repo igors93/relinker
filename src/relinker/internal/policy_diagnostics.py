@@ -266,6 +266,22 @@ def _has_max_time(strategy: Any) -> bool:
     return False
 
 
+def _has_unbounded_exponential(strategy: Any) -> bool:
+    """Return True when the delay tree contains an exponential delay with no maximum cap."""
+    stack = [strategy]
+    while stack:
+        current = stack.pop()
+        if isinstance(current, (ExponentialDelay, RandomExponentialDelay)):
+            if current.maximum is None and current.base > 0 and current.factor > 1:
+                return True
+        elif isinstance(current, (AdditiveDelay, ChainDelay)):
+            inner = current.strategies if isinstance(current, AdditiveDelay) else current.delays
+            for item in inner:
+                if not isinstance(item, (int, float)):
+                    stack.append(item)
+    return False
+
+
 def _has_giveup_observer(policy: Any) -> bool:
     return any(name == "after_giveup" for name, _handler in policy.event_handlers)
 
@@ -350,6 +366,21 @@ def _compute_diagnostics(
                     "Add a delay, max_time(), or a cancellation-aware caller."
                 ),
                 severity="critical",
+            )
+        )
+
+    if is_forever and _has_unbounded_exponential(policy.delay_strategy):
+        warnings.append(
+            PolicyWarning(
+                code="unbounded_exponential_with_forever",
+                message=(
+                    "This policy uses forever() with exponential backoff and no maximum delay cap."
+                ),
+                hint=(
+                    "Without maximum=, the delay saturates at a large finite ceiling once the "
+                    "exponent overflows. Set maximum= explicitly to control the sleep ceiling."
+                ),
+                severity="advisory",
             )
         )
 

@@ -94,7 +94,11 @@ async def test_async_resolved_delay_is_validated_before_sleep_and_retry(delay: o
     assert sleeps == []
 
 
-def test_exponential_overflow_is_rejected_before_infinite_sleep() -> None:
+def test_exponential_overflow_saturates_instead_of_raising() -> None:
+    # Fix 4: overflow now saturates at _SAFE_DELAY_CAP rather than producing inf
+    # and raising InvalidRetryConfigError.  All attempts still complete.
+    from relinker.delays.exponential import _SAFE_DELAY_CAP
+
     calls: list[str] = []
     sleeps: list[float] = []
     policy = (
@@ -105,14 +109,13 @@ def test_exponential_overflow_is_rejected_before_infinite_sleep() -> None:
         .with_sleep(sleeps.append)
     )
 
-    with pytest.raises(
-        InvalidRetryConfigError,
-        match="resolved delay must be a finite non-negative number",
-    ):
+    with pytest.raises(ValueError):
         policy.run(lambda: _always_fails(calls))
 
-    assert calls == ["call", "call"]
-    assert sleeps == [sys.float_info.max]
+    assert calls == ["call", "call", "call"]
+    assert len(sleeps) == 2
+    assert sleeps[0] == sys.float_info.max  # attempt 1: base * factor**0 = base (finite)
+    assert sleeps[1] == _SAFE_DELAY_CAP  # attempt 2: overflow → saturated
 
 
 def test_additive_delay_overflow_is_rejected_before_sleep() -> None:

@@ -53,7 +53,9 @@ def record_failure_and_emit(
                 retry_cause="exception",
                 will_retry=should_retry and not should_stop,
                 will_stop=should_stop,
-            ),
+            )
+            if policy._has_handler("after_failure")
+            else None,
         )
     )
     return should_stop

@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from random import Random
 
 from relinker.delays.base import DelayMixin
+from relinker.delays.exponential import _SAFE_DELAY_CAP
 from relinker.exceptions import InvalidRetryConfigError
 from relinker.internal.validation import ensure_non_negative, ensure_positive
 
@@ -48,6 +50,8 @@ class RandomExponentialDelay(DelayMixin):
             cap = float("inf")
         if self.maximum is not None:
             cap = min(cap, self.maximum)
+        elif not math.isfinite(cap):
+            cap = _SAFE_DELAY_CAP
 
         upper = max(self.minimum, cap)
         random = Random(self.seed + attempt_number if self.seed is not None else None)

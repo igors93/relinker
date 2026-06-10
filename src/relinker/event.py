@@ -9,7 +9,7 @@ any external dependency.
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Literal, TypeAlias
 
 from relinker.state import RetryState
@@ -37,14 +37,18 @@ class RetryEvent:
         value: Returned value, when applicable.
         error: Raised exception, when applicable.
         state: Rich immutable execution state.
+
+    Security note:
+        ``value`` and ``error`` are excluded from ``repr()`` because they may
+        contain secrets, tokens, or sensitive user data.
     """
 
     name: EventName
     attempt_number: int
     function_name: str
     delay: float | None = None
-    value: Any = None
-    error: BaseException | None = None
+    value: Any = field(default=None, repr=False)
+    error: BaseException | None = field(default=None, repr=False)
     state: RetryState | None = None
     policy_name: str | None = None
 

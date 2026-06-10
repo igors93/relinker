@@ -170,12 +170,18 @@ def test_with_logging_sleep_log_contains_delay(caplog: pytest.LogCaptureFixture)
 def test_with_logging_giveup_message_contains_error_message(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """The after_giveup log message should include error class and message."""
+    """The after_giveup log message includes error message when include_error_message=True."""
 
     def task() -> str:
         raise ValueError("bad argument")
 
-    policy = RetryPolicy().attempts(2).on(ValueError).fixed_delay(0).with_logging()
+    policy = (
+        RetryPolicy()
+        .attempts(2)
+        .on(ValueError)
+        .fixed_delay(0)
+        .with_logging(include_error_message=True)
+    )
 
     with caplog.at_level(logging.WARNING, logger="relinker"), pytest.raises(ValueError):
         policy.run(task)

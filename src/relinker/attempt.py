@@ -7,7 +7,7 @@ so users can inspect what happened after a run.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 
@@ -25,13 +25,18 @@ class AttemptRecord:
         has_value: True when the attempt produced a return value.
             Use this rather than checking ``value is not None`` because
             None is a valid function result.
+
+    Security note:
+        ``value`` and ``error`` are excluded from ``repr()`` because they may
+        contain secrets, tokens, or sensitive user data. Access them explicitly
+        via the attributes when detailed diagnostics are needed.
     """
 
     number: int
     started_at: float
     ended_at: float
-    value: Any = None
-    error: BaseException | None = None
+    value: Any = field(default=None, repr=False)
+    error: BaseException | None = field(default=None, repr=False)
     has_value: bool = False
 
     @property

@@ -18,12 +18,18 @@ from relinker.event import EventHandler, RetryEvent
 def make_logging_handler(
     level: int,
     logger: logging.Logger,
+    *,
+    include_error_message: bool = False,
 ) -> EventHandler:
     """
     Create an event handler that logs retry activity to a standard-library logger.
 
     Logs before each sleep (failure + upcoming retry) and after giveup/exhaustion.
     Successful attempts are not logged by default to keep noise low.
+
+    Error messages are excluded by default because they may contain secrets,
+    tokens, URLs, or payload fragments. Set ``include_error_message=True``
+    when you explicitly need the message text and have verified it is safe to log.
     """
 
     def handler(event: RetryEvent) -> None:
@@ -39,14 +45,23 @@ def make_logging_handler(
             )
         elif event.name == "after_giveup":
             if event.error is not None:
-                logger.log(
-                    level,
-                    "Giving up after attempt %d: %s: %s%s",
-                    event.attempt_number,
-                    event.error.__class__.__name__,
-                    event.error,
-                    policy_label,
-                )
+                if include_error_message:
+                    logger.log(
+                        level,
+                        "Giving up after attempt %d: %s: %s%s",
+                        event.attempt_number,
+                        event.error.__class__.__name__,
+                        event.error,
+                        policy_label,
+                    )
+                else:
+                    logger.log(
+                        level,
+                        "Giving up after attempt %d: %s%s",
+                        event.attempt_number,
+                        event.error.__class__.__name__,
+                        policy_label,
+                    )
             else:
                 logger.log(
                     level,

@@ -22,3 +22,13 @@ updates:
           - "mypy"
           - "build"
           - "hatchling"
+
+  - package-ecosystem: "pip"
+    directory: "/requirements"
+    schedule:
+      interval: "weekly"
+    groups:
+      build-tools:
+        patterns:
+          - "build"
+          - "twine"

@@ -1,4 +1,4 @@
-# Build backend pinned to an exact version with hash for reproducible builds.
+# Build backend and its runtime dependencies pinned with hashes for reproducible builds.
 # Used with: pip install --no-deps --only-binary :all: -r requirements/build-backend.txt
 # Then: python -m build --no-isolation
 # Dependabot monitors this file and can propose updates.
@@ -6,3 +6,5 @@
 
 hatchling==1.30.1 \
     --hash=sha256:161eacafb3c6f91526e92116d21426369f2c36e98c36a864f11a96345ad4ee31
+trove-classifiers==2026.6.1.19 \
+    --hash=sha256:ab4c4ec93cc4a4e7815fa759906e05e6bb3f2fbd92ea0f897288c6a43efd15b3

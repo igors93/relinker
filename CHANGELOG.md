@@ -8,6 +8,8 @@ the compatibility and deprecation policy documented in
 
 ## Unreleased
 
+## 1.3.0 - 2026-06-10
+
 ### Added
 
 - Added explicit error-message redaction to `RetryResult.to_dict()`,

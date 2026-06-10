@@ -16,7 +16,7 @@ import logging
 from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from dataclasses import dataclass, replace
-from typing import Any, Generic, Literal, cast, overload
+from typing import Any, Generic, Literal, overload
 
 from relinker.budget import RetryBudget
 from relinker.conditions.base import RetryCondition

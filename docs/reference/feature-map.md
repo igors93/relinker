@@ -24,7 +24,7 @@ A quick reference from need to API. All names listed here are stable exports.
 | Simple decorator | `@retry(attempts=n, delay=d, on=(Error,))` |
 | Reusable policy | `RetryPolicy()` |
 | Run a function | `policy.run(fn)` or `policy.run(fn, arg1, arg2)` |
-| Run an async function | `policy.run_async(fn)` or `await policy.run_async(fn)` |
+| Run an async function | `await policy.run_async(fn)` |
 | Decorate a function | `@policy` |
 
 ## Stop strategies
@@ -34,7 +34,7 @@ A quick reference from need to API. All names listed here are stable exports.
 | Limit total attempts | `.attempts(n)` |
 | Limit by elapsed time | `.max_time(seconds)` |
 | Retry indefinitely | `.forever()` |
-| Custom stop condition | `.stop_when(callback)` |
+| Custom stop strategy | `.stop_when(strategy)` |
 | Either condition stops | `.or_stop_after_attempts(n)` / `.or_stop_after_time(s)` |
 | Both conditions stop | `.and_stop_after_attempts(n)` / `.and_stop_after_time(s)` |
 
@@ -63,7 +63,7 @@ A quick reference from need to API. All names listed here are stable exports.
 | Custom function | `.custom_delay(lambda attempt: attempt * 0.5)` |
 | State-aware delay | `.stateful_delay(callback)` — receives `RetryState` |
 | Add jitter | `.jitter(maximum=0.5)` |
-| Add flat offset | `.add_delay(seconds)` |
+| Add another delay strategy | `.add_delay(strategy)` |
 
 ## HTTP helpers
 
@@ -74,7 +74,7 @@ A quick reference from need to API. All names listed here are stable exports.
 | Retry by status code | `.retry_if_result(retry_if_status({429, 500, 503}))` |
 | Respect `Retry-After` header | `.stateful_delay(retry_after_delay(default=1.0, maximum=60.0))` |
 | Parse `Retry-After` manually | `parse_retry_after(header_value, default=1.0)` |
-| Check one status code | `should_retry_http_status(code)` |
+| Check one status code | `should_retry_http_status(code, statuses)` |
 | Default retryable statuses | `DEFAULT_RETRYABLE_STATUSES` |
 | Default transport exception set | `DEFAULT_RETRYABLE_TRANSPORT_EXCEPTIONS` |
 | Maximum cap for Retry-After | `MAX_RETRY_AFTER_SECONDS` |
@@ -105,7 +105,7 @@ A quick reference from need to API. All names listed here are stable exports.
 | Need | API |
 |---|---|
 | Structured result object | `.return_result()` — returns `RetryResult` |
-| Enable history recording | `.keep_history()` |
+| Limit retained history | `.keep_history(maximum)` |
 | Attempt count | `result.attempt_count` |
 | Success/failure flag | `result.succeeded` / `result.failed` |
 | Total elapsed time | `result.total_time` |
@@ -135,7 +135,7 @@ A quick reference from need to API. All names listed here are stable exports.
 | Hook on failure | `.on_failure(handler)` |
 | Hook before sleep | `.on_retry(handler)` |
 | Hook when giving up | `.on_giveup(handler)` |
-| Generic event hook | `.on_event(handler)` |
+| Generic event hook | `.on_event(name, handler)` |
 | Name a policy | `.named("payments-api")` |
 
 ## Diagnostics and guidance

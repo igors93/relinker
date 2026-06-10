@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import warnings
 from functools import partial
 
@@ -77,9 +78,8 @@ class TestSyncSleeperContract:
                 policy.run(lambda: (_ for _ in ()).throw(ValueError("x")))
 
         runtime_warnings = [w for w in caught if issubclass(w.category, RuntimeWarning)]
-        assert not runtime_warnings, (
-            f"Got RuntimeWarning about unawaited coroutine: {[str(w.message) for w in runtime_warnings]}"
-        )
+        msgs = [str(w.message) for w in runtime_warnings]
+        assert not runtime_warnings, f"Got RuntimeWarning about unawaited coroutine: {msgs}"
 
     def test_sleeper_not_called_when_config_invalid(self) -> None:
         """If rejection happens at with_sleep() time, the sleeper is never invoked."""
@@ -88,7 +88,7 @@ class TestSyncSleeperContract:
             pass
 
         with pytest.raises(InvalidRetryConfigError):
-            policy = RetryPolicy().attempts(2).on(ValueError).with_sleep(bad_sleep)
+            RetryPolicy().attempts(2).on(ValueError).with_sleep(bad_sleep)
             # If we somehow got here, run() must not call bad_sleep
             # (but we expect the error above)
 
@@ -126,7 +126,7 @@ class TestAsyncSleeperContract:
         self._policy(AsyncSleeper())
 
     async def test_sync_function_returning_non_awaitable_raises_at_runtime(self) -> None:
-        """Sync function returning None as async_sleep must raise InvalidRetryConfigError, not TypeError."""
+        """Sync function returning None as async_sleep must raise InvalidRetryConfigError."""
 
         def returns_none(s: float) -> None:
             return None
@@ -200,10 +200,8 @@ class TestAsyncSleeperContract:
 
         coro = _done()
         # Drive it to completion
-        try:
+        with contextlib.suppress(StopIteration):
             coro.send(None)
-        except StopIteration:
-            pass
 
         # A new coroutine (not the completed one) should still work
         async def make_coro(s: float) -> None:

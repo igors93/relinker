@@ -7,6 +7,8 @@ state with function_name='<simulation>' and no error/value context.
 
 from __future__ import annotations
 
+import contextlib
+
 from relinker import RetryPolicy
 from relinker.delays.composite import AdditiveDelay
 from relinker.delays.fixed import FixedDelay
@@ -42,10 +44,8 @@ def test_stateful_plus_jitter_sees_real_last_error() -> None:
     )
 
     err = ValueError("real error")
-    try:
+    with contextlib.suppress(ValueError):
         policy.run(lambda: (_ for _ in ()).throw(err))
-    except ValueError:
-        pass
 
     assert captured, "callback was never called"
     state = captured[0]
@@ -66,10 +66,8 @@ def test_stateful_plus_jitter_sees_real_function_name() -> None:
 
     captured, callback = _capture_states()
     policy = RetryPolicy().attempts(2).on(OSError).stateful_delay(callback).jitter(maximum=0.0)
-    try:
+    with contextlib.suppress(OSError):
         policy.run(my_func)
-    except OSError:
-        pass
 
     assert captured
     assert captured[0].function_name == "my_func"
@@ -82,10 +80,8 @@ def test_stateful_plus_fixed_sees_real_state() -> None:
     policy = (
         RetryPolicy().attempts(2).on(ValueError).stateful_delay(callback).add_delay(FixedDelay(0.0))
     )
-    try:
+    with contextlib.suppress(ValueError):
         policy.run(lambda: (_ for _ in ()).throw(ValueError("x")))
-    except ValueError:
-        pass
 
     assert captured
     assert captured[0].last_error is not None
@@ -106,10 +102,8 @@ def test_fixed_plus_stateful_sees_real_state() -> None:
         RetryPolicy().attempts(2).on(ValueError),
         delay_strategy=additive,
     )
-    try:
+    with contextlib.suppress(ValueError):
         policy.run(lambda: (_ for _ in ()).throw(ValueError("x")))
-    except ValueError:
-        pass
 
     assert captured
     assert captured[0].last_error is not None
@@ -158,10 +152,8 @@ def test_two_stateful_in_additive_both_see_real_state() -> None:
         RetryPolicy().attempts(2).on(ValueError),
         delay_strategy=AdditiveDelay((stateful_a, stateful_b)),
     )
-    try:
+    with contextlib.suppress(ValueError):
         policy.run(lambda: (_ for _ in ()).throw(ValueError("x")))
-    except ValueError:
-        pass
 
     assert captured_a and captured_b
     # Both receive the same execution context (not simulation)
@@ -187,10 +179,8 @@ def test_nested_additive_stateful_sees_real_state() -> None:
         RetryPolicy().attempts(2).on(ValueError),
         delay_strategy=outer,
     )
-    try:
+    with contextlib.suppress(ValueError):
         policy.run(lambda: (_ for _ in ()).throw(ValueError("x")))
-    except ValueError:
-        pass
 
     assert captured
     assert captured[0].function_name != "<simulation>"
@@ -212,10 +202,8 @@ def test_stateful_callback_called_once_per_retry() -> None:
         .stateful_delay(counting_callback)
         .jitter(minimum=0.0, maximum=0.0)
     )
-    try:
+    with contextlib.suppress(ValueError):
         policy.run(lambda: (_ for _ in ()).throw(ValueError("x")))
-    except ValueError:
-        pass
 
     # 4 attempts → 3 retries → 3 sleeps → callback called 3 times
     assert call_count[0] == 3
@@ -325,10 +313,8 @@ def test_deep_stateful_composition_does_not_recurse() -> None:
         delay_strategy=current,  # type: ignore[arg-type]
     )
     # Should not raise RecursionError
-    try:
+    with contextlib.suppress(ValueError):
         policy.run(lambda: (_ for _ in ()).throw(ValueError("x")))
-    except ValueError:
-        pass
 
     assert captured
     assert captured[0].function_name != "<simulation>"

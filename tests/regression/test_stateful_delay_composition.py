@@ -102,7 +102,6 @@ def test_fixed_plus_stateful_sees_real_state() -> None:
 
     from dataclasses import replace
 
-
     policy = replace(
         RetryPolicy().attempts(2).on(ValueError),
         delay_strategy=additive,

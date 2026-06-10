@@ -43,7 +43,7 @@ def test_safe_delay_cap_within_pytime_limit() -> None:
 def test_safe_delay_cap_is_not_half_float_max() -> None:
     """_SAFE_DELAY_CAP must NOT be sys.float_info.max / 2 (the regressed value)."""
     regressed_value = sys.float_info.max / 2
-    assert _SAFE_DELAY_CAP != regressed_value, (
+    assert regressed_value != _SAFE_DELAY_CAP, (
         "_SAFE_DELAY_CAP is still set to sys.float_info.max / 2, which overflows sleepers."
     )
 
@@ -113,6 +113,7 @@ def test_random_exponential_overflow_sends_sleeper_safe_value() -> None:
         policy.run(fail)
 
     assert overflow_errors == []
+
 
 # ---------------------------------------------------------------------------
 # ExponentialDelay: finite return even at extreme attempt counts

@@ -63,9 +63,7 @@ def test_second_reserve_blocked_when_capacity_one_and_cleanup_fires() -> None:
     assert r1.scheduled_at != r2.scheduled_at, (
         "two reservations must not occupy the same slot when max_retries=1"
     )
-    assert r2.scheduled_at > r1.scheduled_at, (
-        "second reservation must be scheduled after the first"
-    )
+    assert r2.scheduled_at > r1.scheduled_at, "second reservation must be scheduled after the first"
 
 
 def test_orphaned_reservation_can_be_released() -> None:
@@ -129,9 +127,7 @@ def test_expired_keys_still_removed_after_fix() -> None:
         budget._release(r)
 
     for i in range(30):
-        assert f"stale-{i}" not in budget._reservations, (
-            f"stale-{i} must have been cleaned up"
-        )
+        assert f"stale-{i}" not in budget._reservations, f"stale-{i} must have been cleaned up"
 
 
 def test_concurrent_reserve_at_cleanup_boundary_no_orphan() -> None:
@@ -162,6 +158,7 @@ def test_concurrent_reserve_at_cleanup_boundary_no_orphan() -> None:
         t.join()
 
     assert errors == [], f"Orphaned reservations found: {errors}"
+
 
 # ---------------------------------------------------------------------------
 # Amortized cleanup removes fully-expired keys

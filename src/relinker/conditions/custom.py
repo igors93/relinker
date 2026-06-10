@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from relinker.conditions.base import ConditionMixin
+from relinker.internal.callables import ensure_callable
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,6 +22,9 @@ class CustomCondition(ConditionMixin):
     """
 
     callback: Callable[[BaseException | None, Any], bool]
+
+    def __post_init__(self) -> None:
+        ensure_callable("callback", self.callback)
 
     def should_retry_exception(self, error: BaseException) -> bool:
         """Return True when the callback says the exception should be retried."""

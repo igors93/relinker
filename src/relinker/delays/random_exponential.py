@@ -6,9 +6,8 @@ from dataclasses import dataclass
 from random import Random
 
 from relinker.delays.base import DelayMixin
-from relinker.delays.exponential import _SAFE_DELAY_CAP
 from relinker.exceptions import InvalidRetryConfigError
-from relinker.internal.validation import ensure_non_negative, ensure_positive
+from relinker.internal.validation import MAX_SLEEP_SECONDS, ensure_positive, ensure_safe_delay
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,11 +30,13 @@ class RandomExponentialDelay(DelayMixin):
     seed: int | None = None
 
     def __post_init__(self) -> None:
+        from relinker.internal.validation import ensure_non_negative
+
         ensure_non_negative("base", self.base)
         ensure_positive("factor", self.factor)
-        ensure_non_negative("minimum", self.minimum)
+        ensure_safe_delay("minimum", self.minimum)
         if self.maximum is not None:
-            ensure_non_negative("maximum", self.maximum)
+            ensure_safe_delay("maximum", self.maximum)
             if self.maximum < self.minimum:
                 raise InvalidRetryConfigError("maximum must be greater than or equal to minimum")
 
@@ -49,8 +50,8 @@ class RandomExponentialDelay(DelayMixin):
             cap = float("inf")
         if self.maximum is not None:
             cap = min(cap, self.maximum)
-        elif cap > _SAFE_DELAY_CAP:
-            cap = _SAFE_DELAY_CAP
+        elif cap > MAX_SLEEP_SECONDS:
+            cap = MAX_SLEEP_SECONDS
 
         upper = max(self.minimum, cap)
         random = Random(self.seed + attempt_number if self.seed is not None else None)

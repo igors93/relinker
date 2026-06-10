@@ -55,7 +55,10 @@ from relinker.internal.callables import (
     ensure_callable,
     ensure_retryable_callable,
     ensure_sync_retryable_callable,
+    ensure_sync_sleeper,
+    instantiate_exception_class,
     is_async_callable,
+    validate_exception_class,
 )
 from relinker.internal.sleep import async_sleep as default_async_sleep
 from relinker.internal.sleep import sleep as default_sleep
@@ -212,6 +215,13 @@ class RetryPolicy(Generic[T]):
             self.should_raise_last and explicit_exhaustion_behaviors > 0
         ):
             raise InvalidRetryConfigError("exhaustion behaviors are mutually exclusive")
+        # Validate sleeper contracts at construction time.
+        # The default sleepers (_no_sleep, default_sleep) are always valid, so we skip
+        # validation only for the sentinel no-ops to avoid import-time overhead.
+        if self.sleep is not _no_sleep and self.sleep is not default_sleep:
+            ensure_sync_sleeper(self.sleep)
+        if self.async_sleep is not _no_sleep_async and self.async_sleep is not default_async_sleep:
+            ensure_callable("async_sleep", self.async_sleep)
 
     def named(self, name: str) -> RetryPolicy[T]:
         """Return a new policy with a human-readable optional name."""
@@ -338,6 +348,7 @@ class RetryPolicy(Generic[T]):
 
     def or_retry_if_result(self, predicate: Callable[[Any], bool]) -> RetryPolicy[T]:
         """Return a new policy that OR-combines current condition with result retry."""
+        ensure_callable("predicate", predicate)
         return replace(
             self,
             condition=AnyCondition(
@@ -549,11 +560,20 @@ class RetryPolicy(Generic[T]):
         resolved_factory: ExceptionFactory
 
         if isinstance(exception, type) and issubclass(exception, BaseException):
+            _MESSAGE = "Retry attempts were exhausted."
+            # Validate early: check signature without calling the constructor.
+            validate_exception_class(exception, _MESSAGE)
 
             def make_from_class(result: RetryResult[Any]) -> BaseException:
-                return exception("Retry attempts were exhausted.")
+                return instantiate_exception_class(exception, _MESSAGE)
 
             resolved_factory = make_from_class
+        elif isinstance(exception, type):
+            # Class that is not a BaseException subclass — reject early
+            raise InvalidRetryConfigError(
+                f"{exception.__name__} is not a BaseException subclass; "
+                "pass an exception class, an exception instance, or a factory callable"
+            )
         elif isinstance(exception, BaseException):
 
             def make_from_instance(result: RetryResult[Any]) -> BaseException:
@@ -561,7 +581,7 @@ class RetryPolicy(Generic[T]):
 
             resolved_factory = make_from_instance
         elif callable(exception):
-            resolved_factory = cast(ExceptionFactory, exception)
+            resolved_factory = exception
         else:
             raise InvalidRetryConfigError("exception must be an exception, class, or factory")
 
@@ -613,7 +633,7 @@ class RetryPolicy(Generic[T]):
 
         Useful for tests (with no_sleep()) and advanced integrations.
         """
-        ensure_callable("sleep", sleep)
+        ensure_sync_sleeper(sleep)
         if async_sleep is not None:
             ensure_callable("async_sleep", async_sleep)
         resolved_async_sleep = async_sleep

@@ -33,9 +33,7 @@ jobs:
           cache: pip
 
       - name: Install package with development dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e ".[dev]"
+        run: python -m pip install -e ".[dev]"
 
       - name: Check formatting
         run: python -m ruff format --check .
@@ -71,9 +69,7 @@ jobs:
           cache: pip
 
       - name: Install package with development dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e ".[dev]"
+        run: python -m pip install -e ".[dev]"
 
       - name: Run tests with coverage
         run: python -m pytest --cov=relinker --cov-report=term-missing --cov-fail-under=85
@@ -97,9 +93,7 @@ jobs:
           cache: pip
 
       - name: Install package with development dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e ".[dev]"
+        run: python -m pip install -e ".[dev]"
 
       - name: Run documentation contracts
         run: |
@@ -126,13 +120,16 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: Install build and validation tools
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements/build-tools.txt
+      - name: Install dev dependencies for twine
+        run: python -m pip install -e ".[dev]"
 
-      - name: Build distribution
-        run: python -m build
+      - name: Install build backend and tools with pinned hashes
+        run: |
+          python -m pip install --no-deps --only-binary :all: -r requirements/build-backend.txt
+          python -m pip install --no-deps --only-binary :all: -r requirements/build-tools.txt
+
+      - name: Build distribution (no-isolation uses pinned backend)
+        run: python -m build --no-isolation
 
       - name: Validate distribution metadata
         run: python -m twine check --strict dist/*

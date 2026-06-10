@@ -38,11 +38,13 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install dependencies
+      - name: Install dev dependencies
+        run: python -m pip install -e ".[dev]"
+
+      - name: Install build backend and tools with pinned hashes
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements/build-tools.txt
-          python -m pip install -e ".[dev]"
+          python -m pip install --no-deps --only-binary :all: -r requirements/build-backend.txt
+          python -m pip install --no-deps --only-binary :all: -r requirements/build-tools.txt
 
       - name: Check formatting and lint
         run: |
@@ -67,8 +69,8 @@ jobs:
           print('py.typed OK')
           "
 
-      - name: Build package
-        run: python -m build
+      - name: Build package (no-isolation uses pinned backend)
+        run: python -m build --no-isolation
 
       - name: Validate distribution metadata with twine
         run: python -m twine check --strict dist/*
@@ -78,7 +80,13 @@ jobs:
           python -m pip install dist/*.whl --force-reinstall
           python -c "import relinker; print('Import OK:', relinker.__version__)"
 
-      - name: Upload distribution artifact
+      - name: Compute SHA-256 checksums of dist artifacts
+        run: |
+          sha256sum dist/* | tee dist/SHA256SUMS
+          echo "Checksums:"
+          cat dist/SHA256SUMS
+
+      - name: Upload distribution artifact with checksums
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: dist
@@ -106,5 +114,13 @@ jobs:
           name: dist
           path: dist/
 
+      - name: Verify SHA-256 checksums of downloaded artifacts
+        run: |
+          echo "Verifying checksums..."
+          sha256sum --check dist/SHA256SUMS
+          echo "All checksums verified OK"
+
       - name: Publish package to PyPI
         uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # release/v1
+        with:
+          skip-existing: false

@@ -1,4 +1,11 @@
 # Pinned build and publish tool versions for reproducible CI.
 # Update these intentionally; Dependabot monitors this file.
-build==1.5.0
-twine==6.2.0
+# Installed with: pip install --no-deps --only-binary :all: -r requirements/build-tools.txt
+# This file covers only build and twine; transitive deps are pre-installed via
+# the project's dev extras or handled separately.
+--require-hashes
+
+build==1.5.0 \
+    --hash=sha256:13f3eecb844759ab66efec90ca17639bbf14dc06cb2fdf37a9010322d9c50a6f
+twine==6.2.0 \
+    --hash=sha256:418ebf08ccda9a8caaebe414433b0ba5e25eb5e4a927667122fbe8f829f985d8

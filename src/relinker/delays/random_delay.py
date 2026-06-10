@@ -7,7 +7,7 @@ from random import Random
 
 from relinker.delays.base import DelayMixin
 from relinker.exceptions import InvalidRetryConfigError
-from relinker.internal.validation import ensure_non_negative
+from relinker.internal.validation import ensure_safe_delay
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,8 +19,8 @@ class RandomDelay(DelayMixin):
     seed: int | None = None
 
     def __post_init__(self) -> None:
-        ensure_non_negative("minimum", self.minimum)
-        ensure_non_negative("maximum", self.maximum)
+        ensure_safe_delay("minimum", self.minimum)
+        ensure_safe_delay("maximum", self.maximum)
         if self.maximum < self.minimum:
             raise InvalidRetryConfigError("maximum must be greater than or equal to minimum")
 

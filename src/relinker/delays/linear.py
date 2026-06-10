@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from relinker.delays.base import DelayMixin
-from relinker.internal.validation import ensure_non_negative
+from relinker.internal.validation import ensure_non_negative, ensure_safe_delay
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,10 +22,10 @@ class LinearDelay(DelayMixin):
     maximum: float | None = None
 
     def __post_init__(self) -> None:
-        ensure_non_negative("start", self.start)
+        ensure_safe_delay("start", self.start)
         ensure_non_negative("step", self.step)
         if self.maximum is not None:
-            ensure_non_negative("maximum", self.maximum)
+            ensure_safe_delay("maximum", self.maximum)
 
     def next_delay(self, attempt_number: int) -> float:
         """Return the linear delay for the given attempt."""

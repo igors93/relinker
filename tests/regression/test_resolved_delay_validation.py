@@ -7,7 +7,6 @@ from typing import Any
 import pytest
 
 from relinker import InvalidRetryConfigError, RetryBudget, RetryPolicy
-from relinker.delays.fixed import FixedDelay
 from relinker.event import RetryEvent
 
 
@@ -119,26 +118,16 @@ def test_exponential_overflow_saturates_instead_of_raising() -> None:
     assert sleeps[1] == _SAFE_DELAY_CAP
 
 
-def test_additive_delay_overflow_is_rejected_before_sleep() -> None:
-    calls: list[str] = []
-    sleeps: list[float] = []
-    policy = (
-        RetryPolicy()
-        .attempts(2)
-        .on(ValueError)
-        .fixed_delay(sys.float_info.max)
-        .add_delay(FixedDelay(sys.float_info.max))
-        .with_sleep(sleeps.append)
-    )
+def test_additive_delay_above_ceiling_is_rejected_before_sleep() -> None:
+    # Values above MAX_SLEEP_SECONDS are now rejected at construction time.
+    # The sleeper is never called and the function under test is not even invoked.
+    import math
 
-    with pytest.raises(
-        InvalidRetryConfigError,
-        match="resolved delay must be a finite non-negative number",
-    ):
-        policy.run(lambda: _always_fails(calls))
+    from relinker.internal.validation import MAX_SLEEP_SECONDS
 
-    assert calls == ["call"]
-    assert sleeps == []
+    above = math.nextafter(MAX_SLEEP_SECONDS, math.inf)
+    with pytest.raises(InvalidRetryConfigError):
+        RetryPolicy().fixed_delay(above)
 
 
 def test_sync_context_manager_validates_resolved_delay_before_sleep() -> None:

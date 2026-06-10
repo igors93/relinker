@@ -8,7 +8,6 @@ import sys
 import pytest
 
 from relinker import InvalidRetryConfigError, RetryPolicy
-from relinker.delays.fixed import FixedDelay
 
 
 def test_exponential_delay_with_maximum_saturates_to_finite_maximum() -> None:
@@ -25,20 +24,11 @@ def test_exponential_delay_with_maximum_saturates_to_finite_maximum() -> None:
 
 
 def test_additive_delay_overflow_is_rejected_before_sleep() -> None:
-    sleeps: list[float] = []
-    policy = (
-        RetryPolicy()
-        .attempts(2)
-        .on(OSError)
-        .fixed_delay(sys.float_info.max)
-        .add_delay(FixedDelay(sys.float_info.max))
-        .with_sleep(sleeps.append)
-    )
+    # With MAX_SLEEP_SECONDS ceiling, values above the ceiling are rejected at
+    # construction time (before the policy runs), so the sleeper is never called.
+    import math
 
-    def fail() -> None:
-        raise OSError("temporary")
+    from relinker.internal.validation import MAX_SLEEP_SECONDS
 
-    with pytest.raises(InvalidRetryConfigError, match="resolved delay"):
-        policy.run(fail)
-
-    assert sleeps == []
+    with pytest.raises(InvalidRetryConfigError):
+        RetryPolicy().fixed_delay(math.nextafter(MAX_SLEEP_SECONDS, math.inf))

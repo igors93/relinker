@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from relinker.delays.stateful import delay_needs_state
 from relinker.event import RetryEvent
 from relinker.exceptions import TryAgain
-from relinker.internal.callables import ensure_awaitable_result
+from relinker.internal.callables import ensure_awaitable_result, ensure_awaitable_sleep_result
 from relinker.internal.clock import now
 from relinker.internal.executor_flow import record_failure_and_emit, state_with_wait_plan
 from relinker.internal.executor_helpers import function_name as _function_name
@@ -119,11 +120,18 @@ async def execute_async(
                     )
                     return finish_exhausted(policy, result)
 
-                pre_sleep_state = runtime.state(
-                    last_value=value,
-                    has_value=True,
-                    retry_cause="result",
-                    will_retry=True,
+                needs_state = delay_needs_state(policy.delay_strategy) or policy._has_handler(
+                    "before_sleep"
+                )
+                pre_sleep_state = (
+                    runtime.state(
+                        last_value=value,
+                        has_value=True,
+                        retry_cause="result",
+                        will_retry=True,
+                    )
+                    if needs_state
+                    else None
                 )
                 plan = plan_retry_wait(policy, attempt_number, pre_sleep_state)
                 if should_stop_before_sleep(
@@ -163,7 +171,9 @@ async def execute_async(
                             function_name=runtime.function_name,
                             delay=plan.total_delay,
                             value=value,
-                            state=state_with_wait_plan(pre_sleep_state, plan),
+                            state=state_with_wait_plan(pre_sleep_state, plan)
+                            if pre_sleep_state is not None
+                            else None,
                         )
                     )
                 except BaseException:
@@ -200,7 +210,9 @@ async def execute_async(
                     return finish_exhausted(policy, result)
 
                 try:
-                    await policy.async_sleep(plan.total_delay)
+                    await ensure_awaitable_sleep_result(
+                        policy.async_sleep(plan.total_delay), plan.total_delay
+                    )
                 except BaseException:
                     release_retry_wait(plan)
                     raise
@@ -255,10 +267,17 @@ async def execute_async(
             )
             return finish_exhausted(policy, result)
 
-        pre_sleep_state = runtime.state(
-            last_error=error,
-            retry_cause="exception",
-            will_retry=True,
+        needs_state = delay_needs_state(policy.delay_strategy) or policy._has_handler(
+            "before_sleep"
+        )
+        pre_sleep_state = (
+            runtime.state(
+                last_error=error,
+                retry_cause="exception",
+                will_retry=True,
+            )
+            if needs_state
+            else None
         )
         plan = plan_retry_wait(policy, attempt_number, pre_sleep_state)
         if should_stop_before_sleep(
@@ -297,7 +316,9 @@ async def execute_async(
                     function_name=runtime.function_name,
                     delay=plan.total_delay,
                     error=error,
-                    state=state_with_wait_plan(pre_sleep_state, plan),
+                    state=state_with_wait_plan(pre_sleep_state, plan)
+                    if pre_sleep_state is not None
+                    else None,
                 )
             )
         except BaseException:
@@ -333,7 +354,9 @@ async def execute_async(
             return finish_exhausted(policy, result)
 
         try:
-            await policy.async_sleep(plan.total_delay)
+            await ensure_awaitable_sleep_result(
+                policy.async_sleep(plan.total_delay), plan.total_delay
+            )
         except BaseException:
             release_retry_wait(plan)
             raise

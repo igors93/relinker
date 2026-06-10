@@ -12,7 +12,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from relinker.internal.validation import ensure_non_negative
+from relinker.internal.callables import ensure_callable
+from relinker.internal.validation import ensure_resolved_delay
 
 if TYPE_CHECKING:
     from relinker.delays.base import DelayStrategy
@@ -35,6 +36,9 @@ class StatefulCustomDelay:
     """
 
     callback: Callable[[RetryState], float]
+
+    def __post_init__(self) -> None:
+        ensure_callable("callback", self.callback)
 
     def next_delay(self, attempt_number: int) -> float:
         """
@@ -60,24 +64,47 @@ class StatefulCustomDelay:
 
     def _run(self, state: RetryState) -> float:
         delay = self.callback(state)
-        ensure_non_negative("stateful delay callback return value", delay)
-        return float(delay)
+        return ensure_resolved_delay(delay)
+
+
+def delay_needs_state(strategy: DelayStrategy) -> bool:
+    """Return True if the strategy tree contains any StatefulCustomDelay."""
+    from relinker.delays.composite import AdditiveDelay
+
+    if isinstance(strategy, StatefulCustomDelay):
+        return True
+    if isinstance(strategy, AdditiveDelay):
+        stack = list(strategy.strategies)
+        while stack:
+            child = stack.pop()
+            if isinstance(child, StatefulCustomDelay):
+                return True
+            if isinstance(child, AdditiveDelay):
+                stack.extend(child.strategies)
+    return False
 
 
 def resolve_delay(
     strategy: DelayStrategy,
     attempt_number: int,
-    state: RetryState,
+    state: RetryState | None,
 ) -> float:
     """
-    Resolve the next delay value.
+    Resolve the next delay value passing real execution state to any stateful children.
 
-    Uses the state-aware path when the strategy is a StatefulCustomDelay;
-    otherwise falls back to the standard attempt-number-based path.
-
-    This function is used by executors and context managers so they do not
-    need to know which kind of delay strategy is configured.
+    - StatefulCustomDelay at root: uses next_delay_with_state(state) when state is provided
+    - AdditiveDelay at root: uses next_delay_with_state(attempt_number, state) so
+      every stateful child in the tree receives the real state
+    - All other strategies, or when state is None: uses next_delay(attempt_number)
     """
+    from relinker.delays.composite import AdditiveDelay
+
     if isinstance(strategy, StatefulCustomDelay):
-        return strategy.next_delay_with_state(state)
+        if state is not None:
+            return strategy.next_delay_with_state(state)
+        return strategy.next_delay(attempt_number)
+    if isinstance(strategy, AdditiveDelay):
+        if state is not None:
+            return strategy.next_delay_with_state(attempt_number, state)
+        return strategy.next_delay(attempt_number)
     return strategy.next_delay(attempt_number)

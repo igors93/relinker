@@ -58,9 +58,12 @@ def test_large_or_on_chain_decides_and_serializes_without_recursion_error() -> N
 
 
 def test_add_delay_preserves_nested_additive_arithmetic_order() -> None:
+    # Use a large but valid value to test ordering: the dominant term must come
+    # first so floating-point arithmetic is the same in both forms.
+    large = 80_000.0
     nested = AdditiveDelay(
         (
-            FixedDelay(1e16),
+            FixedDelay(large),
             AdditiveDelay(
                 (
                     FixedDelay(1.0),
@@ -72,7 +75,7 @@ def test_add_delay_preserves_nested_additive_arithmetic_order() -> None:
 
     policy = (
         RetryPolicy()
-        .fixed_delay(1e16)
+        .fixed_delay(large)
         .add_delay(
             AdditiveDelay(
                 (
@@ -87,13 +90,14 @@ def test_add_delay_preserves_nested_additive_arithmetic_order() -> None:
 
 
 def test_add_delay_preserves_observable_nested_additive_arithmetic_order() -> None:
+    large = 80_000.0
     nested = AdditiveDelay(
         (
             FixedDelay(1.0),
             AdditiveDelay(
                 (
                     FixedDelay(1.0),
-                    FixedDelay(1e16),
+                    FixedDelay(large),
                 )
             ),
         )
@@ -106,7 +110,7 @@ def test_add_delay_preserves_observable_nested_additive_arithmetic_order() -> No
             AdditiveDelay(
                 (
                     FixedDelay(1.0),
-                    FixedDelay(1e16),
+                    FixedDelay(large),
                 )
             )
         )

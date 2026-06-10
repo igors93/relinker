@@ -2,16 +2,30 @@
 
 from __future__ import annotations
 
+import inspect
 from typing import TYPE_CHECKING, Any
 
+from relinker.delays.stateful import delay_needs_state
 from relinker.event import RetryEvent
-from relinker.exceptions import TryAgain
+from relinker.exceptions import InvalidRetryConfigError, TryAgain
 from relinker.internal.clock import now
 from relinker.internal.executor_flow import record_failure_and_emit, state_with_wait_plan
 from relinker.internal.executor_helpers import function_name as _function_name
 from relinker.internal.exhaustion import finish_exhausted, should_stop_before_sleep
 from relinker.internal.retry_wait import plan_retry_wait, release_retry_wait
 from relinker.internal.runtime import RetryRuntime
+
+
+def _invoke_sync_sleep(sleep_fn: Any, seconds: float) -> None:
+    """Call the sync sleeper and close any accidentally created coroutine."""
+    result = sleep_fn(seconds)
+    if inspect.iscoroutine(result):
+        result.close()
+        raise InvalidRetryConfigError(
+            "sync sleep returned a coroutine; "
+            "pass an async sleep function as the second argument to with_sleep()"
+        )
+
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -108,11 +122,18 @@ def execute_sync(
                 )
                 return finish_exhausted(policy, result)
 
-            pre_sleep_state = runtime.state(
-                last_value=value,
-                has_value=True,
-                retry_cause="result",
-                will_retry=True,
+            needs_state = delay_needs_state(policy.delay_strategy) or policy._has_handler(
+                "before_sleep"
+            )
+            pre_sleep_state = (
+                runtime.state(
+                    last_value=value,
+                    has_value=True,
+                    retry_cause="result",
+                    will_retry=True,
+                )
+                if needs_state
+                else None
             )
             plan = plan_retry_wait(policy, attempt_number, pre_sleep_state)
             if should_stop_before_sleep(
@@ -152,7 +173,9 @@ def execute_sync(
                         function_name=runtime.function_name,
                         delay=plan.total_delay,
                         value=value,
-                        state=state_with_wait_plan(pre_sleep_state, plan),
+                        state=state_with_wait_plan(pre_sleep_state, plan)
+                        if pre_sleep_state is not None
+                        else None,
                     )
                 )
             except BaseException:
@@ -189,7 +212,7 @@ def execute_sync(
                 return finish_exhausted(policy, result)
 
             try:
-                policy.sleep(plan.total_delay)
+                _invoke_sync_sleep(policy.sleep, plan.total_delay)
             except BaseException:
                 release_retry_wait(plan)
                 raise
@@ -244,10 +267,17 @@ def execute_sync(
             )
             return finish_exhausted(policy, result)
 
-        pre_sleep_state = runtime.state(
-            last_error=error,
-            retry_cause="exception",
-            will_retry=True,
+        needs_state = delay_needs_state(policy.delay_strategy) or policy._has_handler(
+            "before_sleep"
+        )
+        pre_sleep_state = (
+            runtime.state(
+                last_error=error,
+                retry_cause="exception",
+                will_retry=True,
+            )
+            if needs_state
+            else None
         )
         plan = plan_retry_wait(policy, attempt_number, pre_sleep_state)
         if should_stop_before_sleep(
@@ -286,7 +316,9 @@ def execute_sync(
                     function_name=runtime.function_name,
                     delay=plan.total_delay,
                     error=error,
-                    state=state_with_wait_plan(pre_sleep_state, plan),
+                    state=state_with_wait_plan(pre_sleep_state, plan)
+                    if pre_sleep_state is not None
+                    else None,
                 )
             )
         except BaseException:
@@ -322,7 +354,7 @@ def execute_sync(
             return finish_exhausted(policy, result)
 
         try:
-            policy.sleep(plan.total_delay)
+            _invoke_sync_sleep(policy.sleep, plan.total_delay)
         except BaseException:
             release_retry_wait(plan)
             raise

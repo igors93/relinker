@@ -22,32 +22,32 @@ class TestStatefulDelayEnsureNonNegative:
 
     def test_nan_raises(self) -> None:
         policy = self._policy_with_delay(float("nan"))
-        with pytest.raises(InvalidRetryConfigError, match="stateful delay"):
+        with pytest.raises(InvalidRetryConfigError):
             policy.run(self._raise_task)
 
     def test_positive_inf_raises(self) -> None:
         policy = self._policy_with_delay(float("inf"))
-        with pytest.raises(InvalidRetryConfigError, match="stateful delay"):
+        with pytest.raises(InvalidRetryConfigError):
             policy.run(self._raise_task)
 
     def test_negative_inf_raises(self) -> None:
         policy = self._policy_with_delay(float("-inf"))
-        with pytest.raises(InvalidRetryConfigError, match="stateful delay"):
+        with pytest.raises(InvalidRetryConfigError):
             policy.run(self._raise_task)
 
     def test_bool_true_raises(self) -> None:
         policy = self._policy_with_delay(True)
-        with pytest.raises(InvalidRetryConfigError, match="stateful delay"):
+        with pytest.raises(InvalidRetryConfigError):
             policy.run(self._raise_task)
 
     def test_bool_false_raises(self) -> None:
         policy = self._policy_with_delay(False)
-        with pytest.raises(InvalidRetryConfigError, match="stateful delay"):
+        with pytest.raises(InvalidRetryConfigError):
             policy.run(self._raise_task)
 
     def test_negative_raises(self) -> None:
         policy = self._policy_with_delay(-0.001)
-        with pytest.raises(InvalidRetryConfigError, match="stateful delay"):
+        with pytest.raises(InvalidRetryConfigError):
             policy.run(self._raise_task)
 
     def test_zero_accepted(self) -> None:

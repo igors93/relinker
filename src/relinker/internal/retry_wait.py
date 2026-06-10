@@ -29,7 +29,7 @@ class RetryWaitPlan:
 def plan_retry_wait(
     policy: RetryPolicy[Any],
     attempt_number: int,
-    state: RetryState,
+    state: RetryState | None,
 ) -> RetryWaitPlan:
     """Resolve policy delay and, when configured, reserve shared retry capacity."""
     policy_delay = ensure_resolved_delay(

@@ -9,8 +9,10 @@ from relinker.context._shared import (
     _BaseRetryBlockIterator,
     _context_now,
 )
+from relinker.delays.stateful import delay_needs_state
 from relinker.event import RetryEvent
 from relinker.exceptions import TryAgain
+from relinker.executors.sync import _invoke_sync_sleep
 from relinker.internal.executor_flow import state_with_wait_plan
 from relinker.internal.exhaustion import should_stop_before_sleep
 from relinker.internal.retry_wait import plan_retry_wait, release_retry_wait
@@ -111,10 +113,17 @@ class RetryAttemptContext(_BaseRetryAttemptContext):
             self._giveup(error=error, retry_cause="exception")
             return self._apply_exhausted(result, error)
 
-        pre_sleep_state = self.iterator._runtime.state(
-            last_error=error,
-            retry_cause="exception",
-            will_retry=True,
+        needs_state = delay_needs_state(self.policy.delay_strategy) or self.policy._has_handler(
+            "before_sleep"
+        )
+        pre_sleep_state = (
+            self.iterator._runtime.state(
+                last_error=error,
+                retry_cause="exception",
+                will_retry=True,
+            )
+            if needs_state
+            else None
         )
         plan = plan_retry_wait(self.policy, self.number, pre_sleep_state)
         if should_stop_before_sleep(
@@ -143,7 +152,9 @@ class RetryAttemptContext(_BaseRetryAttemptContext):
                     function_name=self.iterator.name,
                     delay=plan.total_delay,
                     error=error,
-                    state=state_with_wait_plan(pre_sleep_state, plan),
+                    state=state_with_wait_plan(pre_sleep_state, plan)
+                    if pre_sleep_state is not None
+                    else None,
                 )
             )
         except BaseException:
@@ -169,7 +180,7 @@ class RetryAttemptContext(_BaseRetryAttemptContext):
             return self._apply_exhausted(result, error)
 
         try:
-            self.policy.sleep(plan.total_delay)
+            _invoke_sync_sleep(self.policy.sleep, plan.total_delay)
         except BaseException:
             release_retry_wait(plan)
             raise
@@ -219,11 +230,18 @@ class RetryAttemptContext(_BaseRetryAttemptContext):
             self._giveup(value=value, retry_cause="result")
             return self._apply_exhausted(result, None)
 
-        pre_sleep_state = self.iterator._runtime.state(
-            last_value=value,
-            has_value=self._has_result,
-            retry_cause="result",
-            will_retry=True,
+        needs_state = delay_needs_state(self.policy.delay_strategy) or self.policy._has_handler(
+            "before_sleep"
+        )
+        pre_sleep_state = (
+            self.iterator._runtime.state(
+                last_value=value,
+                has_value=self._has_result,
+                retry_cause="result",
+                will_retry=True,
+            )
+            if needs_state
+            else None
         )
         plan = plan_retry_wait(self.policy, self.number, pre_sleep_state)
         if should_stop_before_sleep(
@@ -252,7 +270,9 @@ class RetryAttemptContext(_BaseRetryAttemptContext):
                     function_name=self.iterator.name,
                     delay=plan.total_delay,
                     value=value,
-                    state=state_with_wait_plan(pre_sleep_state, plan),
+                    state=state_with_wait_plan(pre_sleep_state, plan)
+                    if pre_sleep_state is not None
+                    else None,
                 )
             )
         except BaseException:
@@ -278,7 +298,7 @@ class RetryAttemptContext(_BaseRetryAttemptContext):
             return self._apply_exhausted(result, None)
 
         try:
-            self.policy.sleep(plan.total_delay)
+            _invoke_sync_sleep(self.policy.sleep, plan.total_delay)
         except BaseException:
             release_retry_wait(plan)
             raise

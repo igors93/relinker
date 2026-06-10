@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from relinker.delays.base import DelayMixin
 from relinker.exceptions import InvalidRetryConfigError
-from relinker.internal.validation import ensure_non_negative
+from relinker.internal.validation import ensure_safe_delay
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,7 +25,7 @@ class ChainDelay(DelayMixin):
             raise InvalidRetryConfigError("delays must contain at least one value")
 
         for index, delay in enumerate(self.delays):
-            ensure_non_negative(f"delays[{index}]", delay)
+            ensure_safe_delay(f"delays[{index}]", delay)
 
     def next_delay(self, attempt_number: int) -> float:
         """Return the delay for the given attempt."""

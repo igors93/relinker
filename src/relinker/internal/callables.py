@@ -90,3 +90,118 @@ def ensure_awaitable_result(value: object) -> Awaitable[Any]:
             "use policy.run() for synchronous callables"
         )
     return value
+
+
+def ensure_sync_sleeper(sleep: Any) -> None:
+    """Raise when sleep is not valid for the synchronous execution path.
+
+    Accepts: sync callables (functions, methods, partials, callable objects).
+    Rejects: coroutine functions, async callable objects (they create unawaited
+    coroutines in the sync executor).
+    """
+    if not callable(sleep):
+        raise InvalidRetryConfigError(f"sleep must be callable, got {type(sleep).__name__}")
+    if is_async_callable(sleep):
+        raise InvalidRetryConfigError(
+            "sync sleep must not be an async callable; "
+            "pass an async sleep function as the second argument to with_sleep()"
+        )
+
+
+def _try_bind(sig: inspect.Signature, *args: Any) -> bool:
+    """Return True if sig.bind(*args) succeeds without raising TypeError."""
+    try:
+        sig.bind(*args)
+        return True
+    except TypeError:
+        return False
+
+
+def _exception_class_call_mode(exception_type: type[BaseException], message: str) -> str:
+    """Return 'message', 'no-arg', or raise InvalidRetryConfigError.
+
+    Only checks the signature; does NOT call the constructor.
+    For built-ins without inspectable signatures, returns 'unknown' as a
+    best-effort (caller must try both).
+    """
+    try:
+        sig = inspect.signature(exception_type)
+    except (ValueError, TypeError):
+        return "unknown"
+
+    if _try_bind(sig, message):
+        return "message"
+    if _try_bind(sig):
+        return "no-arg"
+    raise InvalidRetryConfigError(
+        f"{exception_type.__name__} cannot be instantiated with a message or no "
+        "arguments; use on_exhausted_raise(factory) instead"
+    )
+
+
+def validate_exception_class(exception_type: type[BaseException], message: str) -> None:
+    """Raise InvalidRetryConfigError early if the class cannot accept message or no args.
+
+    Only performs signature inspection — does NOT call the constructor.
+    This provides early feedback at policy-construction time.
+    """
+    _exception_class_call_mode(exception_type, message)
+
+
+def instantiate_exception_class(exception_type: type[BaseException], message: str) -> BaseException:
+    """Instantiate an exception class with appropriate argument passing.
+
+    Strategy:
+    1. If the class accepts a positional message, construct with ``message``.
+    2. If the class accepts zero arguments, construct with no arguments.
+    3. Otherwise raise InvalidRetryConfigError directing the user to use a factory.
+
+    Does not catch TypeError raised from inside the constructor body — that is a
+    programming error in the exception class, not a signature mismatch.
+    """
+    mode = _exception_class_call_mode(exception_type, message)
+
+    if mode == "message":
+        instance = exception_type(message)
+    elif mode == "no-arg":
+        instance = exception_type()
+    else:
+        # mode == "unknown" — built-in without inspectable signature; try message first
+        try:
+            instance = exception_type(message)
+        except TypeError:
+            try:
+                instance = exception_type()
+            except TypeError:
+                raise InvalidRetryConfigError(
+                    f"{exception_type.__name__} cannot be instantiated with a message or no "
+                    "arguments; use on_exhausted_raise(factory) instead"
+                ) from None
+
+    if not isinstance(instance, BaseException):
+        raise InvalidRetryConfigError(f"{exception_type.__name__} did not return a BaseException")
+    return instance
+
+
+def ensure_awaitable_sleep_result(result: Any, seconds: float) -> Awaitable[Any]:
+    """Return ``result`` if it is awaitable, or raise InvalidRetryConfigError.
+
+    Called at runtime after invoking the async sleeper to catch sync functions
+    that return non-awaitables (e.g. None or a number) before the 'await'
+    expression, which would otherwise raise a bare TypeError.
+
+    When ``result`` is a coroutine that was created but will never be awaited
+    (a programming error), close it to suppress the RuntimeWarning.
+    """
+    if inspect.isawaitable(result):
+        return result
+
+    # If somehow a coroutine was created but is not awaitable (impossible in practice,
+    # but be defensive), close it to avoid the RuntimeWarning.
+    if inspect.iscoroutine(result):
+        result.close()
+
+    raise InvalidRetryConfigError(
+        f"async_sleep must return an awaitable, got {type(result).__name__}; "
+        "use an async function or a function that returns a coroutine/future"
+    )

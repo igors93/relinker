@@ -132,3 +132,13 @@ class TestChecksumVerification:
             "publish.yml must verify checksum in both build and publish jobs "
             f"— only {sha_count} sha256 reference(s) found"
         )
+
+    def test_publish_workflow_removes_checksum_manifest_before_pypi_publish(self) -> None:
+        """publish.yml must not pass SHA256SUMS to the PyPI publish action."""
+        content = PUBLISH_YML.read_text()
+
+        verify_index = content.index("sha256sum --check dist/SHA256SUMS")
+        remove_index = content.index("rm dist/SHA256SUMS")
+        publish_index = content.index("pypa/gh-action-pypi-publish")
+
+        assert verify_index < remove_index < publish_index

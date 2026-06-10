@@ -88,7 +88,10 @@ def finish_exhausted(policy: RetryPolicy[Any], result: RetryResult[Any]) -> Any:
     return result.value
 
 
-def resolve_tracked_result(policy: RetryPolicy[Any], result: RetryResult[Any]) -> Any:
+def resolve_tracked_result(
+    policy: RetryPolicy[Any],
+    result: RetryResult[Any],
+) -> Any:
     """
     Convert a tracked RetryResult to the behavior configured by the policy.
 
@@ -103,8 +106,6 @@ def resolve_tracked_result(policy: RetryPolicy[Any], result: RetryResult[Any]) -
         return finish_exhausted(policy, result)
 
     if result.error is not None:
-        if policy.should_raise_last:
-            raise result.error
-        return None
+        raise result.error
 
     return result.value

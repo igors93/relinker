@@ -83,6 +83,7 @@ class _BaseRetryBlockIterator:
         value: Any = None,
         error: BaseException | None = None,
         retry_cause: str,
+        will_stop: bool,
     ) -> None:
         self.policy.emit(
             RetryEvent(
@@ -96,7 +97,7 @@ class _BaseRetryBlockIterator:
                     last_error=error,
                     has_value=has_value,
                     retry_cause=retry_cause,
-                    will_stop=True,
+                    will_stop=will_stop,
                 ),
             )
         )
@@ -138,6 +139,7 @@ class _BaseRetryAttemptContext:
         value: Any = None,
         error: BaseException | None = None,
         retry_cause: str,
+        will_stop: bool = True,
     ) -> None:
         self.iterator._emit_giveup(
             attempt_number=self.number,
@@ -145,4 +147,5 @@ class _BaseRetryAttemptContext:
             error=error,
             has_value=error is None and self._has_result,
             retry_cause=retry_cause,
+            will_stop=will_stop,
         )

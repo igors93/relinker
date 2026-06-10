@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
 from random import Random
 
@@ -50,7 +49,7 @@ class RandomExponentialDelay(DelayMixin):
             cap = float("inf")
         if self.maximum is not None:
             cap = min(cap, self.maximum)
-        elif not math.isfinite(cap):
+        elif cap > _SAFE_DELAY_CAP:
             cap = _SAFE_DELAY_CAP
 
         upper = max(self.minimum, cap)

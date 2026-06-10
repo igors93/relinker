@@ -1,4 +1,4 @@
-"""Regression tests: exponential overflow saturation (Fix 4)."""
+"""Regression tests: exponential overflow saturation."""
 
 from __future__ import annotations
 
@@ -9,6 +9,110 @@ import pytest
 
 from relinker.delays.exponential import _SAFE_DELAY_CAP, ExponentialDelay
 from relinker.delays.random_exponential import RandomExponentialDelay
+
+# ---------------------------------------------------------------------------
+# Regression: _SAFE_DELAY_CAP was sys.float_info.max / 2, which overflows
+# time.sleep() and asyncio.sleep() on all real platforms.
+# On Python 3.10+ both sleepers use _PyTime_t (signed int64, nanosecond
+# resolution). Max representable: (2**63 - 1) ns ≈ 9.22e9 s ≈ 292 years.
+# Verified on Windows Python 3.10:
+#   time.sleep(sys.float_info.max / 2)
+#   → OverflowError: timestamp too large to convert to C _PyTime_t
+#
+# Direct time.sleep() is NOT called in tests to avoid actually sleeping for
+# the cap duration. Instead we validate through bound checks and fake sleepers.
+# ---------------------------------------------------------------------------
+
+# Conservative platform ceiling derived from _PyTime_t (signed int64 nanoseconds).
+_PYTIME_MAX_SECONDS = (2**63 - 1) / 1e9  # ≈ 9.22e9 s ≈ 292 years
+
+
+def test_safe_delay_cap_within_pytime_limit() -> None:
+    """_SAFE_DELAY_CAP must be within the _PyTime_t range accepted by all sleepers.
+
+    time.sleep() and asyncio.sleep() use _PyTime_t (int64, nanoseconds).
+    Values > _PYTIME_MAX_SECONDS raise:
+        OverflowError: timestamp too large to convert to C _PyTime_t
+    """
+    assert _SAFE_DELAY_CAP <= _PYTIME_MAX_SECONDS, (
+        f"_SAFE_DELAY_CAP={_SAFE_DELAY_CAP!r} exceeds _PyTime_t limit "
+        f"({_PYTIME_MAX_SECONDS:.3e}s). time.sleep() raises OverflowError."
+    )
+
+
+def test_safe_delay_cap_is_not_half_float_max() -> None:
+    """_SAFE_DELAY_CAP must NOT be sys.float_info.max / 2 (the regressed value)."""
+    regressed_value = sys.float_info.max / 2
+    assert _SAFE_DELAY_CAP != regressed_value, (
+        "_SAFE_DELAY_CAP is still set to sys.float_info.max / 2, which overflows sleepers."
+    )
+
+
+def test_policy_with_overflow_delay_sends_sleeper_safe_value() -> None:
+    """A sleeper that validates its argument must not receive an overflow-causing value."""
+    from relinker import RetryPolicy
+
+    overflow_errors: list[str] = []
+    received_delays: list[float] = []
+
+    def validating_sleeper(seconds: float) -> None:
+        received_delays.append(seconds)
+        if seconds > _PYTIME_MAX_SECONDS:
+            overflow_errors.append(
+                f"delay {seconds!r} exceeds _PyTime_t limit — would overflow time.sleep"
+            )
+
+    calls = 0
+
+    def fail() -> None:
+        nonlocal calls
+        calls += 1
+        raise ValueError("boom")
+
+    policy = (
+        RetryPolicy()
+        .attempts(3)
+        .on(ValueError)
+        .exponential_delay(base=sys.float_info.max, factor=sys.float_info.max)
+        .with_sleep(validating_sleeper)
+    )
+
+    with pytest.raises(ValueError):
+        policy.run(fail)
+
+    assert overflow_errors == [], f"Sleeper received oversized values: {overflow_errors}"
+    assert all(math.isfinite(d) for d in received_delays)
+
+
+def test_random_exponential_overflow_sends_sleeper_safe_value() -> None:
+    """RandomExponentialDelay overflow must also produce a sleeper-safe value."""
+    from relinker import RetryPolicy
+
+    overflow_errors: list[str] = []
+
+    def validating_sleeper(seconds: float) -> None:
+        if seconds > _PYTIME_MAX_SECONDS:
+            overflow_errors.append(f"delay {seconds!r} overflows _PyTime_t")
+
+    calls = 0
+
+    def fail() -> None:
+        nonlocal calls
+        calls += 1
+        raise ValueError("boom")
+
+    policy = (
+        RetryPolicy()
+        .attempts(3)
+        .on(ValueError)
+        .random_exponential_delay(base=sys.float_info.max, factor=sys.float_info.max, seed=1)
+        .with_sleep(validating_sleeper)
+    )
+
+    with pytest.raises(ValueError):
+        policy.run(fail)
+
+    assert overflow_errors == []
 
 # ---------------------------------------------------------------------------
 # ExponentialDelay: finite return even at extreme attempt counts
@@ -59,8 +163,8 @@ def test_safe_delay_cap_is_finite() -> None:
     assert sys.float_info.max >= _SAFE_DELAY_CAP
 
 
-def test_safe_delay_cap_is_half_float_max() -> None:
-    assert sys.float_info.max / 2 == _SAFE_DELAY_CAP
+def test_safe_delay_cap_is_one_day() -> None:
+    assert _SAFE_DELAY_CAP == 86_400.0
 
 
 def test_exponential_overflow_does_not_raise() -> None:

@@ -114,8 +114,9 @@ def test_exponential_overflow_saturates_instead_of_raising() -> None:
 
     assert calls == ["call", "call", "call"]
     assert len(sleeps) == 2
-    assert sleeps[0] == sys.float_info.max  # attempt 1: base * factor**0 = base (finite)
-    assert sleeps[1] == _SAFE_DELAY_CAP  # attempt 2: overflow → saturated
+    # Both attempts saturate: base itself exceeds _SAFE_DELAY_CAP so is capped immediately.
+    assert sleeps[0] == _SAFE_DELAY_CAP
+    assert sleeps[1] == _SAFE_DELAY_CAP
 
 
 def test_additive_delay_overflow_is_rejected_before_sleep() -> None:

@@ -2,18 +2,22 @@
 
 from __future__ import annotations
 
-import math
-import sys
 from dataclasses import dataclass
 
 from relinker.delays.base import DelayMixin
 from relinker.internal.validation import ensure_non_negative, ensure_positive
 
-# When exponential backoff overflows to inf and no explicit maximum is configured,
-# the delay saturates here. This prevents InvalidRetryConfigError in long-running
-# or forever() policies while keeping the delay representable and finite.
-# Callers that need a practical ceiling should set maximum= explicitly.
-_SAFE_DELAY_CAP: float = sys.float_info.max / 2
+# Maximum delay produced when exponential growth overflows and no explicit
+# maximum is configured.  The value is 1 day (86 400 seconds).
+#
+# Rationale:
+#   - time.sleep() and asyncio.sleep() use _PyTime_t (signed int64, nanoseconds)
+#     internally.  Values above ~9.22e9 seconds raise OverflowError on all
+#     supported platforms (Python 3.10-3.14, Linux/macOS/Windows).
+#     sys.float_info.max / 2 ≈ 8.99e307 is far outside this range.
+#   - 86 400 s (1 day) is more than enough for any practical backoff ceiling.
+#   - Callers that need a different ceiling must set ``maximum=`` explicitly.
+_SAFE_DELAY_CAP: float = 86_400.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,6 +54,6 @@ class ExponentialDelay(DelayMixin):
             delay = float("inf")
         if self.maximum is not None:
             return min(delay, self.maximum)
-        if not math.isfinite(delay):
+        if delay > _SAFE_DELAY_CAP:
             return _SAFE_DELAY_CAP
         return delay

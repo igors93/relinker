@@ -120,10 +120,10 @@ class RetryBudget:
         self._validate_key(key)
 
         with self._lock:
-            reservations = self._reservations.setdefault(key, deque())
             current = float(current_time)
             candidate = max(current, float(not_before))
             self._maybe_cleanup(current)
+            reservations = self._reservations.setdefault(key, deque())
             self._prune(reservations, current)
             scheduled_times = sorted(item.scheduled_at for item in reservations)
             candidate = self._first_legal_slot(candidate, scheduled_times)

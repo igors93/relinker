@@ -11,6 +11,159 @@ from relinker import RetryBudget
 from relinker.budget import _CLEANUP_INTERVAL
 
 # ---------------------------------------------------------------------------
+# Regression: orphaned reservation when cleanup fires during _reserve()
+# ---------------------------------------------------------------------------
+# Bug: _reserve() called setdefault() BEFORE _maybe_cleanup(). When cleanup
+# fired, it removed the newly-created empty deque. The reservation was then
+# appended to a detached local reference — never stored in _reservations.
+# This allowed retries beyond max_retries.
+# ---------------------------------------------------------------------------
+
+
+def test_reservation_not_orphaned_when_cleanup_fires_at_first_call() -> None:
+    """Exact bug scenario: cleanup fires on the very first _reserve() of a new key."""
+    budget = RetryBudget(max_retries=1, per=60.0)
+    # Prime op_count so the NEXT operation triggers cleanup.
+    budget._op_count = _CLEANUP_INTERVAL - 1
+
+    reservation = budget._reserve("new-key", current_time=100.0, not_before=100.0)
+
+    assert "new-key" in budget._reservations, (
+        "key must remain in _reservations after _reserve() + cleanup"
+    )
+    assert any(r.token == reservation.token for r in budget._reservations["new-key"]), (
+        "reservation must be registered in _reservations, not orphaned"
+    )
+
+
+def test_reservation_consumes_capacity_when_cleanup_fires_during_reserve(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """After the fix, the reservation must consume capacity even when cleanup fires."""
+    budget = RetryBudget(max_retries=1, per=60.0)
+    controlled_time = 100.0
+    monkeypatch.setattr("relinker.budget._monotonic", lambda: controlled_time)
+    budget._op_count = _CLEANUP_INTERVAL - 1
+
+    budget._reserve("capped-key", current_time=controlled_time, not_before=controlled_time)
+
+    snap = budget.snapshot("capped-key")
+    assert snap.active == 1, "reservation must be counted as active"
+    assert snap.available == 0, "max_retries=1 must be fully consumed"
+
+
+def test_second_reserve_blocked_when_capacity_one_and_cleanup_fires() -> None:
+    """max_retries=1: second immediate reserve must be deferred, not granted the same slot."""
+    budget = RetryBudget(max_retries=1, per=60.0)
+    budget._op_count = _CLEANUP_INTERVAL - 1
+
+    r1 = budget._reserve("api", current_time=100.0, not_before=100.0)
+    r2 = budget._reserve("api", current_time=100.0, not_before=100.0)
+
+    assert r1.scheduled_at != r2.scheduled_at, (
+        "two reservations must not occupy the same slot when max_retries=1"
+    )
+    assert r2.scheduled_at > r1.scheduled_at, (
+        "second reservation must be scheduled after the first"
+    )
+
+
+def test_orphaned_reservation_can_be_released() -> None:
+    """Reservation created when cleanup fires must be releasable without error."""
+    budget = RetryBudget(max_retries=2, per=60.0)
+    budget._op_count = _CLEANUP_INTERVAL - 1
+
+    r = budget._reserve("rel-key", current_time=10.0, not_before=10.0)
+    # Must not raise
+    budget._release(r)
+
+    snap = budget.snapshot("rel-key")
+    assert snap.active == 0
+
+
+def test_snapshot_reflects_reservation_created_when_cleanup_fires(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """snapshot() must report the reservation even when cleanup fired during reserve."""
+    budget = RetryBudget(max_retries=3, per=60.0)
+    controlled_time = 50.0
+    monkeypatch.setattr("relinker.budget._monotonic", lambda: controlled_time)
+    budget._op_count = _CLEANUP_INTERVAL - 1
+
+    budget._reserve("snap-key", current_time=controlled_time, not_before=controlled_time)
+
+    snap = budget.snapshot("snap-key")
+    assert snap.active == 1
+    assert snap.capacity == 3
+    assert snap.available == 2
+
+
+def test_previously_expired_key_new_reserve_at_cleanup_boundary() -> None:
+    """A key that previously expired can get a fresh reservation even at cleanup boundary."""
+    budget = RetryBudget(max_retries=2, per=1.0)
+
+    # First reservation — will expire.
+    budget._reserve("old", current_time=0.0, not_before=0.0)
+    # Expire it.
+    budget.cleanup()
+    assert "old" not in budget._reservations
+
+    # Prime for cleanup on next operation.
+    budget._op_count = _CLEANUP_INTERVAL - 1
+
+    r = budget._reserve("old", current_time=10.0, not_before=10.0)
+
+    assert "old" in budget._reservations
+    assert any(x.token == r.token for x in budget._reservations["old"])
+
+
+def test_expired_keys_still_removed_after_fix() -> None:
+    """The fix must not disable automatic cleanup of expired keys."""
+    budget = RetryBudget(max_retries=2, per=1.0)
+    for i in range(30):
+        budget._reserve(f"stale-{i}", current_time=0.0, not_before=0.0)
+
+    # Trigger many operations past cleanup interval at t=100 (all reservations expired).
+    for _ in range(_CLEANUP_INTERVAL + 10):
+        r = budget._reserve("trigger", current_time=100.0, not_before=100.0)
+        budget._release(r)
+
+    for i in range(30):
+        assert f"stale-{i}" not in budget._reservations, (
+            f"stale-{i} must have been cleaned up"
+        )
+
+
+def test_concurrent_reserve_at_cleanup_boundary_no_orphan() -> None:
+    """Under concurrency, no reservation must be orphaned at cleanup boundaries."""
+    import threading
+
+    budget = RetryBudget(max_retries=20, per=60.0)
+    budget._op_count = _CLEANUP_INTERVAL - 5  # Close to boundary
+
+    errors: list[str] = []
+    barrier = Barrier(10)
+
+    def worker(i: int) -> None:
+        barrier.wait(timeout=5)
+        r = budget._reserve(f"w-{i}", current_time=100.0, not_before=100.0)
+        key = f"w-{i}"
+        if key not in budget._reservations:
+            errors.append(f"key {key} orphaned after reserve")
+            return
+        found = any(x.token == r.token for x in budget._reservations.get(key, []))
+        if not found:
+            errors.append(f"reservation {r.token} orphaned for key {key}")
+
+    threads = [threading.Thread(target=worker, args=(i,)) for i in range(10)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert errors == [], f"Orphaned reservations found: {errors}"
+
+# ---------------------------------------------------------------------------
 # Amortized cleanup removes fully-expired keys
 # ---------------------------------------------------------------------------
 

@@ -127,3 +127,46 @@ def test_capped_random_exponential_delay_does_not_overflow() -> None:
     value = delay.next_delay(1025)
 
     assert 0.0 <= value <= 60.0
+
+
+def test_valid_simulated_delay_succeeds() -> None:
+    # A delay of exactly 86_400.0 seconds is valid.
+    policy = RetryPolicy().attempts(2).fixed_delay(86_400.0)
+
+    sim = policy.simulate(attempts=2)
+    assert sim.attempt_count == 2
+    assert sim.attempts[0].delay_before_next_attempt == 86_400.0
+
+    prev = policy.preview(attempts=2)
+    assert "86400" in prev
+
+
+def test_invalid_composite_delay_raises_in_simulation() -> None:
+    # An additive delay resulting in 90_000s (> 86_400s) should raise InvalidRetryConfigError
+    policy = RetryPolicy().attempts(2).fixed_delay(80_000).add_delay(FixedDelay(10_000))
+
+    with pytest.raises(
+        InvalidRetryConfigError,
+        match="resolved delay must be a finite non-negative number not exceeding 86400",
+    ):
+        policy.simulate(attempts=2)
+
+    with pytest.raises(
+        InvalidRetryConfigError,
+        match="resolved delay must be a finite non-negative number not exceeding 86400",
+    ):
+        policy.preview(attempts=2)
+
+
+def test_invalid_composite_delay_raises_in_runtime() -> None:
+    policy = RetryPolicy().attempts(2).fixed_delay(80_000).add_delay(FixedDelay(10_000))
+
+    def fail():
+        raise TimeoutError("boom")
+
+    with pytest.raises(
+        InvalidRetryConfigError,
+        match="resolved delay must be a finite non-negative number not exceeding 86400",
+    ):
+        policy.run(fail)
+

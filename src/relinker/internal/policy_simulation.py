@@ -12,6 +12,7 @@ from typing import Any, cast
 
 from relinker.diagnostics import RetryLoadEstimate, RetrySimulation, RetrySimulationAttempt
 from relinker.exceptions import InvalidRetryConfigError
+from relinker.internal.validation import ensure_resolved_delay
 from relinker.stop.attempts import StopAfterAttempt
 from relinker.stop.composite import AllStopStrategy, AnyStopStrategy
 from relinker.stop.forever import StopForever
@@ -48,7 +49,8 @@ def _safe_next_delay(policy: Any, attempt_number: int) -> float:
         raise InvalidRetryConfigError(
             "Simulation is not supported for policies with custom delay callbacks"
         )
-    return cast(float, policy.delay_strategy.next_delay(attempt_number))
+    raw_delay = policy.delay_strategy.next_delay(attempt_number)
+    return ensure_resolved_delay(raw_delay)
 
 
 def simulate_policy(policy: Any, attempts: int) -> RetrySimulation:

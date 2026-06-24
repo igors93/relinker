@@ -169,4 +169,3 @@ def test_invalid_composite_delay_raises_in_runtime() -> None:
         match="resolved delay must be a finite non-negative number not exceeding 86400",
     ):
         policy.run(fail)
-

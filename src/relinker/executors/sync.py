@@ -239,6 +239,12 @@ def execute_sync(
                     attempt_number=attempt_number,
                     function_name=runtime.function_name,
                     error=error,
+                    state=runtime.state(
+                        last_error=error,
+                        retry_cause="exception",
+                        will_retry=False,
+                        will_stop=False,
+                    ),
                 )
             )
             if policy.should_return_result:

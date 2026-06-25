@@ -12,7 +12,7 @@ from typing import Any, cast
 
 from relinker.diagnostics import RetryLoadEstimate, RetrySimulation, RetrySimulationAttempt
 from relinker.exceptions import InvalidRetryConfigError
-from relinker.internal.validation import ensure_resolved_delay
+from relinker.internal.validation import ensure_positive_int, ensure_resolved_delay
 from relinker.stop.attempts import StopAfterAttempt
 from relinker.stop.composite import AllStopStrategy, AnyStopStrategy
 from relinker.stop.forever import StopForever
@@ -59,8 +59,7 @@ def simulate_policy(policy: Any, attempts: int) -> RetrySimulation:
 
     Accepts Any to avoid a circular import; the caller is always RetryPolicy.
     """
-    if attempts <= 0:
-        raise InvalidRetryConfigError("attempts must be greater than zero")
+    ensure_positive_int("attempts", attempts)
 
     simulated_attempts: list[RetrySimulationAttempt] = []
     elapsed = 0.0

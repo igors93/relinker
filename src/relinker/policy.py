@@ -42,12 +42,12 @@ from relinker.diagnostics import (
     RetrySimulation,
 )
 from relinker.event import (
+    VALID_EVENT_NAMES,
     EventFailureMode,
     EventHandler,
     EventHandlerRegistration,
     EventName,
     RetryEvent,
-    VALID_EVENT_NAMES,
 )
 from relinker.exceptions import InvalidRetryConfigError
 from relinker.executors.async_ import execute_async

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
-from typing import Any, Literal, TypeAlias
+from typing import Any, Literal, TypeAlias, get_args
 
 from relinker.state import RetryState
 
@@ -22,6 +22,8 @@ EventName: TypeAlias = Literal[
     "after_giveup",
 ]
 EventFailureMode: TypeAlias = Literal["propagate", "isolate"]
+
+VALID_EVENT_NAMES: frozenset[str] = frozenset(get_args(EventName))
 
 
 @dataclass(frozen=True, slots=True)

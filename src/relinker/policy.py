@@ -47,6 +47,7 @@ from relinker.event import (
     EventHandlerRegistration,
     EventName,
     RetryEvent,
+    VALID_EVENT_NAMES,
 )
 from relinker.exceptions import InvalidRetryConfigError
 from relinker.executors.async_ import execute_async
@@ -671,6 +672,11 @@ class RetryPolicy(Generic[T]):
         failure_mode: EventFailureMode = "propagate",
     ) -> RetryPolicy[T]:
         """Return a new policy with an additional event handler."""
+        if name not in VALID_EVENT_NAMES:
+            accepted = ", ".join(sorted(VALID_EVENT_NAMES))
+            raise InvalidRetryConfigError(
+                f"unknown event name {name!r}; expected one of: {accepted}"
+            )
         ensure_callable("handler", handler)
         if is_async_callable(handler):
             raise InvalidRetryConfigError(

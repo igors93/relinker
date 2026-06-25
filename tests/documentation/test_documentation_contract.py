@@ -194,7 +194,7 @@ def test_release_checklist_allows_only_approved_public_api_additions() -> None:
 
     assert "Public API snapshots are unchanged." not in release
     assert (
-        "Public API snapshots match the explicitly approved release surface for 1.3.0." in release
+        "Public API snapshots match the explicitly approved release surface for 1.3.1." in release
     )
     assert "No unplanned public API additions or removals are present." in release
 
@@ -280,7 +280,7 @@ def test_compatibility_references_one_zero() -> None:
 def test_release_docs_contain_one_zero_checklist() -> None:
     release = (ROOT / "docs/maintainers/release.md").read_text(encoding="utf-8")
 
-    assert "1.3.0" in release
+    assert "1.3.1" in release
     assert "Checklist" in release
 
 

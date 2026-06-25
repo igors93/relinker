@@ -19,8 +19,8 @@ def test_version_sources_report_current_release() -> None:
     with (ROOT / "pyproject.toml").open("rb") as file:
         project_version = tomllib.load(file)["project"]["version"]
 
-    assert project_version == "1.3.0"
-    assert relinker.__version__ == "1.3.0"
+    assert project_version == "1.3.1"
+    assert relinker.__version__ == "1.3.1"
 
 
 def test_classifier_is_production_stable() -> None:
@@ -34,7 +34,7 @@ def test_classifier_is_production_stable() -> None:
 
 def test_changelog_has_dated_current_release_section() -> None:
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    pattern = re.compile(r"^## 1\.3\.0 - \d{4}-\d{2}-\d{2}$", re.MULTILINE)
+    pattern = re.compile(r"^## 1\.3\.1 - \d{4}-\d{2}-\d{2}$", re.MULTILINE)
     matches = pattern.findall(changelog)
 
     assert len(matches) == 1
@@ -42,13 +42,13 @@ def test_changelog_has_dated_current_release_section() -> None:
 
 def test_changelog_current_release_records_release_changes() -> None:
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    start = changelog.index("## 1.3.0")
-    end = changelog.index("## 1.2.0")
+    start = changelog.index("## 1.3.1")
+    end = changelog.index("## 1.3.0")
     block = changelog[start:end]
 
-    assert "PolicyWarning" in block
-    assert "complete" in block
-    assert "seeded_random_delay" in block
+    assert "giveup" in block
+    assert "on()" in block
+    assert "retry_after_delay" in block
 
 
 def test_readme_is_stable() -> None:
@@ -105,4 +105,4 @@ def test_wheel_validator_checks_version() -> None:
     content = (ROOT / "scripts/validate_installed_wheel.py").read_text(encoding="utf-8")
 
     assert "distribution_version" in content
-    assert "1.3.0" in content
+    assert "1.3.1" in content

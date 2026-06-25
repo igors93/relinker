@@ -8,6 +8,31 @@ the compatibility and deprecation policy documented in
 
 ## Unreleased
 
+## 1.3.1 - 2026-06-25
+
+### Fixed
+
+- `giveup` events for non-retryable errors now include `RetryState` in both the
+  sync and async executors. Previously, the `state` field was absent from these
+  events, leaving handlers unable to inspect attempt history or elapsed time on
+  final rejection.
+- `RetryPolicy.on()` now raises `InvalidRetryConfigError` immediately for unknown
+  event names, listing the accepted names in the error message. Previously, an
+  unrecognised name was silently accepted and the handler would never fire.
+- `RetryPolicy.simulate()` now validates each computed delay through
+  `ensure_resolved_delay`, catching delays outside runtime-safe bounds before they
+  are returned by the simulation. Previously, an invalid delay value could pass
+  through simulation without raising an error.
+- `retry_after_delay()` and `http_retry_policy()` now validate `default`,
+  `maximum`, `default_delay`, and `maximum_delay` with `ensure_safe_delay` at
+  configuration time, rejecting unsafe delay values before any request is made.
+
+### Changed
+
+- `RetryPolicy.simulate()` now uses the shared `ensure_positive_int` helper for
+  the `attempts` parameter, aligning the error message with the rest of the
+  validation layer.
+
 ## 1.3.0 - 2026-06-10
 
 ### Added

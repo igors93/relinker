@@ -21,7 +21,7 @@ from email.utils import mktime_tz, parsedate_tz
 from typing import TYPE_CHECKING, Any
 
 from relinker.exceptions import InvalidRetryConfigError
-from relinker.internal.validation import ensure_non_negative, ensure_positive_int
+from relinker.internal.validation import ensure_non_negative, ensure_positive_int, ensure_safe_delay
 from relinker.state import RetryState
 
 if TYPE_CHECKING:
@@ -104,19 +104,23 @@ def retry_after_delay(
     header is absent or unparseable, it returns default. The returned delay is
     never negative and is capped by maximum when provided.
     """
-    ensure_non_negative("default", default)
-    safe_default = float(default)
+    safe_default = ensure_safe_delay("default", default)
+    safe_maximum = None
     if maximum is not None:
-        ensure_non_negative("maximum", maximum)
+        safe_maximum = ensure_safe_delay("maximum", maximum)
 
     def delay(state: RetryState) -> float:
         header_value = _extract_retry_after_header(state.last_value)
         if header_value is not None:
-            resolved = parse_retry_after(header_value, default=safe_default)
+            resolved = parse_retry_after(
+                header_value,
+                default=safe_default,
+                maximum=safe_maximum if safe_maximum is not None else MAX_RETRY_AFTER_SECONDS,
+            )
         else:
             resolved = safe_default
-        if maximum is not None:
-            resolved = min(resolved, maximum)
+        if safe_maximum is not None:
+            resolved = min(resolved, safe_maximum)
         return max(0.0, resolved)
 
     return delay
@@ -141,9 +145,9 @@ def http_retry_policy(
     Otherwise it falls back to exponential backoff.
     """
     ensure_positive_int("attempts", attempts)
-    ensure_non_negative("default_delay", default_delay)
+    ensure_safe_delay("default_delay", default_delay)
     if maximum_delay is not None:
-        ensure_non_negative("maximum_delay", maximum_delay)
+        ensure_safe_delay("maximum_delay", maximum_delay)
     transport_exception_types = _normalize_transport_exceptions(transport_exceptions)
 
     from relinker.policy import RetryPolicy

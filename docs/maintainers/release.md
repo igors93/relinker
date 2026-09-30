@@ -89,13 +89,13 @@ Install the wheel in an isolated virtual environment and run the validator:
 python scripts/validate_installed_wheel.py
 ```
 
-## Checklist for 1.3.1
+## Checklist for 1.3.2
 
-- [ ] `pyproject.toml` reports `1.3.1`.
-- [ ] `relinker.__version__` reports `1.3.1`.
-- [ ] `CHANGELOG.md` contains a dated `1.3.1` section.
+- [ ] `pyproject.toml` reports `1.3.2`.
+- [ ] `relinker.__version__` reports `1.3.2`.
+- [ ] `CHANGELOG.md` contains a dated `1.3.2` section.
 - [ ] A new empty `Unreleased` section exists.
-- [ ] Public API snapshots match the explicitly approved release surface for 1.3.1.
+- [ ] Public API snapshots match the explicitly approved release surface for 1.3.2.
 - [ ] No unplanned public API additions or removals are present.
 - [ ] Ruff, mypy, tests, coverage, build, and Twine pass.
 - [ ] The installed wheel validator passes.

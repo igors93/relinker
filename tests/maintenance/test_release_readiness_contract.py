@@ -11,7 +11,7 @@ IGNORED_SCAN_PARTS = {".venv", ".git", "dist", "build"}
 def _unreleased_block() -> str:
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     start = changelog.index("## Unreleased")
-    end = changelog.index("## 1.3.1")
+    end = changelog.index("## 1.3.2")
     return changelog[start:end]
 
 
@@ -29,7 +29,7 @@ def test_changelog_has_unreleased_before_current_release() -> None:
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
 
     assert "## Unreleased" in changelog
-    assert changelog.index("## Unreleased") < changelog.index("## 1.3.1")
+    assert changelog.index("## Unreleased") < changelog.index("## 1.3.2")
 
 
 def test_changelog_one_two_records_released_changes() -> None:
@@ -57,7 +57,15 @@ def test_changelog_one_one_history_remains_present() -> None:
 def test_changelog_history_remains_present_once() -> None:
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
 
-    for heading in ("## 1.0.0", "## 0.8.0", "## 0.7.0", "## 0.6.1", "## 0.6.0", "## 0.4.0"):
+    for heading in (
+        "## 1.3.1",
+        "## 1.0.0",
+        "## 0.8.0",
+        "## 0.7.0",
+        "## 0.6.1",
+        "## 0.6.0",
+        "## 0.4.0",
+    ):
         assert changelog.count(heading) == 1
 
 

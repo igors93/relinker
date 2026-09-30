@@ -8,6 +8,8 @@ the compatibility and deprecation policy documented in
 
 ## Unreleased
 
+## 1.3.2 - 2026-09-30
+
 ### Fixed
 
 - Delays built by composition no longer fail mid-execution once they reach the

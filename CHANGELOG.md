@@ -61,6 +61,11 @@ the compatibility and deprecation policy documented in
   layout.
 - `scripts/lint.sh` runs the same checks as CI, and the installed-wheel
   validator rejects hidden files shipped inside the package.
+- Build and release tooling updated: hatchling 1.32.4 (build-system and hashed
+  backend lock, now kept in sync by a maintenance test, plus its new `tomlkit`
+  dependency in the lock), build 1.6.0,
+  twine 7.0.0, `actions/checkout` v7.0.1, `actions/setup-python` v7.0.0, and
+  `pypa/gh-action-pypi-publish` v1.14.1.
 
 ## 1.3.1 - 2026-06-25
 

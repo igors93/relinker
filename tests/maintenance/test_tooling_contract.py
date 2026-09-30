@@ -104,3 +104,15 @@ def test_wheel_validator_rejects_hidden_files(
 
 def test_wheel_validator_accepts_clean_package() -> None:
     _load_wheel_validator()._validate_package_contents()
+
+
+def test_build_system_hatchling_matches_hashed_backend_lock() -> None:
+    # Dependabot updates "/" (pyproject.toml) and "/requirements" separately, so
+    # a bump in one place can silently leave the other on an older backend.
+    with (ROOT / "pyproject.toml").open("rb") as file:
+        requires = tomllib.load(file)["build-system"]["requires"]
+    lock = (ROOT / "requirements" / "build-backend.txt").read_text(encoding="utf-8")
+    locked = re.search(r"^hatchling==(\S+)", lock, re.MULTILINE)
+
+    assert locked is not None, "hatchling must be pinned in requirements/build-backend.txt"
+    assert requires == [f"hatchling=={locked.group(1)}"]

@@ -21,6 +21,18 @@ def _assert_installed_distribution() -> None:
     )
 
 
+def _validate_package_contents() -> None:
+    package_root = Path(relinker.__file__).resolve().parent
+    hidden = sorted(
+        path.relative_to(package_root).as_posix()
+        for path in package_root.rglob("*")
+        if any(part.startswith(".") for part in path.relative_to(package_root).parts)
+    )
+
+    assert not hidden, f"hidden files were shipped inside the wheel: {hidden}"
+    assert (package_root / "py.typed").is_file(), "py.typed marker is missing"
+
+
 def _validate_public_api() -> None:
     for name in relinker.__all__:
         value: Any = getattr(relinker, name)
@@ -146,6 +158,7 @@ async def _validate_async_scenarios() -> None:
 
 def main() -> None:
     _assert_installed_distribution()
+    _validate_package_contents()
     _validate_public_api()
     _validate_sync_run()
     _validate_decorator()

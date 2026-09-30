@@ -2,24 +2,17 @@
 
 from __future__ import annotations
 
-import importlib
 from collections import deque
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from relinker.attempt import AttemptRecord
-from relinker.event import RetryEvent
+from relinker.internal.executor_flow import FinalDecision, RetryFlow
 from relinker.internal.exhaustion import finish_exhausted
-from relinker.internal.runtime import RetryRuntime
+from relinker.internal.retry_wait import RetryWaitPlan
 from relinker.result import RetryResult
 
 if TYPE_CHECKING:
     from relinker.policy import RetryPolicy
-
-
-def _context_now() -> float:
-    context = cast(Any, importlib.import_module("relinker.context"))
-
-    return cast(float, context.now())
 
 
 class _BaseRetryBlockIterator:
@@ -33,12 +26,7 @@ class _BaseRetryBlockIterator:
     ) -> None:
         self.policy = policy
         self.name = name
-        self._runtime = RetryRuntime(
-            function_name=name,
-            started_at=_context_now(),
-            history_limit=policy.history_limit,
-            policy_name=policy.name,
-        )
+        self._flow = RetryFlow(policy, function_name=name)
         self.finished = False
         self.result: RetryResult[Any] | None = None
         self.outcome: Any = None
@@ -46,61 +34,35 @@ class _BaseRetryBlockIterator:
 
     @property
     def started_at(self) -> float:
-        return self._runtime.started_at
+        return self._flow.runtime.started_at
 
     @property
     def attempts(self) -> deque[AttemptRecord]:
-        return self._runtime.attempts
+        return self._flow.runtime.attempts
 
     @property
     def attempt_number(self) -> int:
-        return self._runtime.attempt_number
+        return self._flow.runtime.attempt_number
 
     def _begin_attempt(self) -> int:
         """Start and return the next attempt number."""
-        return self._runtime.begin_attempt()
+        return self._flow.next_attempt()
 
-    def _apply_exhausted(
-        self,
-        result: RetryResult[Any],
-        current_error: BaseException | None,
-    ) -> bool:
+    def _finish(self, decision: FinalDecision, current_error: BaseException | None) -> bool:
+        """Store a terminal decision; return True when ``current_error`` is suppressed."""
+        self.finished = True
+        self.result = decision.result
+        if decision.kind != "exhaust":
+            return False
         try:
-            resolved = finish_exhausted(self.policy, result)
-            self.outcome = resolved
-            self.has_outcome = True
-            return current_error is not None
+            self.outcome = finish_exhausted(self.policy, decision.result)
         except BaseException as exc:
             if current_error is not None and exc is current_error:
+                # Let the original exception propagate from the with-block.
                 return False
             raise
-
-    def _emit_giveup(
-        self,
-        *,
-        attempt_number: int,
-        has_value: bool,
-        value: Any = None,
-        error: BaseException | None = None,
-        retry_cause: str,
-        will_stop: bool,
-    ) -> None:
-        self.policy.emit(
-            RetryEvent(
-                name="after_giveup",
-                attempt_number=attempt_number,
-                function_name=self.name,
-                value=value,
-                error=error,
-                state=self._runtime.state(
-                    last_value=value,
-                    last_error=error,
-                    has_value=has_value,
-                    retry_cause=retry_cause,
-                    will_stop=will_stop,
-                ),
-            )
-        )
+        self.has_outcome = True
+        return current_error is not None
 
 
 class _BaseRetryAttemptContext:
@@ -126,26 +88,16 @@ class _BaseRetryAttemptContext:
         self._result_value = value
         return value
 
-    def _apply_exhausted(
-        self,
-        result: RetryResult[Any],
-        current_error: BaseException | None,
-    ) -> bool:
-        return self.iterator._apply_exhausted(result, current_error)
+    def _enter(self) -> None:
+        flow = self.iterator._flow
+        flow.enter_attempt()
+        self.attempt_started_at = flow.attempt_started_at
 
-    def _giveup(
-        self,
-        *,
-        value: Any = None,
-        error: BaseException | None = None,
-        retry_cause: str,
-        will_stop: bool = True,
-    ) -> None:
-        self.iterator._emit_giveup(
-            attempt_number=self.number,
-            value=value,
-            error=error,
-            has_value=error is None and self._has_result,
-            retry_cause=retry_cause,
-            will_stop=will_stop,
-        )
+    def _decide(self, error: BaseException | None) -> RetryWaitPlan | FinalDecision | None:
+        """Return the decision for this attempt; None lets a BaseException propagate."""
+        flow = self.iterator._flow
+        if error is not None:
+            if not isinstance(error, Exception):
+                return None
+            return flow.after_exception(error)
+        return flow.after_value(self._result_value, has_value=self._has_result)

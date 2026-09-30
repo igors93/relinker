@@ -15,12 +15,11 @@ from __future__ import annotations
 from typing import Any
 
 from relinker.policy import RetryPolicy
-
-ExceptionTypes = tuple[type[BaseException], ...]
+from relinker.typing import ExceptionTypes
 
 
 def _exceptions_or_default(
-    exception_types: tuple[type[BaseException], ...],
+    exception_types: ExceptionTypes,
     default: ExceptionTypes,
 ) -> ExceptionTypes:
     """Return user-provided exception types or a preset default."""

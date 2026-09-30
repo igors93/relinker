@@ -165,7 +165,9 @@ def _report_isolated_event_failure(event: RetryEvent, error: Exception) -> None:
         )
 
 
-@dataclass(frozen=True, slots=True)
+# No slots=True: on some supported Python versions a frozen slotted dataclass
+# raises TypeError when typing sets __orig_class__, breaking RetryPolicy[T]() calls.
+@dataclass(frozen=True)
 class RetryPolicy(Generic[T]):
     """
     Immutable retry policy builder.
@@ -858,8 +860,11 @@ class RetryPolicy(Generic[T]):
         Simulate the delay timeline without executing user code.
 
         The simulation is advisory and deterministic for built-in delays.
-        Policies with CustomDelay or StatefulCustomDelay callbacks are not supported
-        because simulating them would execute user code.
+        Policies with CustomDelay or StatefulCustomDelay callbacks (including
+        subclasses and callbacks nested in composed delays) are not supported
+        because simulating them would execute user callbacks. A custom class
+        implementing the DelayStrategy protocol is called like a built-in
+        strategy, so its ``next_delay()`` should be free of side effects.
         """
         from relinker.internal.policy_simulation import simulate_policy
 

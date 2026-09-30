@@ -15,3 +15,4 @@ They use a simple format:
 - [003 — Shared retry runtime bookkeeping](003-shared-retry-runtime.md)
 - [004 — Focused context-manager package](004-context-package.md)
 - [005 — Process-local retry budgets](005-process-local-retry-budget.md)
+- [006 — Shared deterministic retry decisions](006-shared-retry-decisions.md)

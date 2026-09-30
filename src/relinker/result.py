@@ -6,15 +6,18 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from typing import Any, Generic, Literal, cast
+from typing import Any, Generic, cast
 
 from relinker.attempt import AttemptRecord
+from relinker.state import RetryCause
 from relinker.typing import T
 
-RetryCause = Literal["exception", "result"]
+__all__ = ["RetryCause", "RetryResult"]
 
 
-@dataclass(frozen=True, slots=True)
+# No slots=True: on some supported Python versions a frozen slotted dataclass
+# raises TypeError when typing sets __orig_class__, breaking RetryResult[T]() calls.
+@dataclass(frozen=True)
 class RetryResult(Generic[T]):
     """
     Final execution result.

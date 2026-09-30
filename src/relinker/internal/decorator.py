@@ -33,6 +33,8 @@ def make_decorated(
     """
     ensure_retryable_callable(function)
     stats = RetryStats()
+    # Policies are immutable, so the tracking copy is built once per decoration.
+    tracking_policy = policy.return_result()
 
     def with_policy(new_policy: RetryPolicy[Any]) -> Callable[..., Any]:
         return new_policy(function)
@@ -41,7 +43,6 @@ def make_decorated(
 
         @wraps(function)
         async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
-            tracking_policy = policy.return_result()
             result = await tracking_policy.run_async(function, *args, **kwargs)
             stats.record(result)
             return resolve_tracked_result(policy, result)
@@ -54,7 +55,6 @@ def make_decorated(
 
     @wraps(function)
     def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
-        tracking_policy = policy.return_result()
         result = tracking_policy.run(function, *args, **kwargs)
         stats.record(result)
         return resolve_tracked_result(policy, result)

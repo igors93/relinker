@@ -51,8 +51,5 @@ To run tests, linting, and type checks:
 pip install -e ".[dev]"
 ```
 
-Or install manually:
-
-```bash
-pip install pytest pytest-asyncio ruff mypy build
-```
+The `dev` extra pins the exact Ruff and mypy versions used by CI. Installing
+those tools separately can produce different formatting or type-check results.

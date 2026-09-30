@@ -34,6 +34,12 @@ exhaustion behavior without sleeping.
 Interrupted synchronous sleeps and canceled asynchronous sleeps also release an
 unused reservation before re-raising the interruption unchanged.
 
+The total wait never exceeds the operational delay ceiling of 86,400 seconds
+(one day). When the budget is so saturated that the next free slot is further
+away than that, Relinker releases the reservation and gives up with the
+configured exhaustion behavior. A saturated budget is an operational condition,
+so it never surfaces as `InvalidRetryConfigError`.
+
 ## Observability
 
 The existing `before_sleep` event remains the only sleep event. Its `delay` is

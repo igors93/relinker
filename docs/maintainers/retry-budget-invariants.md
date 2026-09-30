@@ -61,6 +61,13 @@ delay callbacks, or other externally supplied behavior.
 `snapshot()` fields (`active`, `queued`, `available`, and `next_available_in`)
 must come from the same protected view of one key's reservations.
 
+## B10: No reservation outlives an abandoned retry
+
+Every reservation created while planning a retry is either used by a sleep that
+starts or released. That includes a total wait above `MAX_SLEEP_SECONDS`
+(the execution gives up as exhausted) and any exception raised while planning
+after `_reserve()` returned.
+
 ## Test Strategy
 
 The permanent tests include:

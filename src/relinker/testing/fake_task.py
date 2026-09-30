@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Generic
 
+from relinker.exceptions import InvalidRetryConfigError
 from relinker.typing import T
 
 
@@ -37,8 +38,17 @@ class FailTimesBuilder:
 
 
 def fail_times(times: int, error: BaseException | None = None) -> FailTimesBuilder:
-    """Create a fake task builder."""
-    if times < 0:
-        msg = "times must be greater than or equal to 0"
-        raise ValueError(msg)
-    return FailTimesBuilder(times=times, error=error or RuntimeError("planned failure"))
+    """Create a fake task builder that raises ``error`` ``times`` times.
+
+    Raises InvalidRetryConfigError (a ValueError) when ``times`` is not a
+    non-negative integer or ``error`` is not an exception instance.
+    """
+    if isinstance(times, bool) or not isinstance(times, int) or times < 0:
+        raise InvalidRetryConfigError(f"times must be a non-negative integer, got {times!r}")
+    if error is None:
+        error = RuntimeError("planned failure")
+    elif not isinstance(error, BaseException):
+        raise InvalidRetryConfigError(
+            f"error must be an exception instance, got {type(error).__name__}"
+        )
+    return FailTimesBuilder(times=times, error=error)

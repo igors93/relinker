@@ -71,6 +71,16 @@ behavior.
 and context managers. RetryRuntime remains responsible for attempt history,
 counters, `RetryState`, and `RetryResult` construction.
 
+`internal/executor_flow.py` holds `RetryFlow`, the deterministic decision taken
+after each attempt: record it, emit events, decide retry or stop, plan the wait
+and budget reservation, and give up. Executors and context managers keep their
+own loops for calling, awaiting, and sleeping, and translate a final decision
+into their own outcome. See
+[ADR 006](decisions/006-shared-retry-decisions.md).
+
+Runtime code reads time through `relinker.internal.clock.now()`. Tests that need
+a fake clock patch that single function.
+
 ### Results and state
 
 `AttemptRecord`, `RetryState`, and `RetryResult` are immutable observable data.

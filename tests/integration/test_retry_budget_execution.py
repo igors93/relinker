@@ -24,15 +24,11 @@ class FakeClock:
 
 
 def patch_sync_clock(monkeypatch: pytest.MonkeyPatch, clock: FakeClock) -> None:
-    monkeypatch.setattr("relinker.executors.sync.now", clock.now)
-    monkeypatch.setattr("relinker.internal.executor_helpers.now", clock.now)
-    monkeypatch.setattr("relinker.internal.retry_wait.now", clock.now)
+    monkeypatch.setattr("relinker.internal.clock.now", clock.now)
 
 
 def patch_async_clock(monkeypatch: pytest.MonkeyPatch, clock: FakeClock) -> None:
-    monkeypatch.setattr("relinker.executors.async_.now", clock.now)
-    monkeypatch.setattr("relinker.internal.executor_helpers.now", clock.now)
-    monkeypatch.setattr("relinker.internal.retry_wait.now", clock.now)
+    monkeypatch.setattr("relinker.internal.clock.now", clock.now)
 
 
 def test_first_attempt_does_not_consume_budget(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -218,9 +214,7 @@ def test_sync_context_manager_uses_same_budget_wait(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     clock = FakeClock()
-    monkeypatch.setattr("relinker.context.now", clock.now)
-    monkeypatch.setattr("relinker.internal.executor_helpers.now", clock.now)
-    monkeypatch.setattr("relinker.internal.retry_wait.now", clock.now)
+    monkeypatch.setattr("relinker.internal.clock.now", clock.now)
     budget = RetryBudget(max_retries=1, per=10)
     sleeps: list[float] = []
 
@@ -251,9 +245,7 @@ async def test_async_context_manager_uses_same_budget_wait(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     clock = FakeClock()
-    monkeypatch.setattr("relinker.context.now", clock.now)
-    monkeypatch.setattr("relinker.internal.executor_helpers.now", clock.now)
-    monkeypatch.setattr("relinker.internal.retry_wait.now", clock.now)
+    monkeypatch.setattr("relinker.internal.clock.now", clock.now)
     budget = RetryBudget(max_retries=1, per=10)
     sleeps: list[float] = []
 
@@ -315,9 +307,7 @@ def test_sync_context_interrupted_sleep_releases_reservation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     clock = FakeClock()
-    monkeypatch.setattr("relinker.context.now", clock.now)
-    monkeypatch.setattr("relinker.internal.executor_helpers.now", clock.now)
-    monkeypatch.setattr("relinker.internal.retry_wait.now", clock.now)
+    monkeypatch.setattr("relinker.internal.clock.now", clock.now)
     budget = RetryBudget(max_retries=1, per=10)
 
     def interrupt(_: float) -> None:
@@ -343,9 +333,7 @@ async def test_async_context_canceled_sleep_releases_reservation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     clock = FakeClock()
-    monkeypatch.setattr("relinker.context.now", clock.now)
-    monkeypatch.setattr("relinker.internal.executor_helpers.now", clock.now)
-    monkeypatch.setattr("relinker.internal.retry_wait.now", clock.now)
+    monkeypatch.setattr("relinker.internal.clock.now", clock.now)
     budget = RetryBudget(max_retries=1, per=10)
 
     async def cancel(_: float) -> None:

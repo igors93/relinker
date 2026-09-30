@@ -81,6 +81,15 @@ This produces:
 - `dist/relinker-X.Y.Z.tar.gz` — source distribution
 - `dist/relinker-X.Y.Z-py3-none-any.whl` — wheel
 
+## Build backend and publish action compatibility
+
+`pypa/gh-action-pypi-publish` verifies metadata with its own bundled twine,
+not the version in `requirements/build-tools.txt`. When a hatchling upgrade
+raises the `Metadata-Version` of the built wheel, confirm the pinned publish
+action bundles a twine release that accepts it. For example, hatchling 1.32
+produces `Metadata-Version: 2.5`, which needs the action's twine 7
+(`v1.14.2` or later).
+
 ## Verify the build
 
 Install the wheel in an isolated virtual environment and run the validator:

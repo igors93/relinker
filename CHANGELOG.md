@@ -8,6 +8,12 @@ the compatibility and deprecation policy documented in
 
 ## Unreleased
 
+### Internal
+
+- Publishing uses `pypa/gh-action-pypi-publish` v1.14.2. v1.14.1 bundles
+  twine 6.1, which rejects the `Metadata-Version: 2.5` produced by hatchling
+  1.32 and stopped the 1.3.2 upload before anything reached PyPI.
+
 ## 1.3.2 - 2026-09-30
 
 ### Fixed

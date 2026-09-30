@@ -88,6 +88,28 @@ policy = RetryPolicy().attempts(3).with_sleep(
 )
 ```
 
+## Testing helpers
+
+`relinker.testing` provides small helpers for tests and examples:
+
+```python
+from relinker import RetryPolicy
+from relinker.testing import fail_times, no_sleep
+
+task = fail_times(2, ConnectionError("down")).then_return("ok")
+policy = RetryPolicy().attempts(3).on(ConnectionError).fixed_delay(10)
+
+with no_sleep(policy) as fast_policy:
+    assert fast_policy.run(task) == "ok"
+```
+
+- `fail_times(times, error)` builds a callable that raises `error` `times` times
+  and then returns the value given to `then_return()`.
+- `no_sleep(policy)` is a context manager that yields a copy of the policy with
+  sync and async sleep disabled.
+- `no_sleep_async(policy)` returns the same kind of copy without a `with` block.
+  Despite its name, it disables both sleepers.
+
 ## Test the policy, not only the function
 
 Use diagnostics in tests:

@@ -111,6 +111,19 @@ policy = RetryPolicy().fixed_delay(2).jitter(maximum=0.5, seed=1).for_testing()
 `doctor()` reports `seeded_random_delay` when a non-testing policy relies only
 on seeded random delays.
 
+## Operational delay ceiling
+
+Every delay that reaches the sleeper is at most 86,400 seconds (one day).
+
+- Values you configure explicitly, such as `fixed_delay()` or `maximum=`, are
+  rejected with `InvalidRetryConfigError` when they exceed the ceiling.
+- Derived values saturate at the ceiling instead: exponential or linear growth
+  without `maximum=`, and the sums produced by `jitter()` and `add_delay()`.
+  A long-running `forever()` policy with backoff and jitter keeps retrying once
+  the backoff reaches the ceiling.
+- Custom and state-aware callbacks that return a value above the ceiling, or a
+  negative, infinite, or NaN value, raise `InvalidRetryConfigError`.
+
 ## Custom delay
 
 ```python

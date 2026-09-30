@@ -141,31 +141,44 @@ def test_valid_simulated_delay_succeeds() -> None:
     assert "86400" in prev
 
 
-def test_invalid_composite_delay_raises_in_simulation() -> None:
-    # An additive delay resulting in 90_000s (> 86_400s) should raise InvalidRetryConfigError
+def test_composite_delay_above_ceiling_saturates_in_simulation() -> None:
+    # An additive delay summing to 90_000s (> 86_400s) is a derived value, so it
+    # saturates at the operational ceiling like an unbounded exponential backoff.
     policy = RetryPolicy().attempts(2).fixed_delay(80_000).add_delay(FixedDelay(10_000))
+
+    simulation = policy.simulate(attempts=2)
+
+    assert simulation.attempts[0].delay_before_next_attempt == 86_400.0
+    assert "86400" in policy.preview(attempts=2)
+
+
+def test_composite_delay_above_ceiling_saturates_in_runtime() -> None:
+    sleeps: list[float] = []
+    policy = (
+        RetryPolicy()
+        .attempts(2)
+        .fixed_delay(80_000)
+        .add_delay(FixedDelay(10_000))
+        .with_sleep(sleeps.append)
+    )
+
+    def fail():
+        raise TimeoutError("boom")
+
+    with pytest.raises(TimeoutError, match="boom"):
+        policy.run(fail)
+    assert sleeps == [86_400.0]
+
+
+def test_composite_delay_still_rejects_invalid_component() -> None:
+    class NegativeDelay:
+        def next_delay(self, attempt_number: int) -> float:
+            return -1.0
+
+    policy = RetryPolicy().attempts(2).fixed_delay(5).add_delay(NegativeDelay())
 
     with pytest.raises(
         InvalidRetryConfigError,
         match="resolved delay must be a finite non-negative number not exceeding 86400",
     ):
         policy.simulate(attempts=2)
-
-    with pytest.raises(
-        InvalidRetryConfigError,
-        match="resolved delay must be a finite non-negative number not exceeding 86400",
-    ):
-        policy.preview(attempts=2)
-
-
-def test_invalid_composite_delay_raises_in_runtime() -> None:
-    policy = RetryPolicy().attempts(2).fixed_delay(80_000).add_delay(FixedDelay(10_000))
-
-    def fail():
-        raise TimeoutError("boom")
-
-    with pytest.raises(
-        InvalidRetryConfigError,
-        match="resolved delay must be a finite non-negative number not exceeding 86400",
-    ):
-        policy.run(fail)

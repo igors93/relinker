@@ -10,6 +10,9 @@ from __future__ import annotations
 
 from typing import Any, cast
 
+from relinker.delays.composite import AdditiveDelay
+from relinker.delays.custom import CustomDelay
+from relinker.delays.stateful import StatefulCustomDelay
 from relinker.diagnostics import RetryLoadEstimate, RetrySimulation, RetrySimulationAttempt
 from relinker.exceptions import InvalidRetryConfigError
 from relinker.internal.validation import ensure_positive_int, ensure_resolved_delay
@@ -31,15 +34,17 @@ def _class_name(value: object) -> str:
 
 
 def _has_user_callback(strategy: Any) -> bool:
-    """Return True when any delay strategy node contains a user callback."""
+    """Return True when any delay strategy node wraps a user callback.
+
+    Uses isinstance so subclasses of the callback strategies are detected too.
+    """
     stack = [strategy]
     while stack:
         current = stack.pop()
-        if _class_name(current) in {"CustomDelay", "StatefulCustomDelay"}:
+        if isinstance(current, (CustomDelay, StatefulCustomDelay)):
             return True
-        strategies = getattr(current, "strategies", None)
-        if strategies:
-            stack.extend(strategies)
+        if isinstance(current, AdditiveDelay):
+            stack.extend(current.strategies)
     return False
 
 

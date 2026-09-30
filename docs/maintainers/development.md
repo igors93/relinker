@@ -17,6 +17,17 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 ```
 
+## Tool versions
+
+Ruff and mypy change their output between releases, so the `dev` extra pins
+them exactly (`==`), and `.pre-commit-config.yaml` uses the same Ruff version.
+Dependabot's `python-dev-tools` group proposes upgrades, and CI validates them
+before they land. `tests/maintenance/test_tooling_contract.py` keeps the pins
+exact and in sync.
+
+Ruff does not format Markdown files (`extend-exclude = ["*.md"]`), so
+documentation examples keep their hand-formatted builder chains.
+
 ## Run all checks locally
 
 ```bash

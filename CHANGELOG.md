@@ -8,6 +8,60 @@ the compatibility and deprecation policy documented in
 
 ## Unreleased
 
+### Fixed
+
+- Delays built by composition no longer fail mid-execution once they reach the
+  86,400-second operational ceiling. Previously,
+  `forever().exponential_delay(...).jitter(...)` raised
+  `InvalidRetryConfigError` on attempt 18 (about 36 hours in), even with
+  `maximum=86400`, because jitter was added on top of the saturated backoff.
+  Sums from `jitter()` and `add_delay()`, and `linear_delay()` without
+  `maximum=`, now saturate at the ceiling like `exponential_delay()` already
+  did. Each component delay is still validated: a negative, infinite, NaN, or
+  above-ceiling component still raises `InvalidRetryConfigError`.
+- A saturated `RetryBudget` no longer leaks reservations or raises a
+  configuration error. When the next free slot is more than 86,400 seconds away,
+  Relinker releases the reservation and gives up with the configured exhaustion
+  behavior. Previously each such execution raised `InvalidRetryConfigError` and
+  left a queued reservation behind, pushing the next free slot further out.
+  A reservation is now also released if planning fails after reserving.
+- `parse_retry_after()` accepts only ASCII delay-seconds (RFC 9110). Headers
+  such as `--5` or `²` previously made it raise `ValueError`, which crashed
+  `http_retry_policy()` instead of falling back to the default delay.
+- `RetryPolicy[str]()` and `RetryResult[str](...)` no longer raise `TypeError`
+  on Python 3.10. Frozen dataclasses declared with `slots=True` broke the
+  `__orig_class__` assignment made by `typing`; both classes are now frozen
+  without slots.
+- `RetryPolicy.simulate()` detects subclasses of `CustomDelay` and
+  `StatefulCustomDelay`. Detection previously compared class names, so a
+  subclass had its callback executed during simulation.
+- The published wheel no longer contains a stale `.github/workflows/ci.yml`
+  inside the `relinker` package.
+
+### Changed
+
+- `relinker.testing.fail_times()` raises `InvalidRetryConfigError` (still a
+  `ValueError`) for invalid `times` values, and also rejects booleans,
+  non-integers, and non-exception `error` values. The `no_sleep_async()`
+  docstring now states that it disables both sync and async sleep.
+
+### Internal
+
+- Executors and retry-block context managers share one implementation of the
+  post-attempt retry decisions (`internal/executor_flow.py`, ADR 006) instead of
+  four copies. Runtime code reads time through `relinker.internal.clock.now()`,
+  the single patch point for fake clocks in tests.
+- Decorated functions build their result-tracking policy once at decoration
+  time instead of on every call, and event state snapshots are built only when
+  a handler observes the event.
+- Ruff and mypy are pinned exactly in the `dev` extra, and the pre-commit hook
+  uses the same Ruff version. Lower-bound-only pins let Ruff 0.16 start
+  formatting Markdown and broke CI's formatting step for every pull request.
+  Ruff no longer formats Markdown files, so documentation examples keep their
+  layout.
+- `scripts/lint.sh` runs the same checks as CI, and the installed-wheel
+  validator rejects hidden files shipped inside the package.
+
 ## 1.3.1 - 2026-06-25
 
 ### Fixed

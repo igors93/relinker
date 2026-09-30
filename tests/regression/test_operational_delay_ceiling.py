@@ -525,7 +525,7 @@ class TestIntegrationSleeperReceivesSafeValues:
             policy.run(self._make_failing())
         assert sleeps == []
 
-    def test_additive_delay_sum_above_ceiling_does_not_reach_sleeper(self) -> None:
+    def test_additive_delay_sum_above_ceiling_saturates_at_ceiling(self) -> None:
         sleeps, sleeper = _recording_sleeper()
         # Two valid halves that sum above ceiling
         half = MAX_SLEEP_SECONDS / 2.0 + 1.0
@@ -537,12 +537,11 @@ class TestIntegrationSleeperReceivesSafeValues:
             .add_delay(FixedDelay(half))
             .with_sleep(sleeper)
         )
-        # half individually is <= MAX, but sum exceeds it
-        # Whether this is caught depends on the additive sum validation
-        # The sum reaches ensure_resolved_delay which must reject it
-        with pytest.raises(InvalidRetryConfigError):
+        # Each configured value is valid; the sum is derived, so it saturates
+        # like an unbounded exponential backoff instead of failing mid-run.
+        with pytest.raises(ValueError, match="fail-2"):
             policy.run(self._make_failing())
-        assert sleeps == []
+        assert sleeps == [MAX_SLEEP_SECONDS]
 
     async def test_async_fixed_delay_safe_value_reaches_sleeper(self) -> None:
         sleeps: list[float] = []

@@ -64,22 +64,16 @@ def collect_all_events(
 def patch_sync_clock(monkeypatch: pytest.MonkeyPatch, clock: FakeClock) -> None:
     """Patch all synchronous runtime clock readers used by retry execution."""
 
-    monkeypatch.setattr("relinker.executors.sync.now", clock.now)
-    monkeypatch.setattr("relinker.internal.executor_helpers.now", clock.now)
-    monkeypatch.setattr("relinker.internal.retry_wait.now", clock.now)
+    monkeypatch.setattr("relinker.internal.clock.now", clock.now)
 
 
 def patch_async_clock(monkeypatch: pytest.MonkeyPatch, clock: FakeClock) -> None:
     """Patch all asynchronous runtime clock readers used by retry execution."""
 
-    monkeypatch.setattr("relinker.executors.async_.now", clock.now)
-    monkeypatch.setattr("relinker.internal.executor_helpers.now", clock.now)
-    monkeypatch.setattr("relinker.internal.retry_wait.now", clock.now)
+    monkeypatch.setattr("relinker.internal.clock.now", clock.now)
 
 
 def patch_context_clock(monkeypatch: pytest.MonkeyPatch, clock: FakeClock) -> None:
     """Patch all context-manager clock readers used by retry execution."""
 
-    monkeypatch.setattr("relinker.context.now", clock.now)
-    monkeypatch.setattr("relinker.internal.executor_helpers.now", clock.now)
-    monkeypatch.setattr("relinker.internal.retry_wait.now", clock.now)
+    monkeypatch.setattr("relinker.internal.clock.now", clock.now)

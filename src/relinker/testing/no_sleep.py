@@ -29,5 +29,10 @@ def no_sleep(policy: RetryPolicy[Any]) -> Iterator[RetryPolicy[Any]]:
 
 
 def no_sleep_async(policy: RetryPolicy[Any]) -> RetryPolicy[Any]:
-    """Return a copy of the policy with async sleep disabled."""
+    """Return a copy of the policy with sync and async sleep disabled.
+
+    This is the plain-function form of ``no_sleep()``, convenient inside async
+    tests. Despite its name it disables both sleepers, so a policy shared by
+    sync and async code paths never sleeps in tests.
+    """
     return policy.with_sleep(_do_not_sleep, _do_not_sleep_async)

@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from typing import Any
 
 from relinker.attempt import AttemptRecord
-from relinker.internal.clock import now
+from relinker.internal import clock
 from relinker.state import RetryCause, RetryState
 
 
@@ -49,7 +49,7 @@ def build_state(
         function_name=function_name,
         attempt_number=attempt_number,
         started_at=started_at,
-        elapsed=now() - started_at,
+        elapsed=clock.now() - started_at,
         attempts=tuple(attempts),
         last_value=last_value,
         last_error=last_error,

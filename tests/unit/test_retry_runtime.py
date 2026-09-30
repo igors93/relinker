@@ -97,9 +97,9 @@ def test_limited_history_keeps_complete_totals() -> None:
 
 
 def test_state_builds_snapshot_from_runtime(monkeypatch) -> None:
-    import relinker.internal.executor_helpers as executor_helpers
+    import relinker.internal.clock as clock
 
-    monkeypatch.setattr(executor_helpers, "now", lambda: 15.0)
+    monkeypatch.setattr(clock, "now", lambda: 15.0)
     runtime = RetryRuntime(function_name="task", started_at=10.0, history_limit=3)
     error = RuntimeError("boom")
     runtime.begin_attempt()

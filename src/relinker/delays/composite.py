@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from relinker.delays.base import DelayMixin, DelayStrategy
+from relinker.internal.validation import MAX_SLEEP_SECONDS, ensure_resolved_delay
 
 if TYPE_CHECKING:
     from relinker.state import RetryState
@@ -13,7 +14,13 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True, slots=True)
 class AdditiveDelay(DelayMixin):
-    """A delay strategy that sums multiple delay strategies."""
+    """A delay strategy that sums multiple delay strategies.
+
+    Each component delay is validated on its own. The sum is a derived value,
+    so it saturates at MAX_SLEEP_SECONDS instead of failing at runtime: adding
+    jitter to an exponential backoff that already reached the ceiling keeps
+    sleeping for the ceiling.
+    """
 
     strategies: tuple[DelayStrategy, ...]
 
@@ -45,7 +52,7 @@ def _resolve_additive_tree(
             resolved_child = None
 
         if frame.index >= len(frame.delay.strategies):
-            resolved_child = sum(frame.values)
+            resolved_child = min(sum(frame.values), MAX_SLEEP_SECONDS)
             frames.pop()
             continue
 
@@ -55,9 +62,9 @@ def _resolve_additive_tree(
         if isinstance(strategy, AdditiveDelay):
             frames.append(_AdditiveDelayFrame(delay=strategy))
         elif isinstance(strategy, StatefulCustomDelay) and state is not None:
-            frame.values.append(strategy.next_delay_with_state(state))
+            frame.values.append(ensure_resolved_delay(strategy.next_delay_with_state(state)))
         else:
-            frame.values.append(strategy.next_delay(attempt_number))
+            frame.values.append(ensure_resolved_delay(strategy.next_delay(attempt_number)))
 
     if resolved_child is None:  # Defensive guard; the root frame always resolves.
         return 0.0

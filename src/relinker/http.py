@@ -15,6 +15,7 @@ Idempotency note:
 
 from __future__ import annotations
 
+import re
 import time
 from collections.abc import Callable, Iterable
 from email.utils import mktime_tz, parsedate_tz
@@ -34,6 +35,10 @@ DEFAULT_RETRYABLE_TRANSPORT_EXCEPTIONS = (
     OSError,
 )
 _MAX_RETRY_AFTER_HEADER_LENGTH = 256
+# RFC 9110 delay-seconds is 1*DIGIT with ASCII digits only. str.isdigit() also
+# accepts characters such as "²" that int() rejects, so match explicitly. A
+# leading "-" is accepted here only so negative values fall back to default.
+_DELAY_SECONDS = re.compile(r"-?[0-9]+")
 MAX_RETRY_AFTER_SECONDS = 86400.0
 
 
@@ -215,7 +220,7 @@ def parse_retry_after(
     if not stripped or len(stripped) > _MAX_RETRY_AFTER_HEADER_LENGTH:
         return safe_default
 
-    if stripped.lstrip("-").isdigit():
+    if _DELAY_SECONDS.fullmatch(stripped):
         raw = int(stripped)
         if raw < 0:
             return safe_default

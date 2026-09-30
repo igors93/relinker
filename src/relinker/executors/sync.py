@@ -5,15 +5,16 @@ from __future__ import annotations
 import inspect
 from typing import TYPE_CHECKING, Any
 
-from relinker.delays.stateful import delay_needs_state
-from relinker.event import RetryEvent
-from relinker.exceptions import InvalidRetryConfigError, TryAgain
-from relinker.internal.clock import now
-from relinker.internal.executor_flow import record_failure_and_emit, state_with_wait_plan
+from relinker.exceptions import InvalidRetryConfigError
+from relinker.internal.executor_flow import FinalDecision, RetryFlow
 from relinker.internal.executor_helpers import function_name as _function_name
-from relinker.internal.exhaustion import finish_exhausted, should_stop_before_sleep
-from relinker.internal.retry_wait import plan_retry_wait, release_retry_wait
-from relinker.internal.runtime import RetryRuntime
+from relinker.internal.exhaustion import finish_exhausted
+from relinker.internal.retry_wait import RetryWaitPlan, release_retry_wait
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from relinker.policy import RetryPolicy
 
 
 def _invoke_sync_sleep(sleep_fn: Any, seconds: float) -> None:
@@ -27,10 +28,13 @@ def _invoke_sync_sleep(sleep_fn: Any, seconds: float) -> None:
         )
 
 
-if TYPE_CHECKING:
-    from collections.abc import Callable
-
-    from relinker.policy import RetryPolicy
+def sleep_before_retry(policy: RetryPolicy[Any], plan: RetryWaitPlan) -> None:
+    """Sleep for ``plan`` and release its budget reservation if sleeping fails."""
+    try:
+        _invoke_sync_sleep(policy.sleep, plan.total_delay)
+    except BaseException:
+        release_retry_wait(plan)
+        raise
 
 
 def execute_sync(
@@ -40,327 +44,29 @@ def execute_sync(
     **kwargs: Any,
 ) -> Any:
     """Execute a synchronous function using a ``RetryPolicy``."""
-    runtime = RetryRuntime(
-        function_name=_function_name(function),
-        started_at=now(),
-        history_limit=policy.history_limit,
-        policy_name=policy.name,
-    )
+    flow = RetryFlow(policy, function_name=_function_name(function))
 
     while True:
-        attempt_number = runtime.begin_attempt()
-        policy.emit(
-            RetryEvent(
-                name="before_attempt",
-                attempt_number=attempt_number,
-                function_name=runtime.function_name,
-                state=runtime.state() if policy._has_handler("before_attempt") else None,
-            )
-        )
-        attempt_started_at = now()
-        error: Exception
+        flow.next_attempt()
+        flow.enter_attempt()
+        decision: RetryWaitPlan | FinalDecision
 
         try:
             value = function(*args, **kwargs)
-        except TryAgain as caught_error:
-            error = caught_error
-            should_retry = True
-        except Exception as caught_error:
-            error = caught_error
-            should_retry = policy.condition.should_retry_exception(error)
+        except Exception as error:
+            decision = flow.after_exception(error)
         else:
-            attempt_ended_at = now()
-            runtime.record_success(
-                started_at=attempt_started_at,
-                ended_at=attempt_ended_at,
-                value=value,
-                has_value=True,
-            )
-            should_retry_result = policy.condition.should_retry_result(value)
-            elapsed = attempt_ended_at - runtime.started_at
-            should_stop = policy.stop_strategy.should_stop(attempt_number, elapsed)
+            decision = flow.after_value(value)
 
-            if not should_retry_result:
-                result = runtime.result(
-                    ended_at=now(),
-                    value=value,
-                )
-                policy.emit(
-                    RetryEvent(
-                        name="after_success",
-                        attempt_number=attempt_number,
-                        function_name=runtime.function_name,
-                        value=value,
-                        state=runtime.state(
-                            last_value=value,
-                            has_value=True,
-                        ),
-                    )
-                )
-                return result if policy.should_return_result else value
-
-            if should_stop:
-                result = runtime.result(
-                    ended_at=now(),
-                    value=value,
-                    exhausted=True,
-                    retry_cause="result",
-                )
-                policy.emit(
-                    RetryEvent(
-                        name="after_giveup",
-                        attempt_number=attempt_number,
-                        function_name=runtime.function_name,
-                        value=value,
-                        state=runtime.state(
-                            last_value=value,
-                            has_value=True,
-                            retry_cause="result",
-                            will_stop=True,
-                        ),
-                    )
-                )
-                return finish_exhausted(policy, result)
-
-            needs_state = delay_needs_state(policy.delay_strategy) or policy._has_handler(
-                "before_sleep"
-            )
-            pre_sleep_state = (
-                runtime.state(
-                    last_value=value,
-                    has_value=True,
-                    retry_cause="result",
-                    will_retry=True,
-                )
-                if needs_state
-                else None
-            )
-            plan = plan_retry_wait(policy, attempt_number, pre_sleep_state)
-            if should_stop_before_sleep(
-                policy.stop_strategy,
-                attempt_number,
-                now() - runtime.started_at,
-                plan.total_delay,
-            ):
-                release_retry_wait(plan)
-                result = runtime.result(
-                    ended_at=now(),
-                    value=value,
-                    exhausted=True,
-                    retry_cause="result",
-                )
-                policy.emit(
-                    RetryEvent(
-                        name="after_giveup",
-                        attempt_number=attempt_number,
-                        function_name=runtime.function_name,
-                        value=value,
-                        state=runtime.state(
-                            last_value=value,
-                            has_value=True,
-                            retry_cause="result",
-                            will_stop=True,
-                        ),
-                    )
-                )
-                return finish_exhausted(policy, result)
-
-            try:
-                policy.emit(
-                    RetryEvent(
-                        name="before_sleep",
-                        attempt_number=attempt_number,
-                        function_name=runtime.function_name,
-                        delay=plan.total_delay,
-                        value=value,
-                        state=state_with_wait_plan(pre_sleep_state, plan)
-                        if pre_sleep_state is not None
-                        else None,
-                    )
-                )
-            except BaseException:
-                release_retry_wait(plan)
-                raise
-
-            if should_stop_before_sleep(
-                policy.stop_strategy,
-                attempt_number,
-                now() - runtime.started_at,
-                plan.total_delay,
-            ):
-                release_retry_wait(plan)
-                result = runtime.result(
-                    ended_at=now(),
-                    value=value,
-                    exhausted=True,
-                    retry_cause="result",
-                )
-                policy.emit(
-                    RetryEvent(
-                        name="after_giveup",
-                        attempt_number=attempt_number,
-                        function_name=runtime.function_name,
-                        value=value,
-                        state=runtime.state(
-                            last_value=value,
-                            has_value=True,
-                            retry_cause="result",
-                            will_stop=True,
-                        ),
-                    )
-                )
-                return finish_exhausted(policy, result)
-
-            try:
-                _invoke_sync_sleep(policy.sleep, plan.total_delay)
-            except BaseException:
-                release_retry_wait(plan)
-                raise
+        if isinstance(decision, RetryWaitPlan):
+            sleep_before_retry(policy, decision)
             continue
 
-        attempt_ended_at = now()
-        should_stop = record_failure_and_emit(
-            policy,
-            runtime,
-            attempt_started_at=attempt_started_at,
-            attempt_ended_at=attempt_ended_at,
-            error=error,
-            should_retry=should_retry,
-        )
-
-        if not should_retry:
-            result = runtime.result(
-                ended_at=now(),
-                error=error,
-            )
-            policy.emit(
-                RetryEvent(
-                    name="after_giveup",
-                    attempt_number=attempt_number,
-                    function_name=runtime.function_name,
-                    error=error,
-                    state=runtime.state(
-                        last_error=error,
-                        retry_cause="exception",
-                        will_retry=False,
-                        will_stop=False,
-                    ),
-                )
-            )
-            if policy.should_return_result:
-                return result
-            raise error
-
-        if should_stop:
-            result = runtime.result(
-                ended_at=now(),
-                error=error,
-                exhausted=True,
-                retry_cause="exception",
-            )
-            policy.emit(
-                RetryEvent(
-                    name="after_giveup",
-                    attempt_number=attempt_number,
-                    function_name=runtime.function_name,
-                    error=error,
-                    state=runtime.state(
-                        last_error=error,
-                        retry_cause="exception",
-                        will_stop=True,
-                    ),
-                )
-            )
+        result = decision.result
+        if decision.kind == "exhaust":
             return finish_exhausted(policy, result)
-
-        needs_state = delay_needs_state(policy.delay_strategy) or policy._has_handler(
-            "before_sleep"
-        )
-        pre_sleep_state = (
-            runtime.state(
-                last_error=error,
-                retry_cause="exception",
-                will_retry=True,
-            )
-            if needs_state
-            else None
-        )
-        plan = plan_retry_wait(policy, attempt_number, pre_sleep_state)
-        if should_stop_before_sleep(
-            policy.stop_strategy,
-            attempt_number,
-            now() - runtime.started_at,
-            plan.total_delay,
-        ):
-            release_retry_wait(plan)
-            result = runtime.result(
-                ended_at=now(),
-                error=error,
-                exhausted=True,
-                retry_cause="exception",
-            )
-            policy.emit(
-                RetryEvent(
-                    name="after_giveup",
-                    attempt_number=attempt_number,
-                    function_name=runtime.function_name,
-                    error=error,
-                    state=runtime.state(
-                        last_error=error,
-                        retry_cause="exception",
-                        will_stop=True,
-                    ),
-                )
-            )
-            return finish_exhausted(policy, result)
-
-        try:
-            policy.emit(
-                RetryEvent(
-                    name="before_sleep",
-                    attempt_number=attempt_number,
-                    function_name=runtime.function_name,
-                    delay=plan.total_delay,
-                    error=error,
-                    state=state_with_wait_plan(pre_sleep_state, plan)
-                    if pre_sleep_state is not None
-                    else None,
-                )
-            )
-        except BaseException:
-            release_retry_wait(plan)
-            raise
-
-        if should_stop_before_sleep(
-            policy.stop_strategy,
-            attempt_number,
-            now() - runtime.started_at,
-            plan.total_delay,
-        ):
-            release_retry_wait(plan)
-            result = runtime.result(
-                ended_at=now(),
-                error=error,
-                exhausted=True,
-                retry_cause="exception",
-            )
-            policy.emit(
-                RetryEvent(
-                    name="after_giveup",
-                    attempt_number=attempt_number,
-                    function_name=runtime.function_name,
-                    error=error,
-                    state=runtime.state(
-                        last_error=error,
-                        retry_cause="exception",
-                        will_stop=True,
-                    ),
-                )
-            )
-            return finish_exhausted(policy, result)
-
-        try:
-            _invoke_sync_sleep(policy.sleep, plan.total_delay)
-        except BaseException:
-            release_retry_wait(plan)
-            raise
+        if policy.should_return_result:
+            return result
+        if decision.kind == "reject" and result.error is not None:
+            raise result.error
+        return result.value

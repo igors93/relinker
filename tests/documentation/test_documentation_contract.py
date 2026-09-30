@@ -308,6 +308,7 @@ def test_architectural_decision_records_have_required_sections() -> None:
         "docs/maintainers/decisions/003-shared-retry-runtime.md",
         "docs/maintainers/decisions/004-context-package.md",
         "docs/maintainers/decisions/005-process-local-retry-budget.md",
+        "docs/maintainers/decisions/006-shared-retry-decisions.md",
     )
 
     for relative_path in decision_files:
